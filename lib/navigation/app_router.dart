@@ -110,9 +110,9 @@ class AppRouter {
     // Redirect logic
     redirect: (context, state) {
       final isLoggedIn = authService.isLoggedIn;
-      final isOnLoginPage = state.location == '/login';
-      final isOnRegisterPage = state.location == '/register';
-      final isOnSplashPage = state.location == '/';
+      final isOnLoginPage = state.matchedLocation == '/login';
+      final isOnRegisterPage = state.matchedLocation == '/register';
+      final isOnSplashPage = state.matchedLocation == '/';
       
       // If not logged in and not on auth pages, go to login
       if (!isLoggedIn && !isOnLoginPage && !isOnRegisterPage && !isOnSplashPage) {

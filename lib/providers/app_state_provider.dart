@@ -3,10 +3,12 @@ import 'package:flutter/material.dart';
 import 'package:lol_custom_game_manager/models/models.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
 import 'package:lol_custom_game_manager/services/firebase_service.dart';
+import 'package:lol_custom_game_manager/services/cloud_functions_service.dart';
 
 class AppStateProvider extends ChangeNotifier {
   final AuthService _authService;
   final FirebaseService _firebaseService;
+  final CloudFunctionsService _cloudFunctionsService;
   
   UserModel? _currentUser;
   bool _isLoading = false;
@@ -14,11 +16,13 @@ class AppStateProvider extends ChangeNotifier {
   
   // Constructor
   AppStateProvider({
-    required AuthService authService,
-    required FirebaseService firebaseService,
+    AuthService? authService,
+    FirebaseService? firebaseService,
+    CloudFunctionsService? cloudFunctionsService,
   }) : 
-    _authService = authService,
-    _firebaseService = firebaseService {
+    _authService = authService ?? AuthService(),
+    _firebaseService = firebaseService ?? FirebaseService(),
+    _cloudFunctionsService = cloudFunctionsService ?? CloudFunctionsService() {
     _initializeApp();
   }
   
@@ -27,6 +31,9 @@ class AppStateProvider extends ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _authService.isLoggedIn;
+
+  // Expose services for direct access when needed
+  CloudFunctionsService get cloudFunctionsService => _cloudFunctionsService;
   
   // Initialize app state
   Future<void> _initializeApp() async {
@@ -185,6 +192,20 @@ class AppStateProvider extends ChangeNotifier {
       );
       
       String id = await _firebaseService.createTournament(tournament);
+      
+      // Notify potential participants about new tournament (if we're premium)
+      if (premiumBadge && _currentUser!.isPremium) {
+        try {
+          await _cloudFunctionsService.notifyTournamentParticipants(
+            tournamentId: id,
+            message: '새로운 내전이 생성되었습니다: ${_currentUser!.nickname}님의 내전',
+          );
+        } catch (e) {
+          // Non-critical error, just log it
+          print('Failed to send notifications: $e');
+        }
+      }
+      
       return id;
     } catch (e) {
       _setError('Failed to create tournament: $e');
@@ -216,13 +237,57 @@ class AppStateProvider extends ChangeNotifier {
         userOvr: null,  // TODO: Get user OVR for this role if available
         appliedAt: Timestamp.now(),
         message: message,
+        status: ApplicationStatus.pending,
       );
       
       await _firebaseService.applyToTournament(application);
+      
+      // Process application through cloud function (will handle notifications)
+      try {
+        await _cloudFunctionsService.processTournamentApplication(
+          tournamentId: tournamentId,
+          userId: _currentUser!.uid,
+          role: role,
+        );
+      } catch (e) {
+        // Non-critical error, just log it
+        print('Failed to process application: $e');
+      }
+      
       return true;
     } catch (e) {
       _setError('Failed to apply to tournament: $e');
       return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // Create chat room with notifications
+  Future<String?> createChatRoom({
+    required String targetUserId,
+    required String title,
+    required ChatRoomType type,
+    String? initialMessage,
+  }) async {
+    if (_currentUser == null) return null;
+    
+    _setLoading(true);
+    _clearError();
+    
+    try {
+      // Create chat room and send notification using cloud function
+      final chatRoomId = await _cloudFunctionsService.createChatRoomWithNotification(
+        participantIds: [_currentUser!.uid, targetUserId],
+        title: title,
+        type: type,
+        initialMessage: initialMessage,
+      );
+      
+      return chatRoomId;
+    } catch (e) {
+      _setError('Failed to create chat room: $e');
+      return null;
     } finally {
       _setLoading(false);
     }
@@ -254,6 +319,7 @@ class AppStateProvider extends ChangeNotifier {
         description: description,
         createdAt: Timestamp.now(),
         lastActiveAt: Timestamp.now(),
+        averageRating: _currentUser!.averageRating ?? 0.0,
       );
       
       await _firebaseService.createMercenaryProfile(mercenary);

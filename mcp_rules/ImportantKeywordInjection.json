@@ -1,0 +1,15 @@
+{
+  "name": "ImportantKeywordInjection",
+  "description": "Injects sequential thinking and context7 contexts when user message contains !중요",
+  "trigger": {
+    "type": "message_contains",
+    "pattern": "!중요"
+  },
+  "action": {
+    "type": "inject_contexts",
+    "contexts": [
+      "server-sequential-thinking",
+      "context7"
+    ]
+  }
+} 
