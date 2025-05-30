@@ -1,3 +1,5 @@
+import 'dart:typed_data';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
@@ -290,7 +292,7 @@ class FirebaseService {
   }
 
   // Storage methods
-  Future<String> uploadImage(String path, List<int> bytes) async {
+  Future<String> uploadImage(String path, Uint8List bytes) async {
     try {
       final ref = _storage.ref().child(path);
       await ref.putData(bytes);

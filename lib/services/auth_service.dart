@@ -154,6 +154,6 @@ class AuthService {
   // Get current user model
   Future<UserModel?> getCurrentUserModel() async {
     if (currentUser == null) return null;
-    return await _firebaseService.getCurrentUserModel();
+    return await _firebaseService.getCurrentUser();
   }
 } 

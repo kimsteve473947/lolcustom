@@ -1,3 +1,4 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
@@ -6,6 +7,8 @@ import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 import 'package:lol_custom_game_manager/services/firebase_service.dart';
 import 'package:lol_custom_game_manager/widgets/error_view.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
+import 'package:lol_custom_game_manager/widgets/rating_item.dart';
+import 'package:lol_custom_game_manager/widgets/tournament_card.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
 

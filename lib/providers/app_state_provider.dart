@@ -56,7 +56,7 @@ class AppStateProvider extends ChangeNotifier {
     
     _setLoading(true);
     try {
-      _currentUser = await _firebaseService.getCurrentUserModel();
+      _currentUser = await _firebaseService.getCurrentUser();
       notifyListeners();
     } catch (e) {
       _setError('Failed to load user profile: $e');
@@ -332,13 +332,13 @@ class AppStateProvider extends ChangeNotifier {
     }
   }
   
-  // Helper methods for state management
+  // Helper methods
   void _setLoading(bool loading) {
     _isLoading = loading;
     notifyListeners();
   }
   
-  void _setError(String error) {
+  void _setError(String? error) {
     _errorMessage = error;
     notifyListeners();
   }
