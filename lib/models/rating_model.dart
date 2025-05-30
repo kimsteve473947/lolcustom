@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:equatable/equatable.dart';
 
-class RatingModel {
+class RatingModel extends Equatable {
   final String id;
   final String ratedUserId;
   final String raterId;
@@ -10,8 +11,9 @@ class RatingModel {
   final String? role;
   final String? comment;
   final Timestamp createdAt;
-
-  RatingModel({
+  final int stars; // Required by some UI components
+  
+  const RatingModel({
     required this.id,
     required this.ratedUserId,
     required this.raterId,
@@ -21,26 +23,18 @@ class RatingModel {
     this.role,
     this.comment,
     required this.createdAt,
-  });
-
-  factory RatingModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    
-    return RatingModel(
-      id: doc.id,
-      ratedUserId: data['ratedUserId'] ?? '',
-      raterId: data['raterId'] ?? '',
-      raterName: data['raterName'] ?? 'Unknown',
-      raterProfileImageUrl: data['raterProfileImageUrl'],
-      score: (data['score'] as num?)?.toDouble() ?? 0.0,
-      role: data['role'],
-      comment: data['comment'],
-      createdAt: data['createdAt'] ?? Timestamp.now(),
-    );
-  }
-
-  Map<String, dynamic> toFirestore() {
+    int? stars,
+  }) : stars = stars ?? score.round(); // Default stars to rounded score
+  
+  @override
+  List<Object?> get props => [
+    id, ratedUserId, raterId, raterName, raterProfileImageUrl, 
+    score, role, comment, createdAt, stars
+  ];
+  
+  Map<String, dynamic> toMap() {
     return {
+      'id': id,
       'ratedUserId': ratedUserId,
       'raterId': raterId,
       'raterName': raterName,
@@ -49,9 +43,31 @@ class RatingModel {
       'role': role,
       'comment': comment,
       'createdAt': createdAt,
+      'stars': stars,
     };
   }
-
+  
+  factory RatingModel.fromMap(Map<String, dynamic> map) {
+    return RatingModel(
+      id: map['id'] ?? '',
+      ratedUserId: map['ratedUserId'] ?? '',
+      raterId: map['raterId'] ?? '',
+      raterName: map['raterName'] ?? 'Unknown',
+      raterProfileImageUrl: map['raterProfileImageUrl'],
+      score: (map['score'] as num?)?.toDouble() ?? 0.0,
+      role: map['role'],
+      comment: map['comment'],
+      createdAt: map['createdAt'] ?? Timestamp.now(),
+      stars: map['stars'] ?? ((map['score'] as num?)?.round() ?? 0),
+    );
+  }
+  
+  factory RatingModel.fromFirestore(DocumentSnapshot doc) {
+    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    data['id'] = doc.id;
+    return RatingModel.fromMap(data);
+  }
+  
   RatingModel copyWith({
     String? id,
     String? ratedUserId,
@@ -62,6 +78,7 @@ class RatingModel {
     String? role,
     String? comment,
     Timestamp? createdAt,
+    int? stars,
   }) {
     return RatingModel(
       id: id ?? this.id,
@@ -73,6 +90,7 @@ class RatingModel {
       role: role ?? this.role,
       comment: comment ?? this.comment,
       createdAt: createdAt ?? this.createdAt,
+      stars: stars ?? this.stars,
     );
   }
 } 

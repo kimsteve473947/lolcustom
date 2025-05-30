@@ -5,6 +5,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lol_custom_game_manager/models/models.dart';
+import 'package:lol_custom_game_manager/models/rating_model.dart';
 
 class FirebaseService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
@@ -256,10 +257,13 @@ class FirebaseService {
   Future<List<RatingModel>> getUserRatings(String userId) async {
     try {
       final snapshot = await _firestore.collection('ratings')
-          .where('targetUid', isEqualTo: userId)
-          .orderBy('createdAt', descending: true)
+          .where('targetId', isEqualTo: userId)
           .get();
-      return snapshot.docs.map((doc) => RatingModel.fromFirestore(doc)).toList();
+      return snapshot.docs.map((doc) {
+        final data = doc.data();
+        data['id'] = doc.id;
+        return RatingModel.fromMap(data);
+      }).toList();
     } catch (e) {
       print('Error getting user ratings: $e');
       return [];
@@ -340,5 +344,57 @@ class FirebaseService {
       print('Error uploading image: $e');
       throw e;
     }
+  }
+
+  // Generic methods to fetch document by ID with proper typing
+  Future<DocumentSnapshot<Map<String, dynamic>>> getDocumentById(String collection, String id) async {
+    return await _firestore.collection(collection).doc(id).get();
+  }
+  
+  // Example method for fetching tournaments
+  Future<List<Map<String, dynamic>>> getTournaments() async {
+    final QuerySnapshot<Map<String, dynamic>> snapshot = 
+        await _firestore.collection('tournaments').get();
+    
+    return snapshot.docs.map((doc) {
+      final data = doc.data();
+      data['id'] = doc.id;
+      return data;
+    }).toList();
+  }
+  
+  // Example method for fetching a user profile
+  Future<Map<String, dynamic>?> getUserProfile(String userId) async {
+    final doc = await _firestore.collection('users').doc(userId).get();
+    if (!doc.exists) return null;
+    
+    final data = doc.data();
+    return data;
+  }
+  
+  // Example method to calculate average rating
+  Future<double> calculateAverageRating(String userId) async {
+    final ratings = await getUserRatings(userId);
+    if (ratings.isEmpty) return 0.0;
+    
+    final totalStars = ratings.fold<int>(0, (sum, rating) => sum + rating.stars);
+    return totalStars / ratings.length;
+  }
+  
+  // Example of a storage upload method
+  Future<String> uploadFile(String path, Uint8List bytes) async {
+    final ref = _storage.ref().child(path);
+    await ref.putData(bytes);
+    return await ref.getDownloadURL();
+  }
+  
+  // Example of working with timestamps
+  DateTime? convertTimestampToDateTime(Timestamp? timestamp) {
+    return timestamp?.toDate();
+  }
+  
+  String formatLastMessageTime(DateTime dateTime) {
+    // Implementation of formatting logic
+    return dateTime.toString();
   }
 } 

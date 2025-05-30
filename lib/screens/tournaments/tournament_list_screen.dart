@@ -11,6 +11,8 @@ import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:lol_custom_game_manager/widgets/error_view.dart';
 import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
+import 'package:lol_custom_game_manager/services/tournament_service.dart';
+import 'package:lol_custom_game_manager/widgets/tournament_card_simplified.dart';
 
 class TournamentListScreen extends StatefulWidget {
   const TournamentListScreen({Key? key}) : super(key: key);
@@ -21,6 +23,7 @@ class TournamentListScreen extends StatefulWidget {
 
 class _TournamentListScreenState extends State<TournamentListScreen> {
   final FirebaseService _firebaseService = FirebaseService();
+  final TournamentService _tournamentService = TournamentService();
   
   bool _isLoading = false;
   String? _errorMessage;
@@ -36,6 +39,17 @@ class _TournamentListScreenState extends State<TournamentListScreen> {
   // Scroll controller for pagination
   final ScrollController _scrollController = ScrollController();
 
+  // 필터 설정
+  final Map<String, dynamic> _filters = {
+    'isPaid': null,  // null: 모두, true: 유료만, false: 무료만
+    'ovrLimit': null,  // null: 제한 없음, int: 제한 값
+    'premiumBadge': null,  // null: 모두, true: 프리미엄만
+  };
+  
+  // 날짜 범위
+  DateTime? _startDate;
+  DateTime? _endDate;
+  
   @override
   void initState() {
     super.initState();
@@ -66,19 +80,22 @@ class _TournamentListScreenState extends State<TournamentListScreen> {
     });
     
     try {
-      final tournaments = await _firebaseService.getTournaments(
-        limit: 10,
-        startDate: _selectedDate,
-        endDate: _selectedDate != null 
-          ? DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day, 23, 59, 59)
-          : null,
-        ovrLimit: _ovrToggle ? null : 0, // If OVR toggle is on, we filter matches with OVR limit
+      // 날짜 필터 적용
+      Map<String, dynamic>? filterMap = {..._filters};
+      if (_startDate != null && _endDate != null) {
+        filterMap['startDate'] = _startDate;
+        filterMap['endDate'] = _endDate;
+      }
+      
+      final tournaments = await _tournamentService.getTournaments(
+        limit: 20,
+        filters: filterMap,
       );
       
       setState(() {
         _tournaments = tournaments;
         _isLoading = false;
-        _hasMoreTournaments = tournaments.length == 10;
+        _hasMoreTournaments = tournaments.length == 20;
         _lastDocument = tournaments.isNotEmpty 
           ? FirebaseFirestore.instance
               .collection('tournaments')
@@ -90,6 +107,11 @@ class _TournamentListScreenState extends State<TournamentListScreen> {
         _isLoading = false;
         _errorMessage = 'Failed to load tournaments: $e';
       });
+      
+      // 에러 처리
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('에러가 발생했습니다: $e')),
+      );
     }
   }
 
@@ -101,20 +123,16 @@ class _TournamentListScreenState extends State<TournamentListScreen> {
     });
     
     try {
-      final tournaments = await _firebaseService.getTournaments(
-        limit: 10,
+      final tournaments = await _tournamentService.getTournaments(
+        limit: 20,
         startAfter: _lastDocument,
-        startDate: _selectedDate,
-        endDate: _selectedDate != null 
-          ? DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day, 23, 59, 59)
-          : null,
-        ovrLimit: _ovrToggle ? null : 0,
+        filters: _filters,
       );
       
       setState(() {
         _tournaments.addAll(tournaments);
         _isLoading = false;
-        _hasMoreTournaments = tournaments.length == 10;
+        _hasMoreTournaments = tournaments.length == 20;
         _lastDocument = tournaments.isNotEmpty 
           ? FirebaseFirestore.instance
               .collection('tournaments')
@@ -170,6 +188,10 @@ class _TournamentListScreenState extends State<TournamentListScreen> {
             onPressed: () {
               // TODO: Navigate to search
             },
+          ),
+          IconButton(
+            icon: const Icon(Icons.filter_list),
+            onPressed: () => _showFilterDialog(context),
           ),
         ],
       ),
@@ -346,6 +368,134 @@ class _TournamentListScreenState extends State<TournamentListScreen> {
             child: const Text('내전 만들기'),
           ),
         ],
+      ),
+    );
+  }
+
+  // 필터 다이얼로그
+  Future<void> _showFilterDialog(BuildContext context) async {
+    await showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            title: const Text('필터 설정'),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 참가비 필터
+                const Text('참가비', style: TextStyle(fontWeight: FontWeight.bold)),
+                Row(
+                  children: [
+                    Expanded(
+                      child: RadioListTile<bool?>(
+                        title: const Text('전체'),
+                        value: null,
+                        groupValue: _filters['isPaid'],
+                        onChanged: (value) {
+                          setState(() {
+                            _filters['isPaid'] = value;
+                          });
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<bool?>(
+                        title: const Text('무료'),
+                        value: false,
+                        groupValue: _filters['isPaid'],
+                        onChanged: (value) {
+                          setState(() {
+                            _filters['isPaid'] = value;
+                          });
+                        },
+                      ),
+                    ),
+                    Expanded(
+                      child: RadioListTile<bool?>(
+                        title: const Text('유료'),
+                        value: true,
+                        groupValue: _filters['isPaid'],
+                        onChanged: (value) {
+                          setState(() {
+                            _filters['isPaid'] = value;
+                          });
+                        },
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // OVR 제한 필터
+                const Text('OVR 제한', style: TextStyle(fontWeight: FontWeight.bold)),
+                Slider(
+                  value: (_filters['ovrLimit'] ?? 100).toDouble(),
+                  min: 50,
+                  max: 100,
+                  divisions: 10,
+                  label: _filters['ovrLimit']?.toString() ?? '제한 없음',
+                  onChanged: (value) {
+                    setState(() {
+                      _filters['ovrLimit'] = value.round();
+                    });
+                  },
+                ),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    const Text('50'),
+                    Text(_filters['ovrLimit']?.toString() ?? '제한 없음'),
+                    const Text('100'),
+                  ],
+                ),
+                
+                const SizedBox(height: 8),
+                
+                // OVR 제한 없음 체크박스
+                CheckboxListTile(
+                  title: const Text('OVR 제한 없음'),
+                  value: _filters['ovrLimit'] == null,
+                  onChanged: (value) {
+                    setState(() {
+                      _filters['ovrLimit'] = value! ? null : 70;
+                    });
+                  },
+                ),
+                
+                const SizedBox(height: 16),
+                
+                // 프리미엄 필터
+                CheckboxListTile(
+                  title: const Text('프리미엄 내전만 보기'),
+                  value: _filters['premiumBadge'] == true,
+                  onChanged: (value) {
+                    setState(() {
+                      _filters['premiumBadge'] = value! ? true : null;
+                    });
+                  },
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('취소'),
+              ),
+              ElevatedButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  _loadTournaments();
+                },
+                child: const Text('적용'),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

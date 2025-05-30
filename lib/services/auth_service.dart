@@ -1,159 +1,195 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'package:lol_custom_game_manager/models/models.dart';
-import 'package:lol_custom_game_manager/services/firebase_service.dart';
+import 'package:flutter/foundation.dart';
+import 'package:lol_custom_game_manager/models/user_model.dart';
 
-class AuthService {
+class AuthService extends ChangeNotifier {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
-  final FirebaseService _firebaseService = FirebaseService();
-
-  // Auth state
-  Stream<User?> get authStateChanges => _auth.authStateChanges();
+  
+  // 인증 상태 변경 스트림
+  Stream<User?> authStateChanges() => _auth.authStateChanges();
+  
+  // 현재 사용자 getter
   User? get currentUser => _auth.currentUser;
+  
+  // 현재 사용자가 로그인했는지 확인
   bool get isLoggedIn => currentUser != null;
-
-  // Sign in with email and password
-  Future<UserCredential> signInWithEmailAndPassword(String email, String password) async {
+  
+  // 현재 로그인된 사용자의 UserModel 가져오기
+  Future<UserModel?> getCurrentUserModel() async {
     try {
-      return await _auth.signInWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      final user = currentUser;
+      if (user == null) return null;
+      
+      final doc = await _firestore.collection('users').doc(user.uid).get();
+      
+      if (doc.exists) {
+        return UserModel.fromFirestore(doc);
+      } else {
+        // 사용자 문서가 없는 경우 기본 문서 생성
+        final newUser = UserModel(
+          uid: user.uid,
+          nickname: user.displayName ?? 'User${user.uid.substring(0, 4)}',
+          joinedAt: DateTime.now(),
+        );
+        
+        await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
+        return newUser;
+      }
     } catch (e) {
-      print('Error signing in with email and password: $e');
-      throw e;
+      debugPrint('Error getting user model: $e');
+      return null;
     }
   }
-
-  // Register with email and password
-  Future<UserCredential> registerWithEmailAndPassword(String email, String password) async {
+  
+  // 이메일과 비밀번호로 회원가입
+  Future<UserCredential> signUpWithEmailAndPassword({
+    required String email,
+    required String password,
+    required String nickname,
+  }) async {
     try {
-      return await _auth.createUserWithEmailAndPassword(
+      // Firebase Auth에 사용자 등록
+      final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
         password: password,
-      );
-    } catch (e) {
-      print('Error registering with email and password: $e');
-      throw e;
-    }
-  }
-
-  // Create user profile after registration
-  Future<void> createUserProfile(String nickname) async {
-    if (currentUser == null) throw Exception('User not logged in');
-    
-    try {
-      UserModel newUser = UserModel(
-        uid: currentUser!.uid,
-        nickname: nickname,
-        joinedAt: Timestamp.now(),
       );
       
-      await _firebaseService.createUserProfile(newUser);
+      // 사용자 프로필 업데이트
+      await credential.user?.updateDisplayName(nickname);
+      
+      // Firestore에 사용자 정보 저장
+      await _firestore.collection('users').doc(credential.user!.uid).set({
+        'uid': credential.user!.uid,
+        'email': email,
+        'nickname': nickname,
+        'joinedAt': Timestamp.now(),
+        'credits': 0,
+        'isPremium': false,
+        'isVerified': false,
+      });
+      
+      return credential;
     } catch (e) {
-      print('Error creating user profile: $e');
-      throw e;
+      debugPrint('Error signing up: $e');
+      rethrow;
     }
   }
-
-  // Sign out
+  
+  // 이메일과 비밀번호로 로그인
+  Future<UserCredential> signInWithEmailAndPassword({
+    required String email,
+    required String password,
+  }) async {
+    try {
+      final credential = await _auth.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
+      
+      // 마지막 로그인 시간 업데이트
+      await _firestore.collection('users').doc(credential.user!.uid).update({
+        'lastActiveAt': Timestamp.now(),
+      });
+      
+      return credential;
+    } catch (e) {
+      debugPrint('Error signing in: $e');
+      rethrow;
+    }
+  }
+  
+  // 로그아웃
   Future<void> signOut() async {
     try {
       await _auth.signOut();
     } catch (e) {
-      print('Error signing out: $e');
-      throw e;
+      debugPrint('Error signing out: $e');
+      rethrow;
     }
   }
-
-  // Reset password
-  Future<void> resetPassword(String email) async {
+  
+  // 비밀번호 재설정 이메일 전송
+  Future<void> sendPasswordResetEmail(String email) async {
     try {
       await _auth.sendPasswordResetEmail(email: email);
     } catch (e) {
-      print('Error resetting password: $e');
-      throw e;
+      debugPrint('Error sending password reset email: $e');
+      rethrow;
     }
   }
-
-  // Update email
-  Future<void> updateEmail(String newEmail) async {
-    if (currentUser == null) throw Exception('User not logged in');
-    
+  
+  // 사용자 정보 업데이트
+  Future<void> updateUserProfile({
+    String? nickname,
+    String? profileImageUrl,
+  }) async {
     try {
-      await currentUser!.updateEmail(newEmail);
-    } catch (e) {
-      print('Error updating email: $e');
-      throw e;
-    }
-  }
-
-  // Update password
-  Future<void> updatePassword(String newPassword) async {
-    if (currentUser == null) throw Exception('User not logged in');
-    
-    try {
-      await currentUser!.updatePassword(newPassword);
-    } catch (e) {
-      print('Error updating password: $e');
-      throw e;
-    }
-  }
-
-  // Delete account
-  Future<void> deleteAccount() async {
-    if (currentUser == null) throw Exception('User not logged in');
-    
-    try {
-      // Delete user data from Firestore
-      await _firestore.collection('users').doc(currentUser!.uid).delete();
+      final user = currentUser;
+      if (user == null) throw Exception('사용자가 로그인되어 있지 않습니다.');
       
-      // Delete Auth user
-      await currentUser!.delete();
+      final updates = <String, dynamic>{};
+      
+      if (nickname != null) {
+        await user.updateDisplayName(nickname);
+        updates['nickname'] = nickname;
+      }
+      
+      if (profileImageUrl != null) {
+        await user.updatePhotoURL(profileImageUrl);
+        updates['profileImageUrl'] = profileImageUrl;
+      }
+      
+      if (updates.isNotEmpty) {
+        await _firestore.collection('users').doc(user.uid).update(updates);
+      }
     } catch (e) {
-      print('Error deleting account: $e');
-      throw e;
+      debugPrint('Error updating user profile: $e');
+      rethrow;
     }
   }
-
-  // Verify email
-  Future<void> sendEmailVerification() async {
-    if (currentUser == null) throw Exception('User not logged in');
-    
+  
+  // 계정 삭제
+  Future<void> deleteAccount() async {
     try {
-      await currentUser!.sendEmailVerification();
+      final user = currentUser;
+      if (user == null) throw Exception('사용자가 로그인되어 있지 않습니다.');
+      
+      // Firestore에서 사용자 데이터 삭제
+      await _firestore.collection('users').doc(user.uid).delete();
+      
+      // Firebase Auth에서 사용자 삭제
+      await user.delete();
     } catch (e) {
-      print('Error sending email verification: $e');
-      throw e;
+      debugPrint('Error deleting account: $e');
+      rethrow;
     }
   }
-
-  // Check if email is verified
-  bool isEmailVerified() {
-    if (currentUser == null) return false;
-    return currentUser!.emailVerified;
-  }
-
-  // Re-authenticate user (required for sensitive operations)
-  Future<void> reauthenticateUser(String email, String password) async {
-    if (currentUser == null) throw Exception('User not logged in');
-    
-    try {
-      AuthCredential credential = EmailAuthProvider.credential(
-        email: email,
-        password: password,
-      );
-      await currentUser!.reauthenticateWithCredential(credential);
-    } catch (e) {
-      print('Error re-authenticating user: $e');
-      throw e;
+  
+  // Firebase Auth 오류 메시지를 한글로 변환
+  String getKoreanErrorMessage(FirebaseAuthException e) {
+    switch (e.code) {
+      case 'user-not-found':
+        return '해당 이메일로 등록된 사용자가 없습니다.';
+      case 'wrong-password':
+        return '비밀번호가 일치하지 않습니다.';
+      case 'email-already-in-use':
+        return '이미 사용 중인 이메일입니다.';
+      case 'weak-password':
+        return '비밀번호가 너무 약합니다. 더 강력한 비밀번호를 사용해주세요.';
+      case 'invalid-email':
+        return '유효하지 않은 이메일 형식입니다.';
+      case 'user-disabled':
+        return '해당 계정은 비활성화되었습니다.';
+      case 'too-many-requests':
+        return '너무 많은 요청이 발생했습니다. 잠시 후 다시 시도해주세요.';
+      case 'operation-not-allowed':
+        return '이 작업은 허용되지 않습니다.';
+      case 'network-request-failed':
+        return '네트워크 연결에 문제가 있습니다.';
+      default:
+        return '오류가 발생했습니다: ${e.code}';
     }
-  }
-
-  // Get current user model
-  Future<UserModel?> getCurrentUser() async {
-    if (currentUser == null) return null;
-    return await _firebaseService.getCurrentUser();
   }
 } 

@@ -90,4 +90,45 @@ class CloudFunctionsService {
       throw e;
     }
   }
+
+  // Example of calling a cloud function that handles data correctly for web
+  Future<Map<String, dynamic>> callFunction(
+    String functionName, 
+    Map<String, dynamic> parameters
+  ) async {
+    try {
+      final result = await _functions.httpsCallable(functionName).call(parameters);
+      
+      // The data object is already properly converted to Dart objects by the SDK
+      return result.data as Map<String, dynamic>;
+    } catch (e) {
+      debugPrint('Error calling cloud function $functionName: $e');
+      rethrow;
+    }
+  }
+  
+  // Example for tournament creation
+  Future<String> createTournament(Map<String, dynamic> tournamentData) async {
+    try {
+      final result = await _functions.httpsCallable('createTournament').call(tournamentData);
+      return result.data['tournamentId'] as String;
+    } catch (e) {
+      debugPrint('Error creating tournament: $e');
+      rethrow;
+    }
+  }
+  
+  // Example for user registration in a tournament
+  Future<void> registerForTournament(String tournamentId, String userId, String role) async {
+    try {
+      await _functions.httpsCallable('registerForTournament').call({
+        'tournamentId': tournamentId,
+        'userId': userId,
+        'role': role,
+      });
+    } catch (e) {
+      debugPrint('Error registering for tournament: $e');
+      rethrow;
+    }
+  }
 } 
