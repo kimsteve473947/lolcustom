@@ -4,13 +4,11 @@ import 'package:lol_custom_game_manager/constants/app_theme.dart';
 class ErrorView extends StatelessWidget {
   final String message;
   final VoidCallback? onRetry;
-  final IconData icon;
   
   const ErrorView({
     Key? key,
     required this.message,
     this.onRetry,
-    this.icon = Icons.error_outline,
   }) : super(key: key);
 
   @override
@@ -19,30 +17,34 @@ class ErrorView extends StatelessWidget {
       child: Padding(
         padding: const EdgeInsets.all(24.0),
         child: Column(
-          mainAxisSize: MainAxisSize.min,
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              size: 64,
+            const Icon(
+              Icons.error_outline,
               color: AppColors.error,
+              size: 64,
             ),
             const SizedBox(height: 16),
             Text(
               message,
               style: const TextStyle(
                 fontSize: 16,
-                color: AppColors.textSecondary,
+                color: AppColors.textPrimary,
               ),
               textAlign: TextAlign.center,
             ),
-            if (onRetry != null) ...[
-              const SizedBox(height: 24),
-              ElevatedButton.icon(
-                onPressed: onRetry,
-                icon: const Icon(Icons.refresh),
-                label: const Text('다시 시도'),
+            if (onRetry != null)
+              Padding(
+                padding: const EdgeInsets.only(top: 24),
+                child: ElevatedButton.icon(
+                  onPressed: onRetry,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('다시 시도'),
+                  style: ElevatedButton.styleFrom(
+                    minimumSize: const Size(200, 48),
+                  ),
+                ),
               ),
-            ],
           ],
         ),
       ),

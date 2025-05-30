@@ -44,372 +44,79 @@ flutter pub get
 
 3. Firebase 설정
 
-```bash
-# FlutterFire CLI 설치
-dart pub global activate flutterfire_cli
+Firebase 콘솔(https://console.firebase.google.com/)에서 새 프로젝트를 생성하고 Flutter 앱을 추가합니다.
+FlutterFire CLI를 사용하여 Firebase 설정 파일을 생성합니다:
 
-# Firebase 프로젝트 연결
-flutterfire configure --project=your-firebase-project
+```bash
+flutter pub global activate flutterfire_cli
+flutterfire configure
 ```
 
-4. 앱 실행
+4. 환경 변수 설정
+
+프로젝트 루트에 `.env` 파일을 생성하고 필요한 환경 변수를 설정합니다:
+
+```
+APP_NAME=LoL 내전 매니저
+APP_VERSION=1.0.0
+ENV=development
+```
+
+5. 에셋 디렉토리 생성
 
 ```bash
+mkdir -p assets/images assets/icons
+```
+
+### 실행 방법
+
+```bash
+# 디버그 모드로 실행
 flutter run
+
+# 릴리스 모드로 빌드
+flutter build apk --release  # Android
+flutter build ios --release  # iOS
+flutter build web --release  # Web
 ```
 
-## Firebase 설정 가이드
-
-### 1. Firebase 프로젝트 생성
-
-1. [Firebase Console](https://console.firebase.google.com/)에서 새 프로젝트 생성
-2. Flutter 앱 등록 (안드로이드 및 iOS)
-3. `google-services.json` 및 `GoogleService-Info.plist` 파일 다운로드
-4. 앱의 Android 및 iOS 디렉토리에 각각 배치
-
-### 2. Authentication 설정
-
-1. Firebase Console에서 Authentication 섹션 열기
-2. 이메일/비밀번호 로그인 활성화
-3. Google 로그인 활성화 (선택사항)
-
-### 3. Firestore 설정
-
-1. Firebase Console에서 Firestore 데이터베이스 생성
-2. 테스트 모드에서 시작 (나중에 보안 규칙 설정)
-3. 다음 컬렉션 생성:
-   - users
-   - tournaments
-   - applications
-   - ratings
-   - chatRooms
-   - messages
-   - mercenaries
-
-### 4. Cloud Functions 설정
-
-1. Firebase CLI 설치
-
-```bash
-npm install -g firebase-tools
-```
-
-2. 로그인 및 초기화
-
-```bash
-firebase login
-firebase init functions
-```
-
-3. 아래 Cloud Functions 구현
-
-```javascript
-// functions/index.js
-const functions = require('firebase-functions');
-const admin = require('firebase-admin');
-admin.initializeApp();
-
-// 내전 참가자에게 알림 보내기
-exports.notifyTournamentParticipants = functions.https.onCall(async (data, context) => {
-  const { tournamentId, message } = data;
-  
-  // 인증 확인
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', '인증이 필요합니다.');
-  }
-  
-  try {
-    // 내전 데이터 가져오기
-    const tournamentDoc = await admin.firestore().collection('tournaments').doc(tournamentId).get();
-    if (!tournamentDoc.exists) {
-      throw new functions.https.HttpsError('not-found', '내전을 찾을 수 없습니다.');
-    }
-    
-    // 알림 전송 로직 구현
-    // ...
-    
-    return { success: true };
-  } catch (error) {
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-// 사용자 평가 업데이트
-exports.updateUserRatings = functions.https.onCall(async (data, context) => {
-  const { userId } = data;
-  
-  try {
-    // 모든 평가 가져오기
-    const ratingsSnapshot = await admin.firestore().collection('ratings')
-      .where('targetUid', '==', userId)
-      .get();
-    
-    // 평점 계산
-    let totalStars = 0;
-    let count = 0;
-    
-    ratingsSnapshot.forEach(doc => {
-      const rating = doc.data();
-      totalStars += rating.stars;
-      count++;
-    });
-    
-    const averageRating = count > 0 ? totalStars / count : 0;
-    
-    // 사용자 평점 업데이트
-    await admin.firestore().collection('users').doc(userId).update({
-      averageRating: averageRating
-    });
-    
-    // 용병 프로필이 있다면 업데이트
-    const mercenarySnapshot = await admin.firestore().collection('mercenaries')
-      .where('userUid', '==', userId)
-      .get();
-      
-    if (!mercenarySnapshot.empty) {
-      mercenarySnapshot.forEach(async doc => {
-        await doc.ref.update({ averageRating: averageRating });
-      });
-    }
-    
-    return { success: true, averageRating };
-  } catch (error) {
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-// 내전 신청 처리
-exports.processTournamentApplication = functions.https.onCall(async (data, context) => {
-  const { tournamentId, userId, role } = data;
-  
-  // 인증 확인
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', '인증이 필요합니다.');
-  }
-  
-  try {
-    // 내전 호스트에게 알림 전송
-    // ...
-    
-    return { success: true };
-  } catch (error) {
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-// 만료된 내전 정리
-exports.cleanupExpiredTournaments = functions.https.onCall(async (data, context) => {
-  try {
-    const now = admin.firestore.Timestamp.now();
-    
-    // 지난 내전 찾기
-    const expiredTournamentsSnapshot = await admin.firestore().collection('tournaments')
-      .where('startsAt', '<', now)
-      .where('status', '==', 0) // open status
-      .get();
-    
-    // 상태 업데이트
-    const batch = admin.firestore().batch();
-    expiredTournamentsSnapshot.forEach(doc => {
-      batch.update(doc.ref, { status: 2 }); // inProgress status
-    });
-    
-    await batch.commit();
-    
-    return { success: true, count: expiredTournamentsSnapshot.size };
-  } catch (error) {
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-// 채팅방 생성 및 알림 전송
-exports.createChatRoomWithNotification = functions.https.onCall(async (data, context) => {
-  const { participantIds, title, type, initialMessage } = data;
-  
-  // 인증 확인
-  if (!context.auth) {
-    throw new functions.https.HttpsError('unauthenticated', '인증이 필요합니다.');
-  }
-  
-  try {
-    // 채팅방 생성
-    const chatRoomRef = admin.firestore().collection('chatRooms').doc();
-    
-    // 참가자 맵 생성
-    const participants = {};
-    participantIds.forEach(id => {
-      participants[id] = true;
-    });
-    
-    // 안읽은 메시지 맵 초기화
-    const unreadCount = {};
-    participantIds.forEach(id => {
-      if (id !== context.auth.uid) {
-        unreadCount[id] = 1; // 초기 메시지가 있으면 1, 없으면 0
-      } else {
-        unreadCount[id] = 0;
-      }
-    });
-    
-    await chatRoomRef.set({
-      id: chatRoomRef.id,
-      title,
-      type,
-      participantIds,
-      participants, // 맵 형태로 저장
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastMessageTime: initialMessage ? admin.firestore.FieldValue.serverTimestamp() : null,
-      lastMessageText: initialMessage || null,
-      unreadCount,
-    });
-    
-    // 초기 메시지가 있으면 추가
-    if (initialMessage) {
-      const messageRef = admin.firestore().collection('messages').doc();
-      await messageRef.set({
-        id: messageRef.id,
-        chatRoomId: chatRoomRef.id,
-        senderId: context.auth.uid,
-        senderName: (await admin.firestore().collection('users').doc(context.auth.uid).get()).data().nickname,
-        text: initialMessage,
-        timestamp: admin.firestore.FieldValue.serverTimestamp(),
-        readStatus: {
-          [context.auth.uid]: true,
-        },
-      });
-      
-      // 다른 참가자들에게는 읽지 않음으로 표시
-      participantIds.forEach(id => {
-        if (id !== context.auth.uid) {
-          messageRef.update({
-            [`readStatus.${id}`]: false,
-          });
-        }
-      });
-    }
-    
-    // 알림 전송
-    // ...
-    
-    return { success: true, chatRoomId: chatRoomRef.id };
-  } catch (error) {
-    throw new functions.https.HttpsError('internal', error.message);
-  }
-});
-
-// 주기적으로 만료된 내전 정리 (매일 자정에 실행)
-exports.scheduledCleanupExpiredTournaments = functions.pubsub.schedule('0 0 * * *')
-  .timeZone('Asia/Seoul')
-  .onRun(async (context) => {
-    try {
-      const now = admin.firestore.Timestamp.now();
-      
-      // 지난 내전 찾기
-      const expiredTournamentsSnapshot = await admin.firestore().collection('tournaments')
-        .where('startsAt', '<', now)
-        .where('status', '==', 0) // open status
-        .get();
-      
-      // 상태 업데이트
-      const batch = admin.firestore().batch();
-      expiredTournamentsSnapshot.forEach(doc => {
-        batch.update(doc.ref, { status: 2 }); // inProgress status
-      });
-      
-      await batch.commit();
-      
-      console.log(`Updated ${expiredTournamentsSnapshot.size} expired tournaments`);
-      return null;
-    } catch (error) {
-      console.error('Error cleaning up tournaments:', error);
-      return null;
-    }
-  });
-```
-
-4. 함수 배포
-
-```bash
-firebase deploy --only functions
-```
-
-### 5. Cloud Messaging 설정
-
-1. Firebase Console에서 Cloud Messaging 활성화
-2. Android 및 iOS 앱에 대한 설정 완료
-3. 알림 설정 추가
-
-## Firestore 보안 규칙
-
-아래 보안 규칙을 Cloud Firestore에 적용하세요:
+## 프로젝트 구조
 
 ```
-rules_version = '2';
-service cloud.firestore {
-  match /databases/{database}/documents {
-    // 인증된 사용자만 접근 가능
-    match /{document=**} {
-      allow read, write: if request.auth != null;
-    }
-    
-    // 사용자 문서 접근 제한
-    match /users/{userId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && request.auth.uid == userId;
-    }
-    
-    // 내전 접근 제한
-    match /tournaments/{tournamentId} {
-      allow read: if true;
-      allow create: if request.auth != null;
-      allow update, delete: if request.auth != null && 
-        (resource.data.hostUid == request.auth.uid);
-    }
-    
-    // 채팅방 및 메시지 접근 제한
-    match /chatRooms/{roomId} {
-      allow read: if request.auth != null && 
-        (resource.data.participants[request.auth.uid] == true);
-      allow create: if request.auth != null;
-      
-      match /messages/{messageId} {
-        allow read: if request.auth != null && 
-          get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants[request.auth.uid] == true;
-        allow create: if request.auth != null && 
-          get(/databases/$(database)/documents/chatRooms/$(roomId)).data.participants[request.auth.uid] == true;
-      }
-    }
-  }
-}
+lib/
+├── config/              # 환경 설정
+├── constants/           # 앱 전체에서 사용되는 상수
+├── firebase_options.dart # Firebase 설정
+├── main.dart            # 앱 진입점
+├── models/              # 데이터 모델
+├── navigation/          # 라우팅 설정
+├── providers/           # 상태 관리
+├── screens/             # UI 화면
+│   ├── auth/            # 인증 관련 화면
+│   ├── chat/            # 채팅 관련 화면
+│   ├── main/            # 메인 화면
+│   ├── mercenaries/     # 용병 관련 화면
+│   ├── my_page/         # 마이페이지 화면
+│   ├── rankings/        # 랭킹 화면
+│   └── tournaments/     # 내전 관련 화면
+├── services/            # 비즈니스 로직 및 외부 서비스 연동
+└── widgets/             # 재사용 가능한 위젯
+
+assets/
+├── images/              # 이미지 파일
+└── icons/               # 아이콘 파일
 ```
 
-## 문제 해결
+## 웹 지원 이슈
 
-### 종속성 오류
+현재 이 앱은 iOS 및 Android 플랫폼에서만 정상 작동합니다. 웹 버전은 Firebase JS 패키지의 호환성 문제로 인해 지원되지 않습니다. 향후 릴리스에서 웹 지원을 추가할 예정입니다.
 
-만약 `firebase_functions` 패키지와 관련된 오류가 발생하면, 올바른 패키지 이름이 `cloud_functions`이므로 아래와 같이 변경해주세요:
+## 주의사항
 
-```yaml
-dependencies:
-  # Firebase
-  firebase_core: ^2.24.2
-  firebase_auth: ^4.16.0
-  cloud_firestore: ^4.14.0
-  firebase_storage: ^11.6.0
-  firebase_messaging: ^14.7.10
-  cloud_functions: ^4.6.0  # 올바른 패키지 이름
-  firebase_analytics: ^10.8.0
-```
-
-### intl 패키지 충돌
-
-Flutter의 `flutter_localizations` 패키지는 특정 버전의 `intl` 패키지를 요구합니다. 충돌이 발생하면 아래와 같이 업데이트하세요:
-
-```yaml
-dependencies:
-  intl: ^0.20.2  # flutter_localizations와 호환되는 버전
-```
+- 개발 환경에서는 `.env` 파일의 `ENV` 값을 `development`로 설정하여 테스트 용이성을 높입니다.
+- 운영 환경에서는 `ENV` 값을 `production`으로 변경하여 로그 출력 및 디버그 기능을 비활성화합니다.
+- Firebase 인증은 이메일/비밀번호 방식을 기본으로 하며, 소셜 로그인(구글, 애플)도 지원합니다.
+- 웹 환경은 현재 지원되지 않으므로 iOS 또는 Android 에뮬레이터/시뮬레이터에서 테스트하세요.
 
 ## 라이선스
 
@@ -417,4 +124,4 @@ dependencies:
 
 ## 연락처
 
-질문이나 피드백이 있으시면 이메일로 연락해주세요: your.email@example.com 
+문의사항이 있으시면 [이메일 주소]로 연락주세요. 

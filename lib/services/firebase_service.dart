@@ -3,6 +3,7 @@ import 'dart:typed_data';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_storage/firebase_storage.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lol_custom_game_manager/models/models.dart';
 
 class FirebaseService {
@@ -15,7 +16,7 @@ class FirebaseService {
   Stream<User?> get authStateChanges => _auth.authStateChanges();
 
   // User methods
-  Future<UserModel?> getCurrentUserModel() async {
+  Future<UserModel?> getCurrentUser() async {
     if (currentUser == null) return null;
     try {
       DocumentSnapshot doc = await _firestore.collection('users').doc(currentUser!.uid).get();
@@ -24,7 +25,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error getting current user model: $e');
+      print('Error getting current user: $e');
       return null;
     }
   }
@@ -215,6 +216,32 @@ class FirebaseService {
     }
   }
 
+  Future<MercenaryModel?> getMercenary(String id) async {
+    try {
+      DocumentSnapshot doc = await _firestore.collection('mercenaries').doc(id).get();
+      if (doc.exists) {
+        return MercenaryModel.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting mercenary: $e');
+      return null;
+    }
+  }
+
+  Future<UserModel?> getUserById(String userId) async {
+    try {
+      DocumentSnapshot doc = await _firestore.collection('users').doc(userId).get();
+      if (doc.exists) {
+        return UserModel.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting user by ID: $e');
+      return null;
+    }
+  }
+
   // Rating methods
   Future<String> rateUser(RatingModel rating) async {
     try {
@@ -294,8 +321,20 @@ class FirebaseService {
   // Storage methods
   Future<String> uploadImage(String path, Uint8List bytes) async {
     try {
+      // Handle web vs mobile differently if needed
       final ref = _storage.ref().child(path);
-      await ref.putData(bytes);
+      
+      if (kIsWeb) {
+        // Web specific upload
+        final metadata = SettableMetadata(
+          contentType: 'image/jpeg',
+        );
+        await ref.putData(bytes, metadata);
+      } else {
+        // Mobile upload
+        await ref.putData(bytes);
+      }
+      
       return await ref.getDownloadURL();
     } catch (e) {
       print('Error uploading image: $e');

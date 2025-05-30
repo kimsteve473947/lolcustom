@@ -19,7 +19,7 @@ final GlobalKey<NavigatorState> _shellNavigatorKey = GlobalKey<NavigatorState>(d
 class AppRouter {
   final AuthService authService;
 
-  AppRouter({required this.authService});
+  AppRouter({AuthService? authService}) : authService = authService ?? AuthService();
 
   late final GoRouter router = GoRouter(
     navigatorKey: _rootNavigatorKey,

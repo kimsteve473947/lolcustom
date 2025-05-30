@@ -1,8 +1,12 @@
 import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/foundation.dart';
 import 'package:lol_custom_game_manager/models/models.dart';
 
 class CloudFunctionsService {
-  final FirebaseFunctions _functions = FirebaseFunctions.instance;
+  final FirebaseFunctions _functions;
+  
+  // Initialize with region for web compatibility
+  CloudFunctionsService() : _functions = FirebaseFunctions.instance;
   
   // Call a cloud function to send a notification to all tournament participants
   Future<void> notifyTournamentParticipants({
@@ -86,10 +90,4 @@ class CloudFunctionsService {
       throw e;
     }
   }
-}
-
-// This enum should match the one in models.dart
-enum ChatRoomType {
-  tournamentRecruitment,
-  mercenaryOffer,
 } 

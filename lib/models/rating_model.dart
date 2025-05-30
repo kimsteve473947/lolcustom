@@ -2,87 +2,77 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 class RatingModel {
   final String id;
-  final String tournamentId;
-  final String targetUid;
-  final String raterUid;
+  final String ratedUserId;
+  final String raterId;
   final String raterName;
-  final double stars;
+  final String? raterProfileImageUrl;
+  final double score;
+  final String? role;
   final String? comment;
   final Timestamp createdAt;
-  final Map<String, double>? statRatings; // teamwork, pass, vision, etc.
 
   RatingModel({
     required this.id,
-    required this.tournamentId,
-    required this.targetUid,
-    required this.raterUid,
+    required this.ratedUserId,
+    required this.raterId,
     required this.raterName,
-    required this.stars,
+    this.raterProfileImageUrl,
+    required this.score,
+    this.role,
     this.comment,
     required this.createdAt,
-    this.statRatings,
   });
 
   factory RatingModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
     
-    // Handle the stat ratings map
-    Map<String, double>? statRatings;
-    if (data['statRatings'] != null) {
-      statRatings = {};
-      Map<String, dynamic> statsData = data['statRatings'];
-      statsData.forEach((key, value) {
-        statRatings![key] = (value as num).toDouble();
-      });
-    }
-
     return RatingModel(
       id: doc.id,
-      tournamentId: data['tournamentId'] ?? '',
-      targetUid: data['targetUid'] ?? '',
-      raterUid: data['raterUid'] ?? '',
+      ratedUserId: data['ratedUserId'] ?? '',
+      raterId: data['raterId'] ?? '',
       raterName: data['raterName'] ?? 'Unknown',
-      stars: (data['stars'] ?? 0.0).toDouble(),
+      raterProfileImageUrl: data['raterProfileImageUrl'],
+      score: (data['score'] as num?)?.toDouble() ?? 0.0,
+      role: data['role'],
       comment: data['comment'],
       createdAt: data['createdAt'] ?? Timestamp.now(),
-      statRatings: statRatings,
     );
   }
 
   Map<String, dynamic> toFirestore() {
     return {
-      'tournamentId': tournamentId,
-      'targetUid': targetUid,
-      'raterUid': raterUid,
+      'ratedUserId': ratedUserId,
+      'raterId': raterId,
       'raterName': raterName,
-      'stars': stars,
+      'raterProfileImageUrl': raterProfileImageUrl,
+      'score': score,
+      'role': role,
       'comment': comment,
       'createdAt': createdAt,
-      'statRatings': statRatings,
     };
   }
 
   RatingModel copyWith({
     String? id,
-    String? tournamentId,
-    String? targetUid,
-    String? raterUid,
+    String? ratedUserId,
+    String? raterId,
     String? raterName,
-    double? stars,
+    String? raterProfileImageUrl,
+    double? score,
+    String? role,
     String? comment,
     Timestamp? createdAt,
-    Map<String, double>? statRatings,
   }) {
     return RatingModel(
       id: id ?? this.id,
-      tournamentId: tournamentId ?? this.tournamentId,
-      targetUid: targetUid ?? this.targetUid,
-      raterUid: raterUid ?? this.raterUid,
+      ratedUserId: ratedUserId ?? this.ratedUserId,
+      raterId: raterId ?? this.raterId,
       raterName: raterName ?? this.raterName,
-      stars: stars ?? this.stars,
+      raterProfileImageUrl: raterProfileImageUrl ?? this.raterProfileImageUrl,
+      score: score ?? this.score,
+      role: role ?? this.role,
       comment: comment ?? this.comment,
       createdAt: createdAt ?? this.createdAt,
-      statRatings: statRatings ?? this.statRatings,
     );
   }
 } 
