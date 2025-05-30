@@ -18,56 +18,12 @@ void main() async {
   // Load environment variables
   await EnvConfig.init();
   
-  // Web platform is not supported in this version
-  if (kIsWeb) {
-    runApp(const UnsupportedPlatformApp());
-    return;
-  }
-  
-  // Initialize Firebase
+  // Initialize Firebase for all platforms
   await Firebase.initializeApp(
     options: DefaultFirebaseOptions.currentPlatform,
   );
   
-  // Initialize Firebase messaging only on non-web platforms
-  // Web messaging requires service worker setup
-  
   runApp(const MyApp());
-}
-
-class UnsupportedPlatformApp extends StatelessWidget {
-  const UnsupportedPlatformApp({Key? key}) : super(key: key);
-
-  @override
-  Widget build(BuildContext context) {
-    return MaterialApp(
-      title: 'LoL 내전 매니저',
-      theme: ThemeData(
-        primarySwatch: Colors.blue,
-        visualDensity: VisualDensity.adaptivePlatformDensity,
-      ),
-      home: Scaffold(
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: const [
-              Icon(Icons.web_asset_off, size: 64, color: Colors.red),
-              SizedBox(height: 24),
-              Text(
-                '웹 버전은 아직 지원되지 않습니다',
-                style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-              SizedBox(height: 16),
-              Text(
-                '모바일 앱을 다운로드하여 이용해주세요.',
-                style: TextStyle(fontSize: 16),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
 }
 
 class MyApp extends StatefulWidget {
