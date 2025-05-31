@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "814326964696",
+    "project_id": "lolcustom-app",
+    "storage_bucket": "lolcustom-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:814326964696:android:957ae1cef261f8d0aa92ad",
+        "android_client_info": {
+          "package_name": "com.judgg.lolcustom"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBzq3JoimHPRloRw-2gPgqa0Cu7JxubyBg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
