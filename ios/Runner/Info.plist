@@ -45,5 +45,47 @@
 	<true/>
 	<key>UIApplicationSupportsIndirectInputEvents</key>
 	<true/>
+	
+	<!-- iOS 최소 버전 명시 -->
+	<key>MinimumOSVersion</key>
+	<string>13.0</string>
+	
+	<!-- 네트워크 보안 설정 (Firebase 통신용) -->
+	<key>NSAppTransportSecurity</key>
+	<dict>
+		<key>NSAllowsArbitraryLoads</key>
+		<true/>
+	</dict>
+	
+	<!-- 카메라 권한 (프로필 사진 촬영용) -->
+	<key>NSCameraUsageDescription</key>
+	<string>프로필 사진을 촬영하기 위해 카메라 접근이 필요합니다.</string>
+	
+	<!-- 갤러리 권한 (프로필 사진 선택용) -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>프로필 사진 선택을 위해 사진 라이브러리 접근이 필요합니다.</string>
+	
+	<!-- 위치 권한 (내전 위치 확인용) -->
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>내전 위치 확인을 위해 위치 정보가 필요합니다.</string>
+	
+	<!-- 푸시 알림 백그라운드 모드 -->
+	<key>UIBackgroundModes</key>
+	<array>
+		<string>remote-notification</string>
+	</array>
+	
+	<!-- Firebase URL Scheme (딥링크용) -->
+	<key>CFBundleURLTypes</key>
+	<array>
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+			</array>
+		</dict>
+	</array>
 </dict>
 </plist>
