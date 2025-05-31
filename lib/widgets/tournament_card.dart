@@ -47,7 +47,7 @@ class TournamentCard extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          tournament.hostNickname,
+                          tournament.hostNickname ?? tournament.hostName,
                           style: const TextStyle(
                             fontWeight: FontWeight.bold,
                             fontSize: 16,

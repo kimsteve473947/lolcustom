@@ -28,12 +28,12 @@ class AppRouter {
     initialLocation: '/',
     debugLogDiagnostics: true,
     refreshListenable: GoRouterRefreshStream(authService.authStateChanges()),
-    redirect: (context, state) {
+    redirect: (BuildContext context, GoRouterState state) {
       final isLoggedIn = authService.isLoggedIn;
-      final isInitializing = state.matchedLocation == '/';
-      final isLoggingIn = state.matchedLocation == '/login';
-      final isSigningUp = state.matchedLocation == '/signup';
-      final isPasswordReset = state.matchedLocation == '/password-reset';
+      final isInitializing = state.location == '/';
+      final isLoggingIn = state.location == '/login';
+      final isSigningUp = state.location == '/signup';
+      final isPasswordReset = state.location == '/password-reset';
       
       // 인증이 필요하지 않은 경로 목록
       final publicPaths = [
@@ -54,7 +54,7 @@ class AppRouter {
       }
       
       // 로그인하지 않은 사용자가 보호된 경로에 접근하면 로그인 페이지로 리다이렉트
-      if (!isLoggedIn && !publicPaths.contains(state.matchedLocation)) {
+      if (!isLoggedIn && !publicPaths.contains(state.location)) {
         return '/login?redirect=${state.location}';
       }
       
@@ -69,7 +69,7 @@ class AppRouter {
       GoRoute(
         path: '/login',
         builder: (context, state) => LoginScreen(
-          redirectUrl: state.queryParameters['redirect'],
+          redirectUrl: state.queryParams['redirect'],
         ),
       ),
       GoRoute(
@@ -91,14 +91,14 @@ class AppRouter {
       GoRoute(
         path: '/tournaments/:id',
         builder: (context, state) {
-          final tournamentId = state.pathParameters['id']!;
+          final tournamentId = state.params['id']!;
           return TournamentDetailScreen(tournamentId: tournamentId);
         },
       ),
       GoRoute(
         path: '/mercenaries/:id',
         builder: (context, state) {
-          final userId = state.pathParameters['id']!;
+          final userId = state.params['id']!;
           return MercenaryDetailScreen(userId: userId);
         },
       ),
@@ -113,7 +113,7 @@ class AppRouter {
       GoRoute(
         path: '/chat/:id',
         builder: (context, state) {
-          final chatId = state.pathParameters['id']!;
+          final chatId = state.params['id']!;
           return ChatRoomScreen(chatId: chatId);
         },
       ),

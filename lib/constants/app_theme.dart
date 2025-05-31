@@ -19,6 +19,7 @@ class AppColors {
   static const Color link = Color(0xFF007AFF);
   static const Color divider = Color(0xFFEEEEEE);
   static const Color disabled = Color(0xFFAAAAAA);
+  static const Color textDisabled = Color(0xFFCCCCCC);
   
   // 롤 포지션 컬러
   static const Color top = Color(0xFFFF4D4D);
@@ -26,6 +27,13 @@ class AppColors {
   static const Color mid = Color(0xFF2196F3);
   static const Color adc = Color(0xFFFF9800);
   static const Color support = Color(0xFF9C27B0);
+  
+  // 롤 포지션 컬러 (TournamentCard 사용)
+  static const Color roleTop = Color(0xFFFF4D4D);
+  static const Color roleJungle = Color(0xFF4CAF50);
+  static const Color roleMid = Color(0xFF2196F3);
+  static const Color roleAdc = Color(0xFFFF9800);
+  static const Color roleSupport = Color(0xFF9C27B0);
   
   // 텍스트 컬러
   static const Color textPrimary = Color(0xFF333333);
