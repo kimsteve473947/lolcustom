@@ -43,41 +43,45 @@ class DefaultFirebaseOptions {
     }
   }
 
+  // 아래 정보는 Firebase Console에서 앱을 등록한 후 얻을 수 있는 정보입니다.
+  // 개발 환경에서는 flutterfire configure 명령어로 자동 생성할 수 있습니다.
+  // 샘플 값으로 작성되었으니 실제 앱 개발 시 올바른 값으로 변경하세요.
+  
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'AIzaSyBnHOeeiobpbMF9dhMfXXoP7H2ZW-mOEBY',
-    appId: '1:123456789012:web:1234567890abcdef',
-    messagingSenderId: '123456789012',
-    projectId: 'lol-custom-game-manager',
-    authDomain: 'lol-custom-game-manager.firebaseapp.com',
-    storageBucket: 'lol-custom-game-manager.appspot.com',
-    measurementId: 'G-MEASUREMENT_ID',
+    apiKey: 'YOUR_API_KEY',
+    appId: 'YOUR_APP_ID',
+    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+    projectId: 'YOUR_PROJECT_ID',
+    authDomain: 'YOUR_AUTH_DOMAIN',
+    storageBucket: 'YOUR_STORAGE_BUCKET',
+    measurementId: 'YOUR_MEASUREMENT_ID',
   );
 
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'AIzaSyDklfasd33JHiOfdfKlWerFgxPbmn3Lbg',
-    appId: '1:123456789012:android:1234567890abcdef',
-    messagingSenderId: '123456789012',
-    projectId: 'lol-custom-game-manager',
-    storageBucket: 'lol-custom-game-manager.appspot.com',
+    apiKey: 'YOUR_API_KEY',
+    appId: 'YOUR_APP_ID',
+    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+    projectId: 'YOUR_PROJECT_ID',
+    storageBucket: 'YOUR_STORAGE_BUCKET',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'AIzaSyAsd98fdJFHiHGgfkHHifFWer39FgdTpbL',
-    appId: '1:123456789012:ios:1234567890abcdef',
-    messagingSenderId: '123456789012',
-    projectId: 'lol-custom-game-manager',
-    storageBucket: 'lol-custom-game-manager.appspot.com',
-    iosClientId: '123456789012-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com',
-    iosBundleId: 'com.lolcustom.manager',
+    apiKey: 'YOUR_API_KEY',
+    appId: 'YOUR_APP_ID',
+    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+    projectId: 'YOUR_PROJECT_ID',
+    storageBucket: 'YOUR_STORAGE_BUCKET',
+    iosClientId: 'YOUR_IOS_CLIENT_ID',
+    iosBundleId: 'com.example.lolCustomGameManager',
   );
 
   static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'AIzaSyFklasd93JHiufKlWerFgxPbm3n3Lbg',
-    appId: '1:123456789012:ios:1234567890abcdef',
-    messagingSenderId: '123456789012',
-    projectId: 'lol-custom-game-manager',
-    storageBucket: 'lol-custom-game-manager.appspot.com',
-    iosClientId: '123456789012-abcdefghijklmnopqrstuvwxyz.apps.googleusercontent.com',
-    iosBundleId: 'com.lolcustom.manager',
+    apiKey: 'YOUR_API_KEY',
+    appId: 'YOUR_APP_ID',
+    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
+    projectId: 'YOUR_PROJECT_ID',
+    storageBucket: 'YOUR_STORAGE_BUCKET',
+    iosClientId: 'YOUR_IOS_CLIENT_ID',
+    iosBundleId: 'com.example.lolCustomGameManager',
   );
 } 

@@ -33,17 +33,12 @@ class ErrorView extends StatelessWidget {
               ),
               textAlign: TextAlign.center,
             ),
+            const SizedBox(height: 24),
             if (onRetry != null)
-              Padding(
-                padding: const EdgeInsets.only(top: 24),
-                child: ElevatedButton.icon(
-                  onPressed: onRetry,
-                  icon: const Icon(Icons.refresh),
-                  label: const Text('다시 시도'),
-                  style: ElevatedButton.styleFrom(
-                    minimumSize: const Size(200, 48),
-                  ),
-                ),
+              ElevatedButton.icon(
+                onPressed: onRetry,
+                icon: const Icon(Icons.refresh),
+                label: const Text('다시 시도'),
               ),
           ],
         ),

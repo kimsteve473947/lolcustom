@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
-import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
+import 'package:lol_custom_game_manager/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
 
 class SplashScreen extends StatefulWidget {
@@ -15,19 +15,20 @@ class _SplashScreenState extends State<SplashScreen> {
   @override
   void initState() {
     super.initState();
-    _navigateToNextScreen();
+    _checkAuthAndNavigate();
   }
 
-  Future<void> _navigateToNextScreen() async {
-    // Wait for the splash screen to be visible for a short time
-    await Future.delayed(const Duration(milliseconds: 1500));
-
+  Future<void> _checkAuthAndNavigate() async {
+    // 2초 기다리기 (스플래시 화면 표시 시간)
+    await Future.delayed(const Duration(seconds: 2));
     if (!mounted) return;
     
-    final appState = Provider.of<AppStateProvider>(context, listen: false);
+    // 인증 상태 확인
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
-    if (appState.isLoggedIn) {
-      context.go('/tournaments');
+    // 로그인 상태에 따라 적절한 화면으로 이동
+    if (authProvider.isLoggedIn) {
+      context.go('/main');
     } else {
       context.go('/login');
     }
@@ -41,43 +42,40 @@ class _SplashScreenState extends State<SplashScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            // Logo could be added here
+            // 로고 이미지
             Container(
-              width: 120,
-              height: 120,
-              decoration: const BoxDecoration(
+              width: 150,
+              height: 150,
+              decoration: BoxDecoration(
                 color: Colors.white,
-                shape: BoxShape.circle,
+                borderRadius: BorderRadius.circular(20),
               ),
-              child: Center(
-                child: Text(
-                  '내전',
-                  style: TextStyle(
-                    color: AppColors.primary,
-                    fontSize: 36,
-                    fontWeight: FontWeight.bold,
-                  ),
+              child: const Center(
+                child: Icon(
+                  Icons.sports_esports,
+                  size: 80,
+                  color: AppColors.primary,
                 ),
               ),
             ),
-            const SizedBox(height: 32),
+            const SizedBox(height: 24),
             const Text(
-              '내전 매니저',
+              'LoL 내전 매니저',
               style: TextStyle(
-                color: Colors.white,
-                fontSize: 24,
+                fontSize: 28,
                 fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            const Text(
-              '당신의 게임을 한 단계 업그레이드하세요',
-              style: TextStyle(
                 color: Colors.white,
-                fontSize: 16,
               ),
             ),
-            const SizedBox(height: 64),
+            const SizedBox(height: 8),
+            const Text(
+              '내전을 더 쉽고 편하게',
+              style: TextStyle(
+                fontSize: 16,
+                color: Colors.white70,
+              ),
+            ),
+            const SizedBox(height: 40),
             const CircularProgressIndicator(
               valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
             ),

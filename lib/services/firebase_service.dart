@@ -26,7 +26,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error getting current user: $e');
+      debugPrint('Error getting current user: $e');
       return null;
     }
   }
@@ -35,7 +35,7 @@ class FirebaseService {
     try {
       await _firestore.collection('users').doc(user.uid).set(user.toFirestore());
     } catch (e) {
-      print('Error creating user profile: $e');
+      debugPrint('Error creating user profile: $e');
       throw e;
     }
   }
@@ -44,7 +44,7 @@ class FirebaseService {
     try {
       await _firestore.collection('users').doc(user.uid).update(user.toFirestore());
     } catch (e) {
-      print('Error updating user profile: $e');
+      debugPrint('Error updating user profile: $e');
       throw e;
     }
   }
@@ -90,7 +90,7 @@ class FirebaseService {
       final snapshot = await query.get();
       return snapshot.docs.map((doc) => TournamentModel.fromFirestore(doc)).toList();
     } catch (e) {
-      print('Error getting tournaments: $e');
+      debugPrint('Error getting tournaments: $e');
       return [];
     }
   }
@@ -103,7 +103,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error getting tournament: $e');
+      debugPrint('Error getting tournament: $e');
       return null;
     }
   }
@@ -113,7 +113,7 @@ class FirebaseService {
       DocumentReference ref = await _firestore.collection('tournaments').add(tournament.toFirestore());
       return ref.id;
     } catch (e) {
-      print('Error creating tournament: $e');
+      debugPrint('Error creating tournament: $e');
       throw e;
     }
   }
@@ -122,7 +122,7 @@ class FirebaseService {
     try {
       await _firestore.collection('tournaments').doc(tournament.id).update(tournament.toFirestore());
     } catch (e) {
-      print('Error updating tournament: $e');
+      debugPrint('Error updating tournament: $e');
       throw e;
     }
   }
@@ -133,7 +133,7 @@ class FirebaseService {
       DocumentReference ref = await _firestore.collection('applications').add(application.toFirestore());
       return ref.id;
     } catch (e) {
-      print('Error applying to tournament: $e');
+      debugPrint('Error applying to tournament: $e');
       throw e;
     }
   }
@@ -145,7 +145,7 @@ class FirebaseService {
           .get();
       return snapshot.docs.map((doc) => ApplicationModel.fromFirestore(doc)).toList();
     } catch (e) {
-      print('Error getting tournament applications: $e');
+      debugPrint('Error getting tournament applications: $e');
       return [];
     }
   }
@@ -154,7 +154,7 @@ class FirebaseService {
     try {
       await _firestore.collection('applications').doc(id).update({'status': status.index});
     } catch (e) {
-      print('Error updating application status: $e');
+      debugPrint('Error updating application status: $e');
       throw e;
     }
   }
@@ -193,7 +193,7 @@ class FirebaseService {
       
       return mercenaries;
     } catch (e) {
-      print('Error getting mercenaries: $e');
+      debugPrint('Error getting mercenaries: $e');
       return [];
     }
   }
@@ -203,7 +203,7 @@ class FirebaseService {
       DocumentReference ref = await _firestore.collection('mercenaries').add(mercenary.toFirestore());
       return ref.id;
     } catch (e) {
-      print('Error creating mercenary profile: $e');
+      debugPrint('Error creating mercenary profile: $e');
       throw e;
     }
   }
@@ -212,7 +212,7 @@ class FirebaseService {
     try {
       await _firestore.collection('mercenaries').doc(mercenary.id).update(mercenary.toFirestore());
     } catch (e) {
-      print('Error updating mercenary profile: $e');
+      debugPrint('Error updating mercenary profile: $e');
       throw e;
     }
   }
@@ -225,7 +225,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error getting mercenary: $e');
+      debugPrint('Error getting mercenary: $e');
       return null;
     }
   }
@@ -238,7 +238,7 @@ class FirebaseService {
       }
       return null;
     } catch (e) {
-      print('Error getting user by ID: $e');
+      debugPrint('Error getting user by ID: $e');
       return null;
     }
   }
@@ -249,7 +249,7 @@ class FirebaseService {
       DocumentReference ref = await _firestore.collection('ratings').add(rating.toFirestore());
       return ref.id;
     } catch (e) {
-      print('Error rating user: $e');
+      debugPrint('Error rating user: $e');
       throw e;
     }
   }
@@ -265,7 +265,7 @@ class FirebaseService {
         return RatingModel.fromMap(data);
       }).toList();
     } catch (e) {
-      print('Error getting user ratings: $e');
+      debugPrint('Error getting user ratings: $e');
       return [];
     }
   }
@@ -276,7 +276,7 @@ class FirebaseService {
       DocumentReference ref = await _firestore.collection('chatRooms').add(chatRoom.toFirestore());
       return ref.id;
     } catch (e) {
-      print('Error creating chat room: $e');
+      debugPrint('Error creating chat room: $e');
       throw e;
     }
   }
@@ -289,7 +289,7 @@ class FirebaseService {
           .get();
       return snapshot.docs.map((doc) => ChatRoomModel.fromFirestore(doc)).toList();
     } catch (e) {
-      print('Error getting user chat rooms: $e');
+      debugPrint('Error getting user chat rooms: $e');
       return [];
     }
   }
@@ -307,7 +307,7 @@ class FirebaseService {
       
       return ref.id;
     } catch (e) {
-      print('Error sending message: $e');
+      debugPrint('Error sending message: $e');
       throw e;
     }
   }
@@ -341,7 +341,7 @@ class FirebaseService {
       
       return await ref.getDownloadURL();
     } catch (e) {
-      print('Error uploading image: $e');
+      debugPrint('Error uploading image: $e');
       throw e;
     }
   }

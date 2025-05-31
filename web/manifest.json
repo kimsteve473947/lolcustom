@@ -1,11 +1,11 @@
 {
-    "name": "lol_custom_game_manager",
-    "short_name": "lol_custom_game_manager",
+    "name": "LoL Custom Game Manager",
+    "short_name": "LoL CGM",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
+    "background_color": "#FF6B35",
+    "theme_color": "#FF6B35",
+    "description": "League of Legends custom game manager app to handle mercenary recruitment and participation.",
     "orientation": "portrait-primary",
     "prefer_related_applications": false,
     "icons": [

@@ -158,40 +158,23 @@ class _TournamentListScreenState extends State<TournamentListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Row(
-          children: [
-            Text(
-              '용병구함',
-              style: TextStyle(
-                fontWeight: FontWeight.bold,
-                fontSize: 20,
-              ),
-            ),
-            SizedBox(width: 8),
-            Chip(
-              label: Text('민락동'),
-              padding: EdgeInsets.zero,
-              labelStyle: TextStyle(fontSize: 12),
-              backgroundColor: Color(0xFFEEEEEE),
-            ),
-          ],
-        ),
+        title: const Text('내전'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.notifications_none_rounded),
+            icon: const Icon(Icons.notifications_none),
             onPressed: () {
-              // TODO: Navigate to notifications
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('알림 기능은 준비 중입니다')),
+              );
             },
           ),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {
-              // TODO: Navigate to search
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('검색 기능은 준비 중입니다')),
+              );
             },
-          ),
-          IconButton(
-            icon: const Icon(Icons.filter_list),
-            onPressed: () => _showFilterDialog(context),
           ),
         ],
       ),
@@ -216,7 +199,9 @@ class _TournamentListScreenState extends State<TournamentListScreen> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          context.push('/tournaments/create');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('새 내전 생성 페이지로 이동합니다')),
+          );
         },
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add),

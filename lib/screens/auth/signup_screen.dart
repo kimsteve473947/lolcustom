@@ -5,48 +5,54 @@ import 'package:lol_custom_game_manager/providers/auth_provider.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:provider/provider.dart';
 
-class LoginScreen extends StatefulWidget {
-  final String? redirectUrl;
-  
-  const LoginScreen({Key? key, this.redirectUrl}) : super(key: key);
+class SignupScreen extends StatefulWidget {
+  const SignupScreen({Key? key}) : super(key: key);
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  State<SignupScreen> createState() => _SignupScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _SignupScreenState extends State<SignupScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
+  final _confirmPasswordController = TextEditingController();
+  final _nicknameController = TextEditingController();
   bool _isPasswordVisible = false;
-  bool _rememberMe = false;
+  bool _isConfirmPasswordVisible = false;
+  bool _agreeToTerms = false;
 
   @override
   void dispose() {
     _emailController.dispose();
     _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _nicknameController.dispose();
     super.dispose();
   }
 
-  Future<void> _signIn() async {
+  Future<void> _signUp() async {
     if (!_formKey.currentState!.validate()) return;
+    
+    if (!_agreeToTerms) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('이용약관에 동의해주세요')),
+      );
+      return;
+    }
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
     
     try {
-      await authProvider.signIn(
+      await authProvider.signUp(
         _emailController.text.trim(),
         _passwordController.text,
+        _nicknameController.text.trim(),
       );
       
       if (mounted) {
-        // 로그인 성공 후 리다이렉트 URL이 있으면 해당 URL로 이동
-        final redirectUrl = widget.redirectUrl;
-        if (redirectUrl != null && redirectUrl.isNotEmpty) {
-          context.go(redirectUrl);
-        } else {
-          context.go('/main');
-        }
+        // 회원가입 성공 시 메인 화면으로 이동
+        context.go('/main');
       }
     } catch (e) {
       // 오류는 AuthProvider에서 처리하므로 여기서는 별도 처리 필요 없음
@@ -58,6 +64,9 @@ class _LoginScreenState extends State<LoginScreen> {
     final authProvider = Provider.of<AuthProvider>(context);
 
     return Scaffold(
+      appBar: AppBar(
+        title: const Text('회원가입'),
+      ),
       body: SafeArea(
         child: Center(
           child: SingleChildScrollView(
@@ -68,32 +77,9 @@ class _LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.center,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  // Logo
-                  Center(
-                    child: Container(
-                      width: 80,
-                      height: 80,
-                      decoration: const BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                      ),
-                      child: const Center(
-                        child: Text(
-                          '내전',
-                          style: TextStyle(
-                            color: Colors.white,
-                            fontSize: 24,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(height: 32),
-                  
                   // Title
                   const Text(
-                    '로그인',
+                    '새 계정 만들기',
                     style: TextStyle(
                       fontSize: 28,
                       fontWeight: FontWeight.bold,
@@ -117,6 +103,26 @@ class _LoginScreenState extends State<LoginScreen> {
                       }
                       if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
                         return '유효한 이메일 주소를 입력해주세요';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Nickname field
+                  TextFormField(
+                    controller: _nicknameController,
+                    decoration: const InputDecoration(
+                      labelText: '닉네임',
+                      hintText: '게임에서 사용할 닉네임',
+                      prefixIcon: Icon(Icons.person_outline),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return '닉네임을 입력해주세요';
+                      }
+                      if (value.length < 2) {
+                        return '닉네임은 최소 2자 이상이어야 합니다';
                       }
                       return null;
                     },
@@ -154,31 +160,64 @@ class _LoginScreenState extends State<LoginScreen> {
                       return null;
                     },
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 16),
                   
-                  // Remember me and Forgot password
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
-                        children: [
-                          Checkbox(
-                            value: _rememberMe,
-                            onChanged: (value) {
-                              setState(() {
-                                _rememberMe = value ?? false;
-                              });
-                            },
-                          ),
-                          const Text('자동 로그인'),
-                        ],
-                      ),
-                      TextButton(
+                  // Confirm password field
+                  TextFormField(
+                    controller: _confirmPasswordController,
+                    obscureText: !_isConfirmPasswordVisible,
+                    decoration: InputDecoration(
+                      labelText: '비밀번호 확인',
+                      hintText: '********',
+                      prefixIcon: const Icon(Icons.lock_outline),
+                      suffixIcon: IconButton(
+                        icon: Icon(
+                          _isConfirmPasswordVisible
+                              ? Icons.visibility
+                              : Icons.visibility_off,
+                        ),
                         onPressed: () {
-                          // 비밀번호 찾기 화면으로 이동
-                          context.push('/password-reset');
+                          setState(() {
+                            _isConfirmPasswordVisible = !_isConfirmPasswordVisible;
+                          });
                         },
-                        child: const Text('비밀번호 찾기'),
+                      ),
+                    ),
+                    validator: (value) {
+                      if (value == null || value.isEmpty) {
+                        return '비밀번호를 다시 입력해주세요';
+                      }
+                      if (value != _passwordController.text) {
+                        return '비밀번호가 일치하지 않습니다';
+                      }
+                      return null;
+                    },
+                  ),
+                  const SizedBox(height: 16),
+                  
+                  // Terms and conditions
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _agreeToTerms,
+                        onChanged: (value) {
+                          setState(() {
+                            _agreeToTerms = value ?? false;
+                          });
+                        },
+                      ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () {
+                            setState(() {
+                              _agreeToTerms = !_agreeToTerms;
+                            });
+                          },
+                          child: const Text(
+                            '이용약관 및 개인정보 처리방침에 동의합니다',
+                            style: TextStyle(fontSize: 14),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -203,31 +242,31 @@ class _LoginScreenState extends State<LoginScreen> {
                     ),
                   const SizedBox(height: 24),
                   
-                  // Login button
+                  // Sign up button
                   authProvider.isLoading
                       ? const LoadingIndicator()
                       : ElevatedButton(
-                          onPressed: _signIn,
+                          onPressed: _signUp,
                           child: const Padding(
                             padding: EdgeInsets.symmetric(vertical: 12),
                             child: Text(
-                              '로그인',
+                              '회원가입',
                               style: TextStyle(fontSize: 16),
                             ),
                           ),
                         ),
                   const SizedBox(height: 16),
                   
-                  // Sign up button
+                  // Login link
                   Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Text('계정이 없으신가요?'),
+                      const Text('이미 계정이 있으신가요?'),
                       TextButton(
                         onPressed: () {
-                          context.go('/signup');
+                          context.go('/login');
                         },
-                        child: const Text('회원가입'),
+                        child: const Text('로그인'),
                       ),
                     ],
                   ),

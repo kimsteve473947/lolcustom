@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 
 class AppColors {
   // 메인 컬러
@@ -27,6 +26,10 @@ class AppColors {
   static const Color mid = Color(0xFF2196F3);
   static const Color adc = Color(0xFFFF9800);
   static const Color support = Color(0xFF9C27B0);
+  
+  // 텍스트 컬러
+  static const Color textPrimary = Color(0xFF333333);
+  static const Color textSecondary = Color(0xFF888888);
 }
 
 class AppTheme {
@@ -43,7 +46,7 @@ class AppTheme {
         error: AppColors.error,
         background: AppColors.background,
       ),
-      textTheme: GoogleFonts.notoSansKrTextTheme(),
+      textTheme: const TextTheme(),
       appBarTheme: const AppBarTheme(
         backgroundColor: AppColors.white,
         foregroundColor: AppColors.black,
@@ -87,7 +90,7 @@ class AppTheme {
           ),
         ),
       ),
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         color: AppColors.white,
         elevation: 2,
         shape: RoundedRectangleBorder(
@@ -131,7 +134,7 @@ class AppTheme {
         showUnselectedLabels: true,
         type: BottomNavigationBarType.fixed,
       ),
-      tabBarTheme: const TabBarTheme(
+      tabBarTheme: const TabBarThemeData(
         labelColor: AppColors.primary,
         unselectedLabelColor: AppColors.grey,
         indicatorColor: AppColors.primary,

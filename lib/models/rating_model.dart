@@ -11,7 +11,7 @@ class RatingModel extends Equatable {
   final String? role;
   final String? comment;
   final Timestamp createdAt;
-  final int stars; // Required by some UI components
+  final int stars;
   
   const RatingModel({
     required this.id,
@@ -24,13 +24,42 @@ class RatingModel extends Equatable {
     this.comment,
     required this.createdAt,
     int? stars,
-  }) : stars = stars ?? score.round(); // Default stars to rounded score
+  }) : stars = stars ?? 0; // Initialize with 0 and update after construction if needed
   
   @override
   List<Object?> get props => [
     id, ratedUserId, raterId, raterName, raterProfileImageUrl, 
     score, role, comment, createdAt, stars
   ];
+  
+  // Use this for initializing stars based on score
+  RatingModel _withStarsFromScore() {
+    return copyWith(stars: score.round());
+  }
+  
+  static RatingModel create({
+    required String id,
+    required String ratedUserId,
+    required String raterId,
+    required String raterName,
+    String? raterProfileImageUrl,
+    required double score,
+    String? role,
+    String? comment,
+    required Timestamp createdAt,
+  }) {
+    return RatingModel(
+      id: id,
+      ratedUserId: ratedUserId,
+      raterId: raterId,
+      raterName: raterName,
+      raterProfileImageUrl: raterProfileImageUrl,
+      score: score,
+      role: role,
+      comment: comment,
+      createdAt: createdAt,
+    )._withStarsFromScore();
+  }
   
   Map<String, dynamic> toMap() {
     return {
@@ -45,6 +74,10 @@ class RatingModel extends Equatable {
       'createdAt': createdAt,
       'stars': stars,
     };
+  }
+  
+  Map<String, dynamic> toFirestore() {
+    return toMap();
   }
   
   factory RatingModel.fromMap(Map<String, dynamic> map) {

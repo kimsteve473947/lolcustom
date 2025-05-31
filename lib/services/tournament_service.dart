@@ -12,360 +12,306 @@ class TournamentService {
   // 사용자 ID 가져오기
   String? get _userId => _auth.currentUser?.uid;
   
-  // 모든 토너먼트 가져오기 (페이징 적용)
+  // 콜렉션 참조
+  CollectionReference get _tournamentsRef => _firestore.collection(_collectionPath);
+  
+  // 모든 토너먼트 조회 (최신순)
+  Stream<List<TournamentModel>> getTournamentsStream() {
+    return _tournamentsRef
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => TournamentModel.fromFirestore(doc))
+              .toList();
+        });
+  }
+  
+  // 상태별 토너먼트 조회
+  Stream<List<TournamentModel>> getTournamentsByStatusStream(TournamentStatus status) {
+    return _tournamentsRef
+        .where('status', isEqualTo: status.index)
+        .orderBy('startsAt', descending: false)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => TournamentModel.fromFirestore(doc))
+              .toList();
+        });
+  }
+  
+  // 활성 상태 토너먼트 조회 (시작 시간 순)
+  Stream<List<TournamentModel>> getActiveTournamentsStream() {
+    return _tournamentsRef
+        .where('status', isEqualTo: TournamentStatus.open.index)
+        .orderBy('startsAt', descending: false)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => TournamentModel.fromFirestore(doc))
+              .toList();
+        });
+  }
+  
+  // 특정 토너먼트 조회
+  Stream<TournamentModel?> getTournamentStream(String id) {
+    return _tournamentsRef
+        .doc(id)
+        .snapshots()
+        .map((doc) {
+          if (doc.exists) {
+            return TournamentModel.fromFirestore(doc);
+          }
+          return null;
+        });
+  }
+  
+  // 특정 토너먼트 데이터 가져오기 (Future)
+  Future<TournamentModel?> getTournament(String id) async {
+    try {
+      final doc = await _tournamentsRef.doc(id).get();
+      if (doc.exists) {
+        return TournamentModel.fromFirestore(doc);
+      }
+      return null;
+    } catch (e) {
+      print('Error getting tournament: $e');
+      rethrow;
+    }
+  }
+  
+  // 토너먼트 목록 가져오기 (Future 버전, 필터링 기능 포함)
   Future<List<TournamentModel>> getTournaments({
-    int limit = 10,
+    int? limit,
     DocumentSnapshot? startAfter,
     Map<String, dynamic>? filters,
   }) async {
     try {
-      Query query = _firestore.collection(_collectionPath)
-          .orderBy('startsAt', descending: false)  // 가까운 날짜순
-          .where('status', isEqualTo: TournamentStatus.pending.index) // 대기중인 토너먼트만
-          .limit(limit);
+      Query query = _tournamentsRef.orderBy('startsAt', descending: false);
       
-      // 시작점이 있는 경우 (페이징)
+      // 필터 적용
+      if (filters != null) {
+        // 유료/무료 필터
+        if (filters['isPaid'] != null) {
+          query = query.where('isPaid', isEqualTo: filters['isPaid']);
+        }
+        
+        // 날짜 범위 필터
+        if (filters['startDate'] != null && filters['endDate'] != null) {
+          query = query.where('startsAt', 
+            isGreaterThanOrEqualTo: Timestamp.fromDate(filters['startDate']),
+            isLessThanOrEqualTo: Timestamp.fromDate(filters['endDate'])
+          );
+        }
+        
+        // 프리미엄 필터
+        if (filters['premiumBadge'] != null) {
+          query = query.where('premiumBadge', isEqualTo: filters['premiumBadge']);
+        }
+      }
+      
+      // 페이지네이션
       if (startAfter != null) {
         query = query.startAfterDocument(startAfter);
       }
       
-      // 필터 적용
-      if (filters != null) {
-        // OVR 제한 필터
-        if (filters.containsKey('ovrLimit')) {
-          final ovrLimit = filters['ovrLimit'] as int?;
-          if (ovrLimit != null) {
-            query = query.where('ovrLimit', isLessThanOrEqualTo: ovrLimit);
-          }
-        }
-        
-        // 참가비 필터 (무료/유료)
-        if (filters.containsKey('isPaid')) {
-          final isPaid = filters['isPaid'] as bool?;
-          if (isPaid != null) {
-            query = query.where('isPaid', isEqualTo: isPaid);
-          }
-        }
-        
-        // 프리미엄 배지 필터
-        if (filters.containsKey('premiumBadge')) {
-          final premiumBadge = filters['premiumBadge'] as bool?;
-          if (premiumBadge != null) {
-            query = query.where('premiumBadge', isEqualTo: premiumBadge);
-          }
-        }
-        
-        // 날짜 범위 필터
-        if (filters.containsKey('startDate') && filters.containsKey('endDate')) {
-          final startDate = filters['startDate'] as DateTime?;
-          final endDate = filters['endDate'] as DateTime?;
-          
-          if (startDate != null && endDate != null) {
-            query = query.where('startsAt', 
-              isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
-              isLessThanOrEqualTo: Timestamp.fromDate(endDate),
-            );
-          }
-        }
+      if (limit != null) {
+        query = query.limit(limit);
       }
       
-      final snapshots = await query.get();
+      final snapshot = await query.get();
       
-      // 결과가 비어있으면 빈 리스트 반환
-      if (snapshots.docs.isEmpty) {
-        return [];
-      }
-      
-      // 결과를 TournamentModel 리스트로 변환
-      return snapshots.docs
+      return snapshot.docs
           .map((doc) => TournamentModel.fromFirestore(doc))
           .toList();
     } catch (e) {
-      debugPrint('Error getting tournaments: $e');
-      return [];
+      print('Error getting tournaments: $e');
+      rethrow;
     }
   }
   
-  // 토너먼트 상세 정보 가져오기
-  Future<TournamentModel?> getTournamentById(String id) async {
-    try {
-      final doc = await _firestore.collection(_collectionPath).doc(id).get();
-      
-      if (!doc.exists) {
-        return null;
-      }
-      
-      return TournamentModel.fromFirestore(doc);
-    } catch (e) {
-      debugPrint('Error getting tournament by id: $e');
-      return null;
-    }
-  }
-  
-  // 사용자가 주최한 토너먼트 가져오기
-  Future<List<TournamentModel>> getHostedTournaments() async {
-    if (_userId == null) return [];
+  // 내가 주최한 토너먼트 조회
+  Stream<List<TournamentModel>> getMyHostedTournamentsStream() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return Stream.value([]);
     
-    try {
-      final snapshots = await _firestore.collection(_collectionPath)
-          .where('hostUid', isEqualTo: _userId)
-          .orderBy('createdAt', descending: true)
-          .get();
-      
-      if (snapshots.docs.isEmpty) {
-        return [];
-      }
-      
-      return snapshots.docs
-          .map((doc) => TournamentModel.fromFirestore(doc))
-          .toList();
-    } catch (e) {
-      debugPrint('Error getting hosted tournaments: $e');
-      return [];
-    }
+    return _tournamentsRef
+        .where('hostId', isEqualTo: userId)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => TournamentModel.fromFirestore(doc))
+              .toList();
+        });
   }
   
-  // 사용자가 참가한 토너먼트 가져오기
-  Future<List<TournamentModel>> getJoinedTournaments() async {
-    if (_userId == null) return [];
+  // 내가 참가한 토너먼트 조회
+  Stream<List<TournamentModel>> getMyJoinedTournamentsStream() {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) return Stream.value([]);
     
-    try {
-      final snapshots = await _firestore.collection(_collectionPath)
-          .where('participantUids', arrayContains: _userId)
-          .orderBy('startsAt', descending: true)
-          .get();
-      
-      if (snapshots.docs.isEmpty) {
-        return [];
-      }
-      
-      return snapshots.docs
-          .map((doc) => TournamentModel.fromFirestore(doc))
-          .toList();
-    } catch (e) {
-      debugPrint('Error getting joined tournaments: $e');
-      return [];
-    }
+    return _tournamentsRef
+        .where('participants', arrayContains: userId)
+        .orderBy('startsAt', descending: false)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => TournamentModel.fromFirestore(doc))
+              .toList();
+        });
   }
   
   // 토너먼트 생성
-  Future<String?> createTournament(TournamentModel tournament) async {
-    if (_userId == null) return null;
-    
+  Future<String> createTournament(TournamentModel tournament) async {
     try {
-      // 문서 ID 생성
-      final id = const Uuid().v4();
-      
-      // 호스트 ID와 생성 시간 설정
-      final tournamentData = tournament.copyWith(
-        id: id,
-        hostUid: _userId,
-        createdAt: DateTime.now(),
-      ).toMap();
-      
-      // Firestore에 저장
-      await _firestore.collection(_collectionPath).doc(id).set(tournamentData);
-      
-      return id;
+      final docRef = await _tournamentsRef.add(tournament.toFirestore());
+      return docRef.id;
     } catch (e) {
-      debugPrint('Error creating tournament: $e');
-      return null;
+      print('Error creating tournament: $e');
+      rethrow;
     }
   }
   
   // 토너먼트 업데이트
-  Future<bool> updateTournament(TournamentModel tournament) async {
-    if (_userId == null) return false;
-    
+  Future<void> updateTournament(TournamentModel tournament) async {
     try {
-      // 호스트만 수정 가능하도록 체크
-      if (tournament.hostUid != _userId) {
-        throw Exception('Only the host can update this tournament');
-      }
-      
-      await _firestore.collection(_collectionPath)
-          .doc(tournament.id)
-          .update(tournament.toMap());
-      
-      return true;
+      await _tournamentsRef.doc(tournament.id).update(tournament.toFirestore());
     } catch (e) {
-      debugPrint('Error updating tournament: $e');
-      return false;
+      print('Error updating tournament: $e');
+      rethrow;
     }
   }
   
-  // 토너먼트 취소
-  Future<bool> cancelTournament(String id) async {
-    if (_userId == null) return false;
-    
+  // 토너먼트 삭제
+  Future<void> deleteTournament(String id) async {
     try {
-      final doc = await _firestore.collection(_collectionPath).doc(id).get();
-      
-      if (!doc.exists) {
-        return false;
-      }
-      
-      final tournament = TournamentModel.fromFirestore(doc);
-      
-      // 호스트만 취소 가능하도록 체크
-      if (tournament.hostUid != _userId) {
-        throw Exception('Only the host can cancel this tournament');
-      }
-      
-      // 토너먼트 상태를 취소로 변경
-      await _firestore.collection(_collectionPath).doc(id).update({
-        'status': TournamentStatus.cancelled.index,
-      });
-      
-      return true;
+      await _tournamentsRef.doc(id).delete();
     } catch (e) {
-      debugPrint('Error cancelling tournament: $e');
-      return false;
+      print('Error deleting tournament: $e');
+      rethrow;
     }
   }
   
-  // 토너먼트 참가 신청
-  Future<bool> joinTournament(String tournamentId, String role) async {
-    if (_userId == null) return false;
+  // 토너먼트 참가
+  Future<void> joinTournament(String tournamentId, String position) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('로그인이 필요합니다.');
     
     try {
-      final docRef = _firestore.collection(_collectionPath).doc(tournamentId);
-      
-      // 트랜잭션으로 원자적 업데이트 수행
-      return await _firestore.runTransaction<bool>((transaction) async {
-        final doc = await transaction.get(docRef);
+      await _firestore.runTransaction((transaction) async {
+        // 토너먼트 문서 가져오기
+        final docRef = _tournamentsRef.doc(tournamentId);
+        final docSnapshot = await transaction.get(docRef);
         
-        if (!doc.exists) {
-          return false;
+        if (!docSnapshot.exists) {
+          throw Exception('토너먼트를 찾을 수 없습니다.');
         }
         
-        final tournament = TournamentModel.fromFirestore(doc);
+        // 토너먼트 모델로 변환
+        final tournament = TournamentModel.fromFirestore(docSnapshot);
         
-        // 이미 가득 찬 경우
-        if (tournament.isFull) {
-          throw Exception('Tournament is already full');
+        // 이미 참가했는지 확인
+        if (tournament.participants.contains(userId)) {
+          throw Exception('이미 참가 중인 토너먼트입니다.');
         }
         
-        // 해당 포지션이 가득 찬 경우
-        if (!tournament.hasAvailableSlot(role)) {
-          throw Exception('Selected position is already full');
+        // 참가 가능한지 확인
+        if (!tournament.canJoin(position)) {
+          throw Exception('해당 포지션은 이미 가득 찼거나 참가할 수 없습니다.');
         }
         
-        // 이미 참가한 경우
-        if (tournament.participantUids?.contains(_userId) == true) {
-          throw Exception('You have already joined this tournament');
-        }
+        // 필드 값 업데이트
+        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
+        updatedFilledSlots[position] = (updatedFilledSlots[position] ?? 0) + 1;
         
-        // 업데이트할 데이터 준비
-        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlotsByRole);
-        updatedFilledSlots[role] = (updatedFilledSlots[role] ?? 0) + 1;
+        final updatedParticipants = List<String>.from(tournament.participants)..add(userId);
         
-        final updatedParticipants = List<String>.from(tournament.participantUids ?? []);
-        updatedParticipants.add(_userId!);
-        
-        // 데이터 업데이트
-        transaction.update(docRef, {
-          'filledSlotsByRole': updatedFilledSlots,
-          'participantUids': updatedParticipants,
+        // 모든 슬롯이 채워졌는지 확인하여 상태 업데이트
+        TournamentStatus updatedStatus = tournament.status;
+        final willBeFull = updatedFilledSlots.entries.every((entry) {
+          final totalSlots = tournament.slots[entry.key] ?? 0;
+          return entry.value >= totalSlots;
         });
         
-        return true;
+        if (willBeFull) {
+          updatedStatus = TournamentStatus.full;
+        }
+        
+        // 트랜잭션 업데이트
+        transaction.update(docRef, {
+          'filledSlots': updatedFilledSlots,
+          'participants': updatedParticipants,
+          'status': updatedStatus.index,
+          'updatedAt': Timestamp.now(),
+        });
       });
     } catch (e) {
-      debugPrint('Error joining tournament: $e');
-      return false;
+      print('Error joining tournament: $e');
+      rethrow;
     }
   }
   
   // 토너먼트 참가 취소
-  Future<bool> leaveTournament(String tournamentId, String role) async {
-    if (_userId == null) return false;
+  Future<void> leaveTournament(String tournamentId, String position) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('로그인이 필요합니다.');
     
     try {
-      final docRef = _firestore.collection(_collectionPath).doc(tournamentId);
-      
-      // 트랜잭션으로 원자적 업데이트 수행
-      return await _firestore.runTransaction<bool>((transaction) async {
-        final doc = await transaction.get(docRef);
+      await _firestore.runTransaction((transaction) async {
+        // 토너먼트 문서 가져오기
+        final docRef = _tournamentsRef.doc(tournamentId);
+        final docSnapshot = await transaction.get(docRef);
         
-        if (!doc.exists) {
-          return false;
+        if (!docSnapshot.exists) {
+          throw Exception('토너먼트를 찾을 수 없습니다.');
         }
         
-        final tournament = TournamentModel.fromFirestore(doc);
+        // 토너먼트 모델로 변환
+        final tournament = TournamentModel.fromFirestore(docSnapshot);
         
-        // 참가자가 아닌 경우
-        if (tournament.participantUids?.contains(_userId) != true) {
-          throw Exception('You are not a participant of this tournament');
+        // 참가했는지 확인
+        if (!tournament.participants.contains(userId)) {
+          throw Exception('참가하지 않은 토너먼트입니다.');
         }
         
-        // 해당 포지션이 비어있는 경우
-        final filled = tournament.filledSlotsByRole[role] ?? 0;
-        if (filled <= 0) {
-          throw Exception('This position is already empty');
+        // 필드 값 업데이트
+        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
+        updatedFilledSlots[position] = (updatedFilledSlots[position] ?? 1) - 1;
+        if (updatedFilledSlots[position]! < 0) updatedFilledSlots[position] = 0;
+        
+        final updatedParticipants = List<String>.from(tournament.participants)..remove(userId);
+        
+        // 상태 업데이트
+        TournamentStatus updatedStatus = tournament.status;
+        if (tournament.status == TournamentStatus.full) {
+          updatedStatus = TournamentStatus.open;
         }
         
-        // 업데이트할 데이터 준비
-        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlotsByRole);
-        updatedFilledSlots[role] = (updatedFilledSlots[role] ?? 1) - 1;
-        
-        final updatedParticipants = List<String>.from(tournament.participantUids ?? []);
-        updatedParticipants.remove(_userId);
-        
-        // 데이터 업데이트
+        // 트랜잭션 업데이트
         transaction.update(docRef, {
-          'filledSlotsByRole': updatedFilledSlots,
-          'participantUids': updatedParticipants,
+          'filledSlots': updatedFilledSlots,
+          'participants': updatedParticipants,
+          'status': updatedStatus.index,
+          'updatedAt': Timestamp.now(),
         });
-        
-        return true;
       });
     } catch (e) {
-      debugPrint('Error leaving tournament: $e');
-      return false;
+      print('Error leaving tournament: $e');
+      rethrow;
     }
   }
   
-  // 토너먼트 완료 처리
-  Future<bool> completeTournament(String id) async {
-    if (_userId == null) return false;
-    
+  // 토너먼트 상태 변경
+  Future<void> updateTournamentStatus(String tournamentId, TournamentStatus status) async {
     try {
-      final doc = await _firestore.collection(_collectionPath).doc(id).get();
-      
-      if (!doc.exists) {
-        return false;
-      }
-      
-      final tournament = TournamentModel.fromFirestore(doc);
-      
-      // 호스트만 완료 처리 가능하도록 체크
-      if (tournament.hostUid != _userId) {
-        throw Exception('Only the host can complete this tournament');
-      }
-      
-      // 토너먼트 상태를 완료로 변경
-      await _firestore.collection(_collectionPath).doc(id).update({
-        'status': TournamentStatus.completed.index,
+      await _tournamentsRef.doc(tournamentId).update({
+        'status': status.index,
+        'updatedAt': Timestamp.now(),
       });
-      
-      return true;
     } catch (e) {
-      debugPrint('Error completing tournament: $e');
-      return false;
+      print('Error updating tournament status: $e');
+      rethrow;
     }
-  }
-  
-  // 토너먼트 스트림 (실시간 업데이트)
-  Stream<TournamentModel?> getTournamentStream(String id) {
-    return _firestore.collection(_collectionPath)
-        .doc(id)
-        .snapshots()
-        .map((doc) {
-          if (!doc.exists) {
-            return null;
-          }
-          return TournamentModel.fromFirestore(doc);
-        });
   }
 } 

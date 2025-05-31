@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:lol_custom_game_manager/constants/app_theme.dart';
 
 class TournamentCardSimplified extends StatelessWidget {
   final String id;
   final String title;
-  final String description;
+  final String? description;
   final String hostName;
   final String date;
   final String location;
@@ -11,131 +12,136 @@ class TournamentCardSimplified extends StatelessWidget {
   final int? price;
   final Map<String, int> slots;
   final Map<String, int> filledSlots;
-  final VoidCallback? onTap;
+  final VoidCallback onTap;
 
   const TournamentCardSimplified({
     Key? key,
     required this.id,
     required this.title,
-    required this.description,
+    this.description,
     required this.hostName,
     required this.date,
     required this.location,
-    this.isPaid = false,
+    required this.isPaid,
     this.price,
     required this.slots,
     required this.filledSlots,
-    this.onTap,
+    required this.onTap,
   }) : super(key: key);
 
   @override
   Widget build(BuildContext context) {
     return Card(
       margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      elevation: 2,
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
-          padding: const EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Row(
                 children: [
-                  CircleAvatar(
-                    backgroundColor: Colors.blue.shade100,
-                    child: const Icon(Icons.person, color: Colors.blue),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          hostName,
-                          style: const TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        Text(
-                          date,
-                          style: TextStyle(
-                            color: Colors.grey.shade600,
-                            fontSize: 12,
+                  isPaid
+                      ? Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.warning,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '유료 ${price != null ? '₩${price}' : ''}',
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        )
+                      : Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: AppColors.success,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: const Text(
+                            '무료',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                            ),
                           ),
                         ),
-                      ],
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 16),
-              Text(
-                title,
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
+              if (description != null) ...[
+                const SizedBox(height: 8),
+                Text(
+                  description!,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey.shade700,
+                  ),
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                 ),
+              ],
+              const SizedBox(height: 16),
+              Row(
+                children: [
+                  const Icon(Icons.person, size: 16, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    hostName,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  const Icon(Icons.schedule, size: 16, color: Colors.grey),
+                  const SizedBox(width: 4),
+                  Text(
+                    date,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
               ),
               const SizedBox(height: 8),
-              Text(
-                description,
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  color: Colors.grey.shade700,
-                ),
-              ),
-              const SizedBox(height: 16),
               Row(
                 children: [
                   const Icon(Icons.location_on, size: 16, color: Colors.grey),
                   const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      location,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 14,
-                      ),
+                  Text(
+                    location,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
                     ),
                   ),
                 ],
               ),
-              const SizedBox(height: 8),
-              if (isPaid && price != null)
-                Row(
-                  children: [
-                    const Icon(Icons.attach_money, size: 16, color: Colors.grey),
-                    const SizedBox(width: 4),
-                    Text(
-                      '참가비: ${price}원',
-                      style: TextStyle(
-                        color: Colors.grey.shade700,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ],
-                ),
               const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  _buildRoleStatus('top', filledSlots['top'] ?? 0, slots['top'] ?? 0, Colors.red),
-                  _buildRoleStatus('jg', filledSlots['jungle'] ?? 0, slots['jungle'] ?? 0, Colors.green),
-                  _buildRoleStatus('mid', filledSlots['mid'] ?? 0, slots['mid'] ?? 0, Colors.blue),
-                  _buildRoleStatus('adc', filledSlots['adc'] ?? 0, slots['adc'] ?? 0, Colors.orange),
-                  _buildRoleStatus('sup', filledSlots['support'] ?? 0, slots['support'] ?? 0, Colors.purple),
-                ],
-              ),
-              const SizedBox(height: 8),
-              const Divider(),
-              Text(
-                '총 참가자: ${_getTotalFilledSlots()}/${_getTotalSlots()}명',
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              _buildPositionsBar(),
             ],
           ),
         ),
@@ -143,23 +149,59 @@ class TournamentCardSimplified extends StatelessWidget {
     );
   }
 
-  Widget _buildRoleStatus(String role, int filled, int total, Color color) {
-    final double percentage = total > 0 ? filled / total : 0;
+  Widget _buildPositionsBar() {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        _buildPositionItem('top', '탑'),
+        _buildPositionItem('jungle', '정글'),
+        _buildPositionItem('mid', '미드'),
+        _buildPositionItem('adc', '원딜'),
+        _buildPositionItem('support', '서포터'),
+      ],
+    );
+  }
+
+  Widget _buildPositionItem(String position, String label) {
+    final total = slots[position] ?? 0;
+    final filled = filledSlots[position] ?? 0;
+    final isEmpty = filled < total;
     
+    Color getColor() {
+      switch (position) {
+        case 'top':
+          return AppColors.top;
+        case 'jungle':
+          return AppColors.jungle;
+        case 'mid':
+          return AppColors.mid;
+        case 'adc':
+          return AppColors.adc;
+        case 'support':
+          return AppColors.support;
+        default:
+          return Colors.grey;
+      }
+    }
+
     return Column(
       children: [
         Container(
-          width: 40,
-          height: 40,
+          width: 48,
+          height: 48,
           decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
+            color: isEmpty ? getColor().withOpacity(0.2) : getColor(),
             shape: BoxShape.circle,
+            border: Border.all(
+              color: getColor(),
+              width: 2,
+            ),
           ),
           child: Center(
             child: Text(
-              role,
+              '$filled/$total',
               style: TextStyle(
-                color: color,
+                color: isEmpty ? getColor() : Colors.white,
                 fontWeight: FontWeight.bold,
               ),
             ),
@@ -167,26 +209,13 @@ class TournamentCardSimplified extends StatelessWidget {
         ),
         const SizedBox(height: 4),
         Text(
-          '$filled/$total',
+          label,
           style: TextStyle(
             fontSize: 12,
-            color: filled >= total ? Colors.green : Colors.grey.shade700,
-            fontWeight: FontWeight.bold,
+            color: Colors.grey.shade700,
           ),
         ),
       ],
     );
-  }
-
-  int _getTotalSlots() {
-    int total = 0;
-    slots.forEach((_, count) => total += count);
-    return total;
-  }
-
-  int _getTotalFilledSlots() {
-    int total = 0;
-    filledSlots.forEach((_, count) => total += count);
-    return total;
   }
 } 

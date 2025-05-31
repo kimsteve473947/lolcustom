@@ -3,167 +3,110 @@ import 'package:equatable/equatable.dart';
 
 class MercenaryModel extends Equatable {
   final String id;
-  final String userUid;
+  final String userId;
   final String nickname;
-  final String? profileImageUrl;
-  final String? tier;
-  final Map<String, int> roleStats;
-  final Map<String, int> skillStats;
-  final List<String> preferredPositions;
-  final String? description;
-  final double? averageRating;
+  final String profileImageUrl;
+  final List<String> positions;
+  final String description;
+  final double rating;
   final int ratingCount;
-  final bool isAvailable;
-  final Timestamp createdAt;
-  final Timestamp? lastActiveAt;
-  
+  final DateTime createdAt;
+  final DateTime updatedAt;
+  final bool isActive;
+  final Map<String, dynamic>? additionalInfo;
+
   const MercenaryModel({
     required this.id,
-    required this.userUid,
+    required this.userId,
     required this.nickname,
-    this.profileImageUrl,
-    this.tier,
-    required this.roleStats,
-    required this.skillStats,
-    required this.preferredPositions,
-    this.description,
-    this.averageRating,
+    this.profileImageUrl = '',
+    required this.positions,
+    required this.description,
+    required this.rating,
     required this.ratingCount,
-    required this.isAvailable,
     required this.createdAt,
-    this.lastActiveAt,
+    required this.updatedAt,
+    this.isActive = true,
+    this.additionalInfo,
   });
-  
-  @override
-  List<Object?> get props => [
-    id, userUid, nickname, profileImageUrl, tier, 
-    roleStats, skillStats, preferredPositions, description,
-    averageRating, ratingCount, isAvailable, createdAt, lastActiveAt
-  ];
-  
-  Map<String, dynamic> toMap() {
-    return {
-      'id': id,
-      'userUid': userUid,
-      'nickname': nickname,
-      'profileImageUrl': profileImageUrl,
-      'tier': tier,
-      'roleStats': roleStats,
-      'skillStats': skillStats,
-      'preferredPositions': preferredPositions,
-      'description': description,
-      'averageRating': averageRating,
-      'ratingCount': ratingCount,
-      'isAvailable': isAvailable,
-      'createdAt': createdAt,
-      'lastActiveAt': lastActiveAt,
-    };
-  }
-  
-  factory MercenaryModel.fromMap(Map<String, dynamic> map) {
+
+  factory MercenaryModel.fromFirestore(DocumentSnapshot doc) {
+    final data = doc.data() as Map<String, dynamic>;
     return MercenaryModel(
-      id: map['id'] ?? '',
-      userUid: map['userUid'] ?? '',
-      nickname: map['nickname'] ?? 'Unknown',
-      profileImageUrl: map['profileImageUrl'],
-      tier: map['tier'],
-      roleStats: Map<String, int>.from(map['roleStats'] ?? {}),
-      skillStats: Map<String, int>.from(map['skillStats'] ?? {}),
-      preferredPositions: List<String>.from(map['preferredPositions'] ?? []),
-      description: map['description'],
-      averageRating: (map['averageRating'] as num?)?.toDouble(),
-      ratingCount: map['ratingCount'] ?? 0,
-      isAvailable: map['isAvailable'] ?? true,
-      createdAt: map['createdAt'] ?? Timestamp.now(),
-      lastActiveAt: map['lastActiveAt'],
+      id: doc.id,
+      userId: data['userId'] ?? '',
+      nickname: data['nickname'] ?? '',
+      profileImageUrl: data['profileImageUrl'] ?? '',
+      positions: List<String>.from(data['positions'] ?? []),
+      description: data['description'] ?? '',
+      rating: (data['rating'] ?? 0.0).toDouble(),
+      ratingCount: data['ratingCount'] ?? 0,
+      createdAt: (data['createdAt'] as Timestamp).toDate(),
+      updatedAt: (data['updatedAt'] as Timestamp).toDate(),
+      isActive: data['isActive'] ?? true,
+      additionalInfo: data['additionalInfo'],
     );
   }
-  
-  factory MercenaryModel.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    data['id'] = doc.id;
-    return MercenaryModel.fromMap(data);
-  }
-  
-  // 기존 getter 메서드들 추가
-  int? getStatForRole(String role) {
-    return roleStats[role];
+
+  Map<String, dynamic> toFirestore() {
+    return {
+      'userId': userId,
+      'nickname': nickname,
+      'profileImageUrl': profileImageUrl,
+      'positions': positions,
+      'description': description,
+      'rating': rating,
+      'ratingCount': ratingCount,
+      'createdAt': Timestamp.fromDate(createdAt),
+      'updatedAt': Timestamp.fromDate(updatedAt),
+      'isActive': isActive,
+      'additionalInfo': additionalInfo,
+    };
   }
 
-  int? getSkillStat(String skill) {
-    return skillStats[skill];
-  }
-
-  int get averageRoleStat {
-    if (roleStats.isEmpty) return 0;
-    int total = 0;
-    roleStats.forEach((_, value) => total += value);
-    return total ~/ roleStats.length;
-  }
-
-  int get topRoleStat {
-    if (roleStats.isEmpty) return 0;
-    int highest = 0;
-    roleStats.forEach((_, value) {
-      if (value > highest) highest = value;
-    });
-    return highest;
-  }
-
-  String get topRole {
-    if (roleStats.isEmpty) return 'N/A';
-    String best = '';
-    int highest = 0;
-    roleStats.forEach((key, value) {
-      if (value > highest) {
-        highest = value;
-        best = key;
-      }
-    });
-    return best;
-  }
-  
-  // Proper handling of nullable rating
-  String getFormattedRating() {
-    return (averageRating ?? 0.0).toStringAsFixed(1);
-  }
-  
-  // Example of cast for fold operation
-  static int getTotalMercenaries(Map<String, dynamic> slotsByRole) {
-    return slotsByRole.values.cast<int>().fold(0, (prev, curr) => prev + curr);
-  }
-  
   MercenaryModel copyWith({
     String? id,
-    String? userUid,
+    String? userId,
     String? nickname,
     String? profileImageUrl,
-    String? tier,
-    Map<String, int>? roleStats,
-    Map<String, int>? skillStats,
-    List<String>? preferredPositions,
+    List<String>? positions,
     String? description,
-    double? averageRating,
+    double? rating,
     int? ratingCount,
-    bool? isAvailable,
-    Timestamp? createdAt,
-    Timestamp? lastActiveAt,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+    bool? isActive,
+    Map<String, dynamic>? additionalInfo,
   }) {
     return MercenaryModel(
       id: id ?? this.id,
-      userUid: userUid ?? this.userUid,
+      userId: userId ?? this.userId,
       nickname: nickname ?? this.nickname,
       profileImageUrl: profileImageUrl ?? this.profileImageUrl,
-      tier: tier ?? this.tier,
-      roleStats: roleStats ?? this.roleStats,
-      skillStats: skillStats ?? this.skillStats,
-      preferredPositions: preferredPositions ?? this.preferredPositions,
+      positions: positions ?? this.positions,
       description: description ?? this.description,
-      averageRating: averageRating ?? this.averageRating,
+      rating: rating ?? this.rating,
       ratingCount: ratingCount ?? this.ratingCount,
-      isAvailable: isAvailable ?? this.isAvailable,
       createdAt: createdAt ?? this.createdAt,
-      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+      isActive: isActive ?? this.isActive,
+      additionalInfo: additionalInfo ?? this.additionalInfo,
     );
   }
+
+  @override
+  List<Object?> get props => [
+        id,
+        userId,
+        nickname,
+        profileImageUrl,
+        positions,
+        description,
+        rating,
+        ratingCount,
+        createdAt,
+        updatedAt,
+        isActive,
+        additionalInfo,
+      ];
 } 

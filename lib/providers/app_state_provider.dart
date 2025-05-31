@@ -71,7 +71,10 @@ class AppStateProvider extends ChangeNotifier {
     _clearError();
     
     try {
-      await _authService.signInWithEmailAndPassword(email, password);
+      await _authService.signInWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
       await _loadCurrentUser();
       return true;
     } catch (e) {
@@ -88,8 +91,11 @@ class AppStateProvider extends ChangeNotifier {
     _clearError();
     
     try {
-      await _authService.registerWithEmailAndPassword(email, password);
-      await _authService.createUserProfile(nickname);
+      await _authService.signUpWithEmailAndPassword(
+        email: email,
+        password: password,
+        nickname: nickname,
+      );
       await _loadCurrentUser();
       return true;
     } catch (e) {
@@ -168,27 +174,34 @@ class AppStateProvider extends ChangeNotifier {
     try {
       TournamentModel tournament = TournamentModel(
         id: '',  // Will be set by Firestore
-        hostUid: _currentUser!.uid,
-        hostNickname: _currentUser!.nickname,
-        hostProfileImageUrl: _currentUser!.profileImageUrl,
-        startsAt: Timestamp.fromDate(startsAt),
+        title: '${_currentUser!.nickname}의 내전',
+        description: description ?? '',
+        hostId: _currentUser!.uid,
+        hostName: _currentUser!.nickname,
+        startsAt: startsAt,
         location: location,
-        locationCoordinates: locationCoordinates,
         isPaid: isPaid,
         price: price,
-        ovrLimit: ovrLimit,
-        premiumBadge: premiumBadge,
-        slotsByRole: slotsByRole,
-        filledSlotsByRole: {
+        status: TournamentStatus.open,
+        createdAt: DateTime.now(),
+        slots: slotsByRole,
+        filledSlots: {
           'top': 0,
           'jungle': 0,
           'mid': 0,
           'adc': 0,
           'support': 0,
         },
-        status: TournamentStatus.open,
-        createdAt: Timestamp.now(),
-        description: description,
+        participants: [],
+        // Additional fields can be added to extras if needed
+        rules: {
+          'ovrLimit': ovrLimit,
+          'premiumBadge': premiumBadge,
+          'locationCoordinates': locationCoordinates != null ? {
+            'latitude': locationCoordinates.latitude,
+            'longitude': locationCoordinates.longitude,
+          } : null,
+        },
       );
       
       String id = await _firebaseService.createTournament(tournament);
@@ -202,7 +215,7 @@ class AppStateProvider extends ChangeNotifier {
           );
         } catch (e) {
           // Non-critical error, just log it
-          print('Failed to send notifications: $e');
+          debugPrint('Failed to send notifications: $e');
         }
       }
       
@@ -251,7 +264,7 @@ class AppStateProvider extends ChangeNotifier {
         );
       } catch (e) {
         // Non-critical error, just log it
-        print('Failed to process application: $e');
+        debugPrint('Failed to process application: $e');
       }
       
       return true;
