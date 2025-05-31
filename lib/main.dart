@@ -9,7 +9,18 @@ import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
 import 'package:lol_custom_game_manager/services/cloud_functions_service.dart';
 import 'package:lol_custom_game_manager/services/firebase_service.dart';
+import 'package:lol_custom_game_manager/services/firebase_messaging_service.dart';
 import 'package:lol_custom_game_manager/services/tournament_service.dart';
+import 'package:firebase_messaging/firebase_messaging.dart';
+
+// Firebase background message handler
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // If you're going to use other Firebase services in the background, such as Firestore,
+  // make sure you call `initializeApp` before using other Firebase services.
+  await Firebase.initializeApp(options: DefaultFirebaseOptions.currentPlatform);
+  debugPrint('Handling a background message: ${message.messageId}');
+}
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -18,6 +29,14 @@ Future<void> main() async {
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    
+    // Set up background message handler
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+    
+    // Initialize Firebase Messaging Service
+    final messagingService = FirebaseMessagingService();
+    await messagingService.initialize();
+    
     debugPrint('Firebase initialized successfully');
   } catch (e) {
     debugPrint('Failed to initialize Firebase: $e');
@@ -36,6 +55,7 @@ class MyApp extends StatelessWidget {
     final firebaseService = FirebaseService();
     final cloudFunctionsService = CloudFunctionsService();
     final tournamentService = TournamentService();
+    final messagingService = FirebaseMessagingService();
     
     // Create router
     final appRouter = AppRouter(authService: authService);
@@ -61,6 +81,7 @@ class MyApp extends StatelessWidget {
         Provider<FirebaseService>(create: (_) => firebaseService),
         Provider<CloudFunctionsService>(create: (_) => cloudFunctionsService),
         Provider<TournamentService>(create: (_) => tournamentService),
+        Provider<FirebaseMessagingService>(create: (_) => messagingService),
       ],
       child: Builder(
         builder: (context) {

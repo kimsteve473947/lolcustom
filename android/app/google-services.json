@@ -1,13 +1,32 @@
 {
   "project_info": {
-    "project_number": "814326964696",
-    "project_id": "lolcustom-app",
-    "storage_bucket": "lolcustom-app.firebasestorage.app"
+    "project_number": "879820637627",
+    "project_id": "lolcustom-3d471",
+    "storage_bucket": "lolcustom-3d471.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:814326964696:android:957ae1cef261f8d0aa92ad",
+        "mobilesdk_app_id": "1:879820637627:android:e6887083fc59a9d3c9709e",
+        "android_client_info": {
+          "package_name": "com.example.lol_custom_game_manager"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB7iVwjLVb_TB0P_tBJAU57KmUu3Yq-Dss"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:879820637627:android:3eba3fdbc1aa01c1c9709e",
         "android_client_info": {
           "package_name": "com.judgg.lolcustom"
         }
@@ -15,7 +34,7 @@
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBzq3JoimHPRloRw-2gPgqa0Cu7JxubyBg"
+          "current_key": "AIzaSyB7iVwjLVb_TB0P_tBJAU57KmUu3Yq-Dss"
         }
       ],
       "services": {

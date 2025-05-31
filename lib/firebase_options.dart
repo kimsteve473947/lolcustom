@@ -14,6 +14,14 @@ import 'package:flutter/foundation.dart'
 ///   options: DefaultFirebaseOptions.currentPlatform,
 /// );
 /// ```
+/// 
+/// To generate this file run:
+/// ```
+/// flutterfire configure
+/// ```
+/// 
+/// This will prompt you to select your Firebase project and will generate the
+/// configuration file automatically.
 class DefaultFirebaseOptions {
   static FirebaseOptions get currentPlatform {
     if (kIsWeb) {
@@ -24,18 +32,6 @@ class DefaultFirebaseOptions {
         return android;
       case TargetPlatform.iOS:
         return ios;
-      case TargetPlatform.macOS:
-        return macos;
-      case TargetPlatform.windows:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for windows - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
-      case TargetPlatform.linux:
-        throw UnsupportedError(
-          'DefaultFirebaseOptions have not been configured for linux - '
-          'you can reconfigure this by running the FlutterFire CLI again.',
-        );
       default:
         throw UnsupportedError(
           'DefaultFirebaseOptions are not supported for this platform.',
@@ -46,42 +42,34 @@ class DefaultFirebaseOptions {
   // 아래 정보는 Firebase Console에서 앱을 등록한 후 얻을 수 있는 정보입니다.
   // 개발 환경에서는 flutterfire configure 명령어로 자동 생성할 수 있습니다.
   // 샘플 값으로 작성되었으니 실제 앱 개발 시 올바른 값으로 변경하세요.
-  
+
   static const FirebaseOptions web = FirebaseOptions(
-    apiKey: 'YOUR_API_KEY',
-    appId: 'YOUR_APP_ID',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    authDomain: 'YOUR_AUTH_DOMAIN',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
-    measurementId: 'YOUR_MEASUREMENT_ID',
+    apiKey: 'AIzaSyC8LfhOaKKSSzmrhJe6jfrhy9Yghc3u4dU',
+    appId: '1:879820637627:web:c80d7f17c22b8971c9709e',
+    messagingSenderId: '879820637627',
+    projectId: 'lolcustom-3d471',
+    authDomain: 'lolcustom-3d471.firebaseapp.com',
+    storageBucket: 'lolcustom-3d471.firebasestorage.app',
+    measurementId: 'G-FQGBJCHQE6',
   );
 
+  
+
   static const FirebaseOptions android = FirebaseOptions(
-    apiKey: 'YOUR_API_KEY',
-    appId: 'YOUR_APP_ID',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
+    apiKey: 'AIzaSyB7iVwjLVb_TB0P_tBJAU57KmUu3Yq-Dss',
+    appId: '1:879820637627:android:3eba3fdbc1aa01c1c9709e',
+    messagingSenderId: '879820637627',
+    projectId: 'lolcustom-3d471',
+    storageBucket: 'lolcustom-3d471.firebasestorage.app',
   );
 
   static const FirebaseOptions ios = FirebaseOptions(
-    apiKey: 'YOUR_API_KEY',
-    appId: 'YOUR_APP_ID',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
-    iosClientId: 'YOUR_IOS_CLIENT_ID',
-    iosBundleId: 'com.example.lolCustomGameManager',
+    apiKey: 'AIzaSyBNZvIiG1do382CH-9PWtY7lF-86qzRUkU',
+    appId: '1:879820637627:ios:64a6ebbd52c78d32c9709e',
+    messagingSenderId: '879820637627',
+    projectId: 'lolcustom-3d471',
+    storageBucket: 'lolcustom-3d471.firebasestorage.app',
+    iosBundleId: 'com.judgg.lolcustom',
   );
 
-  static const FirebaseOptions macos = FirebaseOptions(
-    apiKey: 'YOUR_API_KEY',
-    appId: 'YOUR_APP_ID',
-    messagingSenderId: 'YOUR_MESSAGING_SENDER_ID',
-    projectId: 'YOUR_PROJECT_ID',
-    storageBucket: 'YOUR_STORAGE_BUCKET',
-    iosClientId: 'YOUR_IOS_CLIENT_ID',
-    iosBundleId: 'com.example.lolCustomGameManager',
-  );
 } 
