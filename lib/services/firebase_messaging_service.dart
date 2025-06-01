@@ -24,13 +24,30 @@ class FirebaseMessagingService {
     
     debugPrint('User granted permission: ${settings.authorizationStatus}');
     
+    // iOS에서 APNS 토큰 가져오기 (iOS 특화 문제 해결)
+    if (Platform.isIOS) {
+      try {
+        // APNS 토큰을 먼저 확인
+        await _messaging.getAPNSToken();
+        debugPrint('APNS Token retrieved successfully');
+      } catch (e) {
+        debugPrint('Failed to retrieve APNS Token: $e');
+      }
+    }
+    
     // Get token
-    String? token = await _messaging.getToken();
-    debugPrint('FCM Token: $token');
+    try {
+      String? token = await _messaging.getToken();
+      debugPrint('FCM Token: $token');
+    } catch (e) {
+      debugPrint('Failed to get FCM token: $e');
+    }
     
     // Setup local notifications for Android
     if (Platform.isAndroid) {
       await _setupLocalNotifications();
+    } else if (Platform.isIOS) {
+      await _setupIOSNotifications();
     }
     
     // Set up message handlers
@@ -87,6 +104,32 @@ class FirebaseMessagingService {
     await _localNotifications
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(chatChannel);
+  }
+  
+  // iOS 특화 알림 설정
+  Future<void> _setupIOSNotifications() async {
+    final DarwinInitializationSettings initializationSettingsIOS =
+        DarwinInitializationSettings(
+      requestAlertPermission: true,
+      requestBadgePermission: true,
+      requestSoundPermission: true,
+      onDidReceiveLocalNotification: (int id, String? title, String? body, String? payload) async {
+        debugPrint('iOS foreground notification: $title, $body, $payload');
+      }
+    );
+    
+    final InitializationSettings initializationSettings = InitializationSettings(
+      iOS: initializationSettingsIOS,
+    );
+    
+    await _localNotifications.initialize(
+      initializationSettings,
+      onDidReceiveNotificationResponse: (NotificationResponse details) {
+        debugPrint('Notification clicked: ${details.payload}');
+        // Handle notification click
+        _handleNotificationClick(details.payload);
+      },
+    );
   }
   
   // Method to setup message handlers

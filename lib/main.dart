@@ -1,5 +1,6 @@
 import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
+import 'dart:io';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/firebase_options.dart';
 import 'package:lol_custom_game_manager/navigation/app_router.dart';
@@ -13,6 +14,8 @@ import 'package:lol_custom_game_manager/services/firebase_messaging_service.dart
 import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter/foundation.dart';
+import 'package:flutter/foundation.dart';
 
 // Firebase background message handler
 @pragma('vm:entry-point')
@@ -35,13 +38,33 @@ Future<void> main() async {
     // 인증 서비스 초기화 확인
     final auth = FirebaseAuth.instance;
     await auth.authStateChanges().first;
+    debugPrint('Firebase Auth initialized successfully');
     
     // Set up background message handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
     
+    // iOS 권한 먼저 요청
+    if (Platform.isIOS) {
+      final settings = await FirebaseMessaging.instance.requestPermission(
+        alert: true,
+        announcement: false,
+        badge: true,
+        carPlay: false,
+        criticalAlert: false,
+        provisional: false,
+        sound: true,
+      );
+      debugPrint('iOS notification permission: ${settings.authorizationStatus}');
+    }
+    
     // Initialize Firebase Messaging Service
     final messagingService = FirebaseMessagingService();
-    await messagingService.initialize();
+    try {
+      await messagingService.initialize();
+    } catch (e) {
+      debugPrint('Warning: Firebase Messaging initialization error: $e');
+      // Messaging 초기화 실패해도 앱은 계속 실행
+    }
     
     debugPrint('Firebase initialized successfully');
   } catch (e, stackTrace) {
