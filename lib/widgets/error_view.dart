@@ -22,24 +22,25 @@ class ErrorView extends StatelessWidget {
             const Icon(
               Icons.error_outline,
               color: AppColors.error,
-              size: 64,
+              size: 64.0,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 16.0),
             Text(
               message,
-              style: const TextStyle(
-                fontSize: 16,
-                color: AppColors.textPrimary,
-              ),
               textAlign: TextAlign.center,
+              style: const TextStyle(
+                color: AppColors.textPrimary,
+                fontSize: 16.0,
+              ),
             ),
-            const SizedBox(height: 24),
-            if (onRetry != null)
+            if (onRetry != null) ...[
+              const SizedBox(height: 24.0),
               ElevatedButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
                 label: const Text('다시 시도'),
               ),
+            ],
           ],
         ),
       ),

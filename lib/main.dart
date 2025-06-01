@@ -4,7 +4,7 @@ import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/firebase_options.dart';
 import 'package:lol_custom_game_manager/navigation/app_router.dart';
 import 'package:provider/provider.dart';
-import 'package:lol_custom_game_manager/providers/auth_provider.dart';
+import 'package:lol_custom_game_manager/providers/auth_provider.dart' as CustomAuth;
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
 import 'package:lol_custom_game_manager/services/cloud_functions_service.dart';
@@ -12,6 +12,7 @@ import 'package:lol_custom_game_manager/services/firebase_service.dart';
 import 'package:lol_custom_game_manager/services/firebase_messaging_service.dart';
 import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 
 // Firebase background message handler
 @pragma('vm:entry-point')
@@ -26,9 +27,14 @@ Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   try {
+    debugPrint('Initializing Firebase with options: ${DefaultFirebaseOptions.currentPlatform}');
     await Firebase.initializeApp(
       options: DefaultFirebaseOptions.currentPlatform,
     );
+    
+    // 인증 서비스 초기화 확인
+    final auth = FirebaseAuth.instance;
+    await auth.authStateChanges().first;
     
     // Set up background message handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -38,8 +44,10 @@ Future<void> main() async {
     await messagingService.initialize();
     
     debugPrint('Firebase initialized successfully');
-  } catch (e) {
+  } catch (e, stackTrace) {
     debugPrint('Failed to initialize Firebase: $e');
+    debugPrint('Stack trace: $stackTrace');
+    // 오류 로깅을 추가하거나 사용자에게 알림을 표시할 수 있습니다.
   }
   
   runApp(const MyApp());
@@ -63,8 +71,8 @@ class MyApp extends StatelessWidget {
     return MultiProvider(
       providers: [
         // Auth provider
-        ChangeNotifierProvider<AuthProvider>(
-          create: (_) => AuthProvider(authService: authService),
+        ChangeNotifierProvider<CustomAuth.AuthProvider>(
+          create: (_) => CustomAuth.AuthProvider(authService: authService),
         ),
         
         // App state provider
@@ -97,4 +105,4 @@ class MyApp extends StatelessWidget {
       ),
     );
   }
-} 
+}

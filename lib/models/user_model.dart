@@ -32,6 +32,10 @@ class UserModel extends Equatable {
   final PlayerTier tier;
   final bool isPremium;
   final double? averageRating;
+  final int? hostedTournamentsCount;
+  final int? participatedTournamentsCount;
+  final String? position;
+  final int? totalRatingsCount;
 
   const UserModel({
     required this.uid,
@@ -45,6 +49,10 @@ class UserModel extends Equatable {
     this.tier = PlayerTier.unranked,
     this.isPremium = false,
     this.averageRating,
+    this.hostedTournamentsCount,
+    this.participatedTournamentsCount,
+    this.position,
+    this.totalRatingsCount,
   });
 
   // 파이어스토어에서 데이터 불러오기
@@ -62,6 +70,10 @@ class UserModel extends Equatable {
       tier: tierFromString(data['tier']),
       isPremium: data['isPremium'] ?? false,
       averageRating: data['averageRating'] != null ? (data['averageRating'] as num).toDouble() : null,
+      hostedTournamentsCount: data['hostedTournamentsCount'] as int?,
+      participatedTournamentsCount: data['participatedTournamentsCount'] as int?,
+      position: data['position'] as String?,
+      totalRatingsCount: data['totalRatingsCount'] as int?,
     );
   }
 
@@ -78,6 +90,10 @@ class UserModel extends Equatable {
       'tier': tier.toString().split('.').last,
       'isPremium': isPremium,
       'averageRating': averageRating,
+      'hostedTournamentsCount': hostedTournamentsCount,
+      'participatedTournamentsCount': participatedTournamentsCount,
+      'position': position,
+      'totalRatingsCount': totalRatingsCount,
     };
   }
   
@@ -124,6 +140,10 @@ class UserModel extends Equatable {
     PlayerTier? tier,
     bool? isPremium,
     double? averageRating,
+    int? hostedTournamentsCount,
+    int? participatedTournamentsCount,
+    String? position,
+    int? totalRatingsCount,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -137,6 +157,10 @@ class UserModel extends Equatable {
       tier: tier ?? this.tier,
       isPremium: isPremium ?? this.isPremium,
       averageRating: averageRating ?? this.averageRating,
+      hostedTournamentsCount: hostedTournamentsCount ?? this.hostedTournamentsCount,
+      participatedTournamentsCount: participatedTournamentsCount ?? this.participatedTournamentsCount,
+      position: position ?? this.position,
+      totalRatingsCount: totalRatingsCount ?? this.totalRatingsCount,
     );
   }
 
@@ -153,5 +177,9 @@ class UserModel extends Equatable {
         tier,
         isPremium,
         averageRating,
+        hostedTournamentsCount,
+        participatedTournamentsCount,
+        position,
+        totalRatingsCount,
       ];
 } 

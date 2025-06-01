@@ -4,8 +4,27 @@ import 'package:flutter/foundation.dart';
 import 'package:lol_custom_game_manager/models/user_model.dart';
 
 class AuthService {
-  final FirebaseAuth _auth = FirebaseAuth.instance;
-  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  final FirebaseAuth _auth;
+  final FirebaseFirestore _firestore;
+  
+  // 생성자에서 Firebase 인스턴스를 초기화하고 오류 처리
+  AuthService() : 
+    _auth = FirebaseAuth.instance,
+    _firestore = FirebaseFirestore.instance {
+    _checkFirebaseAuth();
+  }
+
+  // Firebase Auth 초기화 확인
+  Future<void> _checkFirebaseAuth() async {
+    try {
+      // 단순히 authStateChanges를 한 번 호출하여 Firebase Auth가 초기화되었는지 확인
+      await _auth.authStateChanges().first;
+      debugPrint('Firebase Auth initialized successfully');
+    } catch (e) {
+      debugPrint('Error initializing Firebase Auth: $e');
+      // 여기서 필요한 경우 사용자에게 알림을 표시하거나 다른 조치를 취할 수 있습니다.
+    }
+  }
   
   // 인증 상태 변경 스트림
   Stream<User?> authStateChanges() => _auth.authStateChanges();
@@ -50,6 +69,9 @@ class AuthService {
     required String nickname,
   }) async {
     try {
+      // Firebase Auth가 초기화되었는지 확인
+      await _checkFirebaseAuth();
+      
       // Firebase Auth에 사용자 등록
       final credential = await _auth.createUserWithEmailAndPassword(
         email: email,
@@ -71,6 +93,9 @@ class AuthService {
       });
       
       return credential;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Auth Exception during signup: ${e.code} - ${e.message}');
+      throw getKoreanErrorMessage(e);
     } catch (e) {
       debugPrint('Error signing up: $e');
       rethrow;
@@ -83,6 +108,9 @@ class AuthService {
     required String password,
   }) async {
     try {
+      // Firebase Auth가 초기화되었는지 확인
+      await _checkFirebaseAuth();
+      
       final credential = await _auth.signInWithEmailAndPassword(
         email: email,
         password: password,
@@ -94,6 +122,9 @@ class AuthService {
       });
       
       return credential;
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Firebase Auth Exception during signin: ${e.code} - ${e.message}');
+      throw getKoreanErrorMessage(e);
     } catch (e) {
       debugPrint('Error signing in: $e');
       rethrow;
@@ -188,6 +219,8 @@ class AuthService {
         return '이 작업은 허용되지 않습니다.';
       case 'network-request-failed':
         return '네트워크 연결에 문제가 있습니다.';
+      case 'configuration-not-found':
+        return 'Firebase 인증 구성 오류가 발생했습니다. 앱을 다시 시작해 주세요.';
       default:
         return '오류가 발생했습니다: ${e.code}';
     }

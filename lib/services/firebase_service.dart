@@ -438,4 +438,22 @@ class FirebaseService {
     // Implementation of formatting logic
     return dateTime.toString();
   }
+
+  // Fetch top users for rankings
+  Future<List<UserModel>> fetchTopUsers({int limit = 20}) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('users')
+          .orderBy('averageRating', descending: true)
+          .limit(limit)
+          .get();
+      
+      return querySnapshot.docs
+          .map((doc) => UserModel.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      debugPrint('Error fetching top users: $e');
+      return [];
+    }
+  }
 }

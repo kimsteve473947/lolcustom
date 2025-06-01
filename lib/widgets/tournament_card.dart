@@ -2,11 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
-import 'package:lol_custom_game_manager/models/models.dart';
+import 'package:lol_custom_game_manager/models/tournament_model.dart';
 
 class TournamentCard extends StatelessWidget {
   final TournamentModel tournament;
-  final Function()? onTap;
+  final VoidCallback? onTap;
 
   const TournamentCard({
     Key? key,
@@ -14,167 +14,26 @@ class TournamentCard extends StatelessWidget {
     this.onTap,
   }) : super(key: key);
 
-  String _formatDate(Timestamp timestamp) {
-    final date = timestamp.toDate();
-    return '${date.year}.${date.month.toString().padLeft(2, '0')}.${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Card(
-      margin: const EdgeInsets.only(bottom: 16),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      elevation: 2,
       child: InkWell(
         onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Row(
-                children: [
-                  CircleAvatar(
-                    backgroundImage: tournament.hostProfileImageUrl != null
-                        ? NetworkImage(tournament.hostProfileImageUrl!)
-                        : null,
-                    radius: 20,
-                    child: tournament.hostProfileImageUrl == null
-                        ? const Icon(Icons.person)
-                        : null,
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          tournament.hostNickname ?? tournament.hostName,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        Text(
-                          _formatDate(tournament.startsAt),
-                          style: const TextStyle(
-                            color: AppColors.textSecondary,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (tournament.premiumBadge)
-                    Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 4,
-                      ),
-                      decoration: BoxDecoration(
-                        color: Colors.amber,
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: const Text(
-                        'PREMIUM',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 10,
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  const Icon(
-                    Icons.location_on,
-                    size: 16,
-                    color: AppColors.textSecondary,
-                  ),
-                  const SizedBox(width: 4),
-                  Expanded(
-                    child: Text(
-                      tournament.location,
-                      style: const TextStyle(
-                        color: AppColors.textSecondary,
-                        fontSize: 14,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-              if (tournament.distance != null)
-                Padding(
-                  padding: const EdgeInsets.only(top: 4),
-                  child: Row(
-                    children: [
-                      const Icon(
-                        Icons.directions,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${tournament.distance!.toStringAsFixed(1)} km',
-                        style: const TextStyle(
-                          color: AppColors.textSecondary,
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              const SizedBox(height: 12),
-              Row(
-                children: [
-                  _buildRoleChip('TOP', tournament.slotsByRole['top'] ?? 0,
-                      tournament.filledSlotsByRole['top'] ?? 0, AppColors.roleTop),
-                  const SizedBox(width: 8),
-                  _buildRoleChip('JG', tournament.slotsByRole['jungle'] ?? 0,
-                      tournament.filledSlotsByRole['jungle'] ?? 0, AppColors.roleJungle),
-                  const SizedBox(width: 8),
-                  _buildRoleChip('MID', tournament.slotsByRole['mid'] ?? 0,
-                      tournament.filledSlotsByRole['mid'] ?? 0, AppColors.roleMid),
-                  const SizedBox(width: 8),
-                  _buildRoleChip('ADC', tournament.slotsByRole['adc'] ?? 0,
-                      tournament.filledSlotsByRole['adc'] ?? 0, AppColors.roleAdc),
-                  const SizedBox(width: 8),
-                  _buildRoleChip('SUP', tournament.slotsByRole['support'] ?? 0,
-                      tournament.filledSlotsByRole['support'] ?? 0, AppColors.roleSupport),
-                ],
-              ),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  if (tournament.isPaid && tournament.price != null)
-                    Text(
-                      '참가비: ${tournament.price}원',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    )
-                  else
-                    const Text(
-                      '무료 참가',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                        color: Colors.green,
-                      ),
-                    ),
-                  if (tournament.ovrLimit != null)
-                    Text(
-                      '평점 제한: ${tournament.ovrLimit}',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 14,
-                      ),
-                    ),
-                ],
-              ),
+              _buildHeader(),
+              const SizedBox(height: 16),
+              _buildLocation(),
+              const SizedBox(height: 16),
+              _buildFooter(),
             ],
           ),
         ),
@@ -182,21 +41,184 @@ class TournamentCard extends StatelessWidget {
     );
   }
 
-  Widget _buildRoleChip(String label, int total, int filled, Color color) {
-    final isFull = filled >= total;
+  Widget _buildHeader() {
+    return Row(
+      children: [
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                DateFormat('M월 d일 (E) HH:mm', 'ko_KR').format(tournament.startsAt.toDate()),
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                tournament.title,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ],
+          ),
+        ),
+        if (tournament.hostProfileImageUrl != null)
+          CircleAvatar(
+            radius: 18,
+            backgroundImage: NetworkImage(tournament.hostProfileImageUrl!),
+          )
+        else
+          const CircleAvatar(
+            radius: 18,
+            child: Icon(Icons.person),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildLocation() {
+    return Row(
+      children: [
+        const Icon(
+          Icons.location_on,
+          size: 16,
+          color: AppColors.textSecondary,
+        ),
+        const SizedBox(width: 4),
+        Expanded(
+          child: Text(
+            tournament.location,
+            style: const TextStyle(
+              color: AppColors.textSecondary,
+            ),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+        ),
+        if (tournament.isPaid)
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            decoration: BoxDecoration(
+              color: AppColors.warning.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(4),
+            ),
+            child: Text(
+              '${NumberFormat('#,###').format(tournament.price ?? 0)}원',
+              style: const TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: AppColors.warning,
+              ),
+            ),
+          ),
+      ],
+    );
+  }
+
+  Widget _buildFooter() {
+    return Row(
+      children: [
+        _buildSlotInfo(),
+        const Spacer(),
+        _buildStatusBadge(),
+      ],
+    );
+  }
+
+  Widget _buildSlotInfo() {
+    // Define role data
+    final roles = [
+      {'key': 'top', 'color': AppColors.roleTop},
+      {'key': 'jungle', 'color': AppColors.roleJungle},
+      {'key': 'mid', 'color': AppColors.roleMid},
+      {'key': 'adc', 'color': AppColors.roleAdc},
+      {'key': 'support', 'color': AppColors.roleSupport},
+    ];
+
+    return Row(
+      children: roles.map((role) {
+        final key = role['key'] as String;
+        final color = role['color'] as Color;
+        final filled = tournament.filledSlotsByRole[key] ?? 0;
+        final total = tournament.slotsByRole[key] ?? 0;
+        final isFull = filled >= total;
+
+        return Container(
+          margin: const EdgeInsets.only(right: 8),
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: isFull 
+                ? color.withOpacity(0.3) 
+                : color.withOpacity(0.8),
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              '$filled/$total',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: isFull ? AppColors.textSecondary : Colors.white,
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildStatusBadge() {
+    Color color;
+    String text;
+
+    switch (tournament.status) {
+      case TournamentStatus.draft:
+        color = Colors.grey;
+        text = '초안';
+        break;
+      case TournamentStatus.open:
+        color = AppColors.success;
+        text = '모집중';
+        break;
+      case TournamentStatus.full:
+        color = AppColors.primary;
+        text = '모집완료';
+        break;
+      case TournamentStatus.inProgress:
+      case TournamentStatus.ongoing:
+        color = AppColors.warning;
+        text = '진행중';
+        break;
+      case TournamentStatus.completed:
+        color = AppColors.textSecondary;
+        text = '완료';
+        break;
+      case TournamentStatus.cancelled:
+        color = AppColors.error;
+        text = '취소됨';
+        break;
+    }
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
       decoration: BoxDecoration(
-        color: isFull ? Colors.grey.shade300 : color.withOpacity(0.2),
-        borderRadius: BorderRadius.circular(4),
-        border: Border.all(color: isFull ? Colors.grey : color),
+        color: color.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: color, width: 1),
       ),
       child: Text(
-        '$label $filled/$total',
+        text,
         style: TextStyle(
-          color: isFull ? Colors.grey : color,
-          fontWeight: FontWeight.bold,
           fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: color,
         ),
       ),
     );

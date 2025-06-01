@@ -27,8 +27,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   final ScrollController _scrollController = ScrollController();
 
   ChatRoomModel? _chatRoom;
-  bool _isLoading = false;
+  bool _isLoading = true;
   String? _errorMessage;
+  List<MessageModel> _messages = [];
   bool _isSending = false;
 
   @override
@@ -51,221 +52,284 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     });
 
     try {
-      // This is a placeholder until we create a method to get a single chat room
-      final chatRooms = await _firebaseService.getUserChatRooms(
-        Provider.of<AppStateProvider>(context, listen: false).currentUser!.uid,
-      );
+      // Load chat room details
+      final chatRoomDoc = await FirebaseFirestore.instance
+          .collection('chatRooms')
+          .doc(widget.chatRoomId)
+          .get();
       
-      final room = chatRooms.firstWhere(
-        (room) => room.id == widget.chatRoomId,
-        orElse: () => throw Exception('Chat room not found'),
-      );
+      if (!chatRoomDoc.exists) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = '채팅방을 찾을 수 없습니다';
+        });
+        return;
+      }
+      
+      final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
+      
+      // Load messages
+      final messagesSnapshot = await FirebaseFirestore.instance
+          .collection('messages')
+          .where('chatRoomId', isEqualTo: widget.chatRoomId)
+          .orderBy('timestamp', descending: true)
+          .limit(50)
+          .get();
+      
+      final messages = messagesSnapshot.docs
+          .map((doc) => MessageModel.fromFirestore(doc))
+          .toList();
+      
+      // Mark messages as read
+      final currentUser = Provider.of<AppStateProvider>(context, listen: false).currentUser;
+      if (currentUser != null) {
+        await FirebaseFirestore.instance
+            .collection('chatRooms')
+            .doc(widget.chatRoomId)
+            .update({
+              'unreadCount.${currentUser.uid}': 0,
+            });
+      }
       
       setState(() {
-        _chatRoom = room;
+        _chatRoom = chatRoom;
+        _messages = messages;
         _isLoading = false;
       });
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Failed to load chat room: $e';
+        _errorMessage = '채팅방 정보를 불러오는 중 오류가 발생했습니다: $e';
       });
     }
   }
 
   Future<void> _sendMessage() async {
-    final appState = Provider.of<AppStateProvider>(context, listen: false);
-    if (appState.currentUser == null || _chatRoom == null || _messageController.text.trim().isEmpty) {
-      return;
-    }
-
-    final messageText = _messageController.text.trim();
-    _messageController.clear();
-
+    final message = _messageController.text.trim();
+    if (message.isEmpty) return;
+    
+    final currentUser = Provider.of<AppStateProvider>(context, listen: false).currentUser;
+    if (currentUser == null || _chatRoom == null) return;
+    
     setState(() {
       _isSending = true;
     });
-
+    
     try {
-      // Create a map of read status initialized to false for all participants
-      Map<String, bool> readStatus = {};
-      for (var participantId in _chatRoom!.participantIds) {
-        readStatus[participantId] = participantId == appState.currentUser!.uid;
+      // Create read status map (all participants have not read the message)
+      final readStatus = <String, bool>{};
+      for (final participantId in _chatRoom!.participantIds) {
+        readStatus[participantId] = participantId == currentUser.uid;
       }
-
-      final message = MessageModel(
-        id: '', // Will be set by Firestore
-        chatRoomId: _chatRoom!.id,
-        senderId: appState.currentUser!.uid,
-        senderName: appState.currentUser!.nickname,
-        senderProfileImageUrl: appState.currentUser!.profileImageUrl,
-        text: messageText,
+      
+      // Create message model
+      final newMessage = MessageModel(
+        id: '',  // Will be set by Firestore
+        chatRoomId: widget.chatRoomId,
+        senderId: currentUser.uid,
+        senderName: currentUser.nickname,
+        senderProfileImageUrl: currentUser.profileImageUrl,
+        text: message,
         readStatus: readStatus,
         timestamp: Timestamp.now(),
       );
-
-      await _firebaseService.sendMessage(message);
       
-      // Scroll to bottom after sending
-      if (_scrollController.hasClients) {
-        _scrollController.animateTo(
-          0,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+      // Send message and get ID
+      final messageId = await _firebaseService.sendMessage(newMessage);
+      
+      // Update unread count for all participants except sender
+      final batch = FirebaseFirestore.instance.batch();
+      final chatRoomRef = FirebaseFirestore.instance
+          .collection('chatRooms')
+          .doc(widget.chatRoomId);
+      
+      // Update last message in chat room
+      batch.update(chatRoomRef, {
+        'lastMessageText': message,
+        'lastMessageTime': Timestamp.now(),
+      });
+      
+      // Update unread count for each participant
+      for (final participantId in _chatRoom!.participantIds) {
+        if (participantId != currentUser.uid) {
+          batch.update(chatRoomRef, {
+            'unreadCount.$participantId': FieldValue.increment(1),
+          });
+        }
       }
+      
+      await batch.commit();
+      
+      // Clear input
+      _messageController.clear();
+      
+      // Add message to list
+      setState(() {
+        _messages.insert(0, newMessage.copyWith(id: messageId));
+        _isSending = false;
+      });
+      
+      // Scroll to bottom
+      _scrollToBottom();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('메시지 전송 실패: $e'),
+          content: Text('메시지를 보내는 중 오류가 발생했습니다: $e'),
           backgroundColor: AppColors.error,
         ),
       );
-    } finally {
       setState(() {
         _isSending = false;
       });
     }
   }
 
+  void _scrollToBottom() {
+    if (_scrollController.hasClients) {
+      _scrollController.animateTo(
+        0,
+        duration: const Duration(milliseconds: 300),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppStateProvider>(context);
-    final currentUser = appState.currentUser;
-
-    return Scaffold(
-      appBar: _chatRoom != null ? AppBar(
-        title: Text(
-          _chatRoom!.title,
-          style: const TextStyle(
-            fontWeight: FontWeight.bold,
-          ),
+    final currentUser = Provider.of<AppStateProvider>(context).currentUser;
+    if (currentUser == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text('로그인이 필요합니다'),
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.info_outline),
-            onPressed: () {
-              // TODO: Show chat info
-            },
-          ),
-        ],
-      ) : AppBar(
-        title: const Text('채팅'),
-      ),
-      body: _errorMessage != null
-          ? ErrorView(
-              message: _errorMessage!,
-              onRetry: _loadChatRoom,
-            )
-          : _isLoading
-              ? const LoadingIndicator()
-              : _chatRoom == null
-                  ? const Center(child: Text('채팅방을 찾을 수 없습니다'))
-                  : Column(
-                      children: [
-                        Expanded(
-                          child: StreamBuilder<List<MessageModel>>(
-                            stream: _firebaseService.getChatMessages(_chatRoom!.id),
-                            builder: (context, snapshot) {
-                              if (snapshot.connectionState == ConnectionState.waiting && !snapshot.hasData) {
-                                return const LoadingIndicator();
-                              }
-
-                              if (snapshot.hasError) {
-                                return ErrorView(
-                                  message: '메시지를 불러오는 중 오류가 발생했습니다: ${snapshot.error}',
-                                  onRetry: () => setState(() {}),
-                                );
-                              }
-
-                              final messages = snapshot.data ?? [];
-                              if (messages.isEmpty) {
-                                return const Center(
-                                  child: Text(
-                                    '아직 메시지가 없습니다.\n첫 메시지를 보내보세요!',
-                                    textAlign: TextAlign.center,
-                                    style: TextStyle(
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                );
-                              }
-
-                              return ListView.builder(
-                                controller: _scrollController,
-                                reverse: true,
-                                padding: const EdgeInsets.all(16),
-                                itemCount: messages.length,
-                                itemBuilder: (context, index) {
-                                  final message = messages[index];
-                                  final isCurrentUser = currentUser != null && message.senderId == currentUser.uid;
-                                  final showAvatar = !isCurrentUser;
-                                  
-                                  // Group messages by date
-                                  final showDateSeparator = index == messages.length - 1 || 
-                                      !_isSameDay(messages[index].timestamp.toDate(), messages[index + 1].timestamp.toDate());
-                                  
-                                  return Column(
-                                    children: [
-                                      if (showDateSeparator)
-                                        _buildDateSeparator(message.timestamp.toDate()),
-                                      _buildMessageItem(message, isCurrentUser, showAvatar),
-                                    ],
-                                  );
-                                },
-                              );
-                            },
-                          ),
-                        ),
-                        _buildMessageInput(),
-                      ],
+      );
+    }
+    
+    return Scaffold(
+      appBar: _buildAppBar(),
+      body: _isLoading
+          ? const LoadingIndicator()
+          : _errorMessage != null
+              ? Center(child: Text(_errorMessage!))
+              : Column(
+                  children: [
+                    Expanded(
+                      child: _buildMessagesList(currentUser.uid),
                     ),
+                    _buildInputArea(),
+                  ],
+                ),
     );
   }
 
-  Widget _buildDateSeparator(DateTime date) {
-    final now = DateTime.now();
-    final yesterday = DateTime(now.year, now.month, now.day - 1);
-    final messageDate = DateTime(date.year, date.month, date.day);
-    
-    String text;
-    if (messageDate == DateTime(now.year, now.month, now.day)) {
-      text = '오늘';
-    } else if (messageDate == yesterday) {
-      text = '어제';
-    } else {
-      text = DateFormat('yyyy년 M월 d일 (E)', 'ko_KR').format(date);
+  PreferredSizeWidget _buildAppBar() {
+    if (_chatRoom == null) {
+      return AppBar(
+        title: const Text('채팅'),
+      );
     }
     
-    return Container(
-      margin: const EdgeInsets.symmetric(vertical: 16),
-      child: Center(
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          decoration: BoxDecoration(
-            color: Colors.grey.shade200,
-            borderRadius: BorderRadius.circular(16),
+    final currentUser = Provider.of<AppStateProvider>(context).currentUser!;
+    final otherParticipantId = _chatRoom!.participantIds.firstWhere(
+      (id) => id != currentUser.uid,
+      orElse: () => currentUser.uid,
+    );
+    
+    final otherParticipantName = _chatRoom!.participantNames[otherParticipantId] ?? '알 수 없음';
+    final otherParticipantImage = _chatRoom!.participantProfileImages[otherParticipantId];
+    
+    return AppBar(
+      titleSpacing: 0,
+      title: Row(
+        children: [
+          CircleAvatar(
+            radius: 20,
+            backgroundImage: otherParticipantImage != null
+                ? NetworkImage(otherParticipantImage)
+                : null,
+            child: otherParticipantImage == null
+                ? const Icon(Icons.person, size: 20)
+                : null,
           ),
-          child: Text(
-            text,
-            style: const TextStyle(
-              fontSize: 12,
-              color: AppColors.textSecondary,
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  _chatRoom!.type == ChatRoomType.direct
+                      ? otherParticipantName
+                      : _chatRoom!.title,
+                  style: const TextStyle(
+                    fontSize: 16,
+                  ),
+                ),
+                Text(
+                  _chatRoom!.type == ChatRoomType.tournamentRecruitment
+                      ? '내전 관련 채팅'
+                      : _chatRoom!.type == ChatRoomType.mercenaryOffer
+                          ? '용병 관련 채팅'
+                          : '',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppColors.textSecondary,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
+        ],
       ),
+      actions: [
+        IconButton(
+          icon: const Icon(Icons.more_vert),
+          onPressed: () {
+            // TODO: Show chat options menu
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMessagesList(String currentUserId) {
+    if (_messages.isEmpty) {
+      return const Center(
+        child: Text(
+          '아직 대화가 없습니다\n메시지를 보내 대화를 시작하세요',
+          textAlign: TextAlign.center,
+          style: TextStyle(
+            color: AppColors.textSecondary,
+          ),
+        ),
+      );
+    }
+    
+    return ListView.builder(
+      controller: _scrollController,
+      reverse: true,
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: _messages.length,
+      itemBuilder: (context, index) {
+        final message = _messages[index];
+        final isCurrentUser = message.senderId == currentUserId;
+        final showAvatar = index == _messages.length - 1 || 
+                           _messages[index + 1].senderId != message.senderId;
+        
+        return _buildMessageItem(message, isCurrentUser, showAvatar);
+      },
     );
   }
 
   Widget _buildMessageItem(MessageModel message, bool isCurrentUser, bool showAvatar) {
+    final time = DateFormat('HH:mm').format(message.timestamp.toDate());
+    
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
+      padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
-        mainAxisAlignment: isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         crossAxisAlignment: CrossAxisAlignment.end,
+        mainAxisAlignment: isCurrentUser ? MainAxisAlignment.end : MainAxisAlignment.start,
         children: [
-          if (showAvatar) ...[
+          if (!isCurrentUser && showAvatar)
             CircleAvatar(
               radius: 16,
               backgroundImage: message.senderProfileImageUrl != null
@@ -274,87 +338,73 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               child: message.senderProfileImageUrl == null
                   ? const Icon(Icons.person, size: 16)
                   : null,
-            ),
-            const SizedBox(width: 8),
-          ],
-          if (!isCurrentUser && !showAvatar)
-            const SizedBox(width: 40), // Space for avatar alignment
-          Column(
-            crossAxisAlignment: isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-            children: [
-              if (!isCurrentUser)
-                Padding(
-                  padding: const EdgeInsets.only(left: 4, bottom: 4),
-                  child: Text(
-                    message.senderName,
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                    ),
+            )
+          else if (!isCurrentUser && !showAvatar)
+            const SizedBox(width: 32),
+            
+          const SizedBox(width: 8),
+          
+          if (!isCurrentUser && showAvatar)
+            Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  message.senderName,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
                   ),
                 ),
-              Row(
-                crossAxisAlignment: CrossAxisAlignment.end,
-                children: [
-                  if (isCurrentUser) ...[
-                    Text(
-                      _formatMessageTime(message.timestamp.toDate()),
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(width: 4),
-                  ],
-                  Container(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.7,
-                    ),
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                    decoration: BoxDecoration(
-                      color: isCurrentUser ? AppColors.primary : Colors.grey.shade200,
-                      borderRadius: BorderRadius.circular(16).copyWith(
-                        bottomLeft: isCurrentUser ? const Radius.circular(16) : const Radius.circular(4),
-                        bottomRight: isCurrentUser ? const Radius.circular(4) : const Radius.circular(16),
-                      ),
-                    ),
-                    child: Text(
-                      message.text,
-                      style: TextStyle(
-                        color: isCurrentUser ? Colors.white : AppColors.textPrimary,
-                      ),
-                    ),
-                  ),
-                  if (!isCurrentUser) ...[
-                    const SizedBox(width: 4),
-                    Text(
-                      _formatMessageTime(message.timestamp.toDate()),
-                      style: const TextStyle(
-                        fontSize: 10,
-                        color: AppColors.textSecondary,
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
+                const SizedBox(height: 4),
+                _buildMessageBubble(message.text, isCurrentUser),
+              ],
+            )
+          else
+            _buildMessageBubble(message.text, isCurrentUser),
+            
+          const SizedBox(width: 8),
+          
+          Text(
+            time,
+            style: const TextStyle(
+              fontSize: 10,
+              color: AppColors.textSecondary,
+            ),
           ),
         ],
       ),
     );
   }
 
-  Widget _buildMessageInput() {
+  Widget _buildMessageBubble(String text, bool isCurrentUser) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.7,
+      ),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+      decoration: BoxDecoration(
+        color: isCurrentUser ? AppColors.primary : Colors.grey.shade200,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Text(
+        text,
+        style: TextStyle(
+          color: isCurrentUser ? Colors.white : AppColors.textPrimary,
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInputArea() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: Colors.white,
         boxShadow: [
           BoxShadow(
-            color: Colors.grey.withOpacity(0.1),
-            spreadRadius: 1,
-            blurRadius: 3,
-            offset: const Offset(0, -1),
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 4,
+            offset: const Offset(0, -2),
           ),
         ],
       ),
@@ -371,11 +421,13 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             child: TextField(
               controller: _messageController,
               decoration: const InputDecoration(
-                hintText: '메시지를 입력하세요',
+                hintText: '메시지 입력...',
                 border: InputBorder.none,
                 contentPadding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
               ),
-              textInputAction: TextInputAction.send,
+              minLines: 1,
+              maxLines: 5,
+              textCapitalization: TextCapitalization.sentences,
               onSubmitted: (_) => _sendMessage(),
             ),
           ),
@@ -396,15 +448,5 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         ],
       ),
     );
-  }
-
-  String _formatMessageTime(DateTime dateTime) {
-    return DateFormat('HH:mm').format(dateTime);
-  }
-
-  bool _isSameDay(DateTime date1, DateTime date2) {
-    return date1.year == date2.year && 
-           date1.month == date2.month && 
-           date1.day == date2.day;
   }
 } 
