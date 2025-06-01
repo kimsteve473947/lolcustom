@@ -170,11 +170,11 @@ class AppStateProvider extends ChangeNotifier {
     required bool isPaid,
     int? price,
     int? ovrLimit,
+    PlayerTier? tierLimit,
     String? description,
-    bool premiumBadge = false,
+    bool? premiumBadge, // Optional: Will be determined by user's premium status
     GeoPoint? locationCoordinates,
     GameFormat? gameFormat,
-    GameServer? gameServer,
     String? customRoomName,
     String? customRoomPassword,
   }) async {
@@ -205,6 +205,9 @@ class AppStateProvider extends ChangeNotifier {
         'team2': 0,
       };
       
+      // 프리미엄 멤버십 확인하여 자동으로 프리미엄 배지 설정
+      final bool hasPremiumBadge = premiumBadge ?? _currentUser!.isPremium;
+      
       TournamentModel tournament = TournamentModel(
         id: '',  // Will be set by Firestore
         title: title.isNotEmpty ? title : '${_currentUser!.nickname}의 내전',
@@ -225,13 +228,15 @@ class AppStateProvider extends ChangeNotifier {
         filledSlotsByRole: filledSlotsByRole,
         participants: [],
         ovrLimit: ovrLimit,
-        premiumBadge: premiumBadge,
+        tierLimit: tierLimit,
+        premiumBadge: hasPremiumBadge,
         gameFormat: gameFormat ?? GameFormat.single,
-        gameServer: gameServer ?? GameServer.kr,
+        gameServer: GameServer.kr, // 기본값으로 한국 서버 설정
         // Additional fields can be added to extras if needed
         rules: {
           'ovrLimit': ovrLimit,
-          'premiumBadge': premiumBadge,
+          'tierLimit': tierLimit?.index,
+          'premiumBadge': hasPremiumBadge,
           'locationCoordinates': locationCoordinates != null ? {
             'latitude': locationCoordinates.latitude,
             'longitude': locationCoordinates.longitude,
@@ -244,7 +249,7 @@ class AppStateProvider extends ChangeNotifier {
       String id = await _firebaseService.createTournament(tournament);
       
       // Notify potential participants about new tournament (if we're premium)
-      if (premiumBadge && _currentUser!.isPremium) {
+      if (hasPremiumBadge) {
         try {
           await _cloudFunctionsService.notifyTournamentParticipants(
             tournamentId: id,

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
+import 'package:lol_custom_game_manager/models/user_model.dart';
 
 enum TournamentStatus {
   draft,    // 초안 상태
@@ -38,7 +39,8 @@ class TournamentModel extends Equatable {
   final String location; // 게임 서버 지역 정보로 사용
   final bool isPaid;
   final int? price;
-  final int? ovrLimit;
+  final int? ovrLimit; // 기존 제한 필드 (하위 호환성 유지)
+  final PlayerTier? tierLimit; // 추가: 티어 제한
   final bool premiumBadge;
   final TournamentStatus status;
   final DateTime createdAt;
@@ -74,6 +76,7 @@ class TournamentModel extends Equatable {
     required this.isPaid,
     this.price,
     this.ovrLimit,
+    this.tierLimit,
     this.premiumBadge = false,
     required this.status,
     required this.createdAt,
@@ -191,6 +194,16 @@ class TournamentModel extends Equatable {
       'support': 0,
     };
     
+    // tierLimit을 문자열에서 PlayerTier enum으로 변환
+    PlayerTier? tierLimit;
+    if (data['tierLimit'] != null) {
+      if (data['tierLimit'] is int) {
+        tierLimit = PlayerTier.values[data['tierLimit'] as int];
+      } else if (data['tierLimit'] is String) {
+        tierLimit = UserModel.tierFromString(data['tierLimit'] as String);
+      }
+    }
+    
     return TournamentModel(
       id: doc.id,
       title: data['title'] ?? '',
@@ -204,6 +217,7 @@ class TournamentModel extends Equatable {
       isPaid: data['isPaid'] ?? false,
       price: data['price'],
       ovrLimit: data['ovrLimit'],
+      tierLimit: tierLimit,
       premiumBadge: data['premiumBadge'] ?? false,
       status: TournamentStatus.values[data['status'] ?? 0],
       createdAt: (data['createdAt'] as Timestamp).toDate(),
@@ -237,6 +251,7 @@ class TournamentModel extends Equatable {
       'isPaid': isPaid,
       'price': price,
       'ovrLimit': ovrLimit,
+      'tierLimit': tierLimit?.index,
       'premiumBadge': premiumBadge,
       'status': status.index,
       'createdAt': Timestamp.fromDate(createdAt),
@@ -269,6 +284,7 @@ class TournamentModel extends Equatable {
     bool? isPaid,
     int? price,
     int? ovrLimit,
+    PlayerTier? tierLimit,
     bool? premiumBadge,
     TournamentStatus? status,
     DateTime? updatedAt,
@@ -298,6 +314,7 @@ class TournamentModel extends Equatable {
       isPaid: isPaid ?? this.isPaid,
       price: price ?? this.price,
       ovrLimit: ovrLimit ?? this.ovrLimit,
+      tierLimit: tierLimit ?? this.tierLimit,
       premiumBadge: premiumBadge ?? this.premiumBadge,
       status: status ?? this.status,
       createdAt: createdAt,
@@ -346,7 +363,7 @@ class TournamentModel extends Equatable {
   @override
   List<Object?> get props => [
     id, title, description, hostId, hostName, hostProfileImageUrl, hostNickname,
-    startsAt, location, isPaid, price, ovrLimit, premiumBadge, status, createdAt, 
+    startsAt, location, isPaid, price, ovrLimit, tierLimit, premiumBadge, status, createdAt, 
     updatedAt, slots, filledSlots, slotsByRole, filledSlotsByRole,
     participants, rules, results, distance, gameFormat, gameServer, customRoomName, customRoomPassword
   ];

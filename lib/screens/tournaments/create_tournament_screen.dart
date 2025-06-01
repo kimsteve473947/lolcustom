@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
-import 'package:lol_custom_game_manager/constants/lol_constants.dart';
 import 'package:lol_custom_game_manager/models/tournament_model.dart';
+import 'package:lol_custom_game_manager/models/user_model.dart';
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
+import 'package:lol_custom_game_manager/widgets/tier_selector.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
@@ -19,21 +20,19 @@ class CreateTournamentScreen extends StatefulWidget {
 class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  final _customRoomNameController = TextEditingController();
-  final _customRoomPasswordController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _priceController = TextEditingController();
-  final _ovrLimitController = TextEditingController();
   
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = TimeOfDay.now();
   
   bool _isPaid = false;
-  bool _hasPremiumBadge = false;
   
   // 리그 오브 레전드 특화 필드
   GameFormat _gameFormat = GameFormat.single;
-  GameServer _gameServer = GameServer.kr;
+  
+  // 티어 제한
+  PlayerTier? _selectedTierLimit;
   
   // 라인별 인원 - 각 2명으로 고정
   final Map<String, int> _slotsByRole = {
@@ -49,11 +48,8 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   @override
   void dispose() {
     _titleController.dispose();
-    _customRoomNameController.dispose();
-    _customRoomPasswordController.dispose();
     _descriptionController.dispose();
     _priceController.dispose();
-    _ovrLimitController.dispose();
     super.dispose();
   }
   
@@ -146,18 +142,14 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     try {
       final tournamentId = await appState.createTournament(
         title: _titleController.text,
-        location: LolGameServers.names[_gameServer] ?? '한국 서버',
+        location: '한국 서버', // 기본값으로 한국 서버 고정
         startsAt: _selectedDate,
         slotsByRole: _slotsByRole,
         isPaid: _isPaid,
         price: _isPaid ? int.parse(_priceController.text) : null,
-        ovrLimit: _ovrLimitController.text.isNotEmpty ? int.parse(_ovrLimitController.text) : null,
+        tierLimit: _selectedTierLimit,
         description: _descriptionController.text.isNotEmpty ? _descriptionController.text : '리그 오브 레전드 내전입니다',
-        premiumBadge: _hasPremiumBadge,
         gameFormat: _gameFormat,
-        gameServer: _gameServer,
-        customRoomName: _customRoomNameController.text.isNotEmpty ? _customRoomNameController.text : null,
-        customRoomPassword: _customRoomPasswordController.text.isNotEmpty ? _customRoomPasswordController.text : null,
       );
       
       if (tournamentId != null && mounted) {
@@ -211,19 +203,25 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                   const SizedBox(height: 24),
                   _buildGameFormatSection(),
                   const SizedBox(height: 24),
-                  _buildGameServerSection(),
-                  const SizedBox(height: 24),
-                  _buildCustomRoomSection(),
+                  _buildTierLimitSection(),
                   const SizedBox(height: 24),
                   _buildPriceSection(),
                   const SizedBox(height: 24),
                   _buildDescriptionSection(),
-                  const SizedBox(height: 24),
-                  _buildPremiumSection(),
                   const SizedBox(height: 32),
                   ElevatedButton(
                     onPressed: _createTournament,
-                    child: const Text('내전 만들기'),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                    ),
+                    child: const Text(
+                      '내전 만들기',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
                   ),
                 ],
               ),
@@ -370,85 +368,14 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     );
   }
   
-  Widget _buildGameServerSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '게임 서버',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        InputDecorator(
-          decoration: const InputDecoration(
-            border: OutlineInputBorder(),
-            contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-          ),
-          child: DropdownButtonHideUnderline(
-            child: DropdownButton<GameServer>(
-              value: _gameServer,
-              isExpanded: true,
-              items: GameServer.values.map((server) {
-                return DropdownMenuItem<GameServer>(
-                  value: server,
-                  child: Text(LolGameServers.names[server] ?? '한국 서버'),
-                );
-              }).toList(),
-              onChanged: (value) {
-                if (value != null) {
-                  setState(() {
-                    _gameServer = value;
-                  });
-                }
-              },
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildCustomRoomSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '커스텀 방 정보',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        const Text(
-          '커스텀 방 이름과 비밀번호는 내전 시작 전까지 입력하지 않아도 됩니다',
-          style: TextStyle(
-            fontSize: 12,
-            color: AppColors.textSecondary,
-          ),
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _customRoomNameController,
-          decoration: const InputDecoration(
-            labelText: '커스텀 방 이름',
-            hintText: '예: 내전방123',
-            border: OutlineInputBorder(),
-          ),
-        ),
-        const SizedBox(height: 12),
-        TextFormField(
-          controller: _customRoomPasswordController,
-          decoration: const InputDecoration(
-            labelText: '커스텀 방 비밀번호',
-            hintText: '예: 1234',
-            border: OutlineInputBorder(),
-          ),
-        ),
-      ],
+  Widget _buildTierLimitSection() {
+    return TierSelector(
+      initialTier: _selectedTierLimit,
+      onTierChanged: (tier) {
+        setState(() {
+          _selectedTierLimit = tier;
+        });
+      },
     );
   }
   
@@ -500,23 +427,6 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
               ),
             ],
           ),
-        const SizedBox(height: 16),
-        const Text(
-          '실력 제한',
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 8),
-        TextFormField(
-          controller: _ovrLimitController,
-          decoration: const InputDecoration(
-            labelText: '티어 제한 (없으면 비워두세요)',
-            border: OutlineInputBorder(),
-            hintText: '예: 골드 이상, 플래티넘 이하 등',
-          ),
-        ),
       ],
     );
   }
@@ -540,34 +450,6 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
             border: OutlineInputBorder(),
           ),
           maxLines: 5,
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildPremiumSection() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        const Text(
-          '프리미엄 내전',
-          style: TextStyle(
-            fontSize: 18,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 16),
-        SwitchListTile(
-          title: const Text('프리미엄 내전 배지'),
-          subtitle: const Text('프리미엄 배지로 내전을 더 돋보이게 합니다'),
-          value: _hasPremiumBadge,
-          activeColor: AppColors.primary,
-          contentPadding: EdgeInsets.zero,
-          onChanged: (value) {
-            setState(() {
-              _hasPremiumBadge = value;
-            });
-          },
         ),
       ],
     );

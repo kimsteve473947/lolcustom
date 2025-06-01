@@ -141,12 +141,28 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Failed to load tournaments: $e';
+        // 에러 메시지 개선
+        if (e.toString().contains('index') && e.toString().contains('failed-precondition')) {
+          _errorMessage = '필터링에 필요한 인덱스가 생성 중입니다. 잠시 후 다시 시도해주세요.';
+        } else {
+          _errorMessage = '내전 목록을 불러오는 중 오류가 발생했습니다: ${e.toString().split(']').last.trim()}';
+        }
       });
       
       // 에러 처리
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('에러가 발생했습니다: $e')),
+        SnackBar(
+          content: Text(
+            e.toString().contains('index') 
+                ? '필터링에 필요한 인덱스가 생성 중입니다. 잠시 후 다시 시도해주세요.'
+                : '에러가 발생했습니다: ${e.toString().split(']').last.trim()}'
+          ),
+          action: SnackBarAction(
+            label: '다시 시도',
+            onPressed: _loadFreeTournaments,
+          ),
+          duration: const Duration(seconds: 5),
+        ),
       );
     }
   }
@@ -190,12 +206,28 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
     } catch (e) {
       setState(() {
         _isLoading = false;
-        _errorMessage = 'Failed to load paid tournaments: $e';
+        // 에러 메시지 개선
+        if (e.toString().contains('index') && e.toString().contains('failed-precondition')) {
+          _errorMessage = '필터링에 필요한 인덱스가 생성 중입니다. 잠시 후 다시 시도해주세요.';
+        } else {
+          _errorMessage = '내전 목록을 불러오는 중 오류가 발생했습니다: ${e.toString().split(']').last.trim()}';
+        }
       });
       
       // 에러 처리
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('에러가 발생했습니다: $e')),
+        SnackBar(
+          content: Text(
+            e.toString().contains('index') 
+                ? '필터링에 필요한 인덱스가 생성 중입니다. 잠시 후 다시 시도해주세요.'
+                : '에러가 발생했습니다: ${e.toString().split(']').last.trim()}'
+          ),
+          action: SnackBarAction(
+            label: '다시 시도',
+            onPressed: _loadPaidTournaments,
+          ),
+          duration: const Duration(seconds: 5),
+        ),
       );
     }
   }
