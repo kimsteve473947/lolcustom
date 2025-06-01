@@ -163,6 +163,7 @@ class AppStateProvider extends ChangeNotifier {
   
   // Create tournament
   Future<String?> createTournament({
+    required String title,
     required String location,
     required DateTime startsAt,
     required Map<String, int> slotsByRole,
@@ -172,6 +173,10 @@ class AppStateProvider extends ChangeNotifier {
     String? description,
     bool premiumBadge = false,
     GeoPoint? locationCoordinates,
+    GameFormat? gameFormat,
+    GameServer? gameServer,
+    String? customRoomName,
+    String? customRoomPassword,
   }) async {
     if (_currentUser == null) return null;
     
@@ -202,8 +207,8 @@ class AppStateProvider extends ChangeNotifier {
       
       TournamentModel tournament = TournamentModel(
         id: '',  // Will be set by Firestore
-        title: '${_currentUser!.nickname}의 내전',
-        description: description ?? '',
+        title: title.isNotEmpty ? title : '${_currentUser!.nickname}의 내전',
+        description: description ?? '리그 오브 레전드 내전입니다',
         hostId: _currentUser!.uid,
         hostName: _currentUser!.nickname,
         hostNickname: _currentUser!.nickname,
@@ -219,6 +224,10 @@ class AppStateProvider extends ChangeNotifier {
         slotsByRole: slotsByRole,
         filledSlotsByRole: filledSlotsByRole,
         participants: [],
+        ovrLimit: ovrLimit,
+        premiumBadge: premiumBadge,
+        gameFormat: gameFormat ?? GameFormat.single,
+        gameServer: gameServer ?? GameServer.kr,
         // Additional fields can be added to extras if needed
         rules: {
           'ovrLimit': ovrLimit,
@@ -227,6 +236,8 @@ class AppStateProvider extends ChangeNotifier {
             'latitude': locationCoordinates.latitude,
             'longitude': locationCoordinates.longitude,
           } : null,
+          'customRoomName': customRoomName,
+          'customRoomPassword': customRoomPassword,
         },
       );
       
@@ -237,7 +248,7 @@ class AppStateProvider extends ChangeNotifier {
         try {
           await _cloudFunctionsService.notifyTournamentParticipants(
             tournamentId: id,
-            message: '새로운 내전이 생성되었습니다: ${_currentUser!.nickname}님의 내전',
+            message: '새로운 내전이 생성되었습니다: ${title.isNotEmpty ? title : _currentUser!.nickname}님의 내전',
           );
         } catch (e) {
           // Non-critical error, just log it

@@ -11,6 +11,21 @@ enum TournamentStatus {
   cancelled // 취소됨
 }
 
+// 경기 방식을 정의하는 열거형
+enum GameFormat {
+  single,   // 단판
+  bestOfThree, // 3판 2선승제
+  bestOfFive, // 5판 3선승제
+}
+
+// 게임 서버 지역
+enum GameServer {
+  kr,       // 한국 서버
+  jp,       // 일본 서버
+  na,       // 북미 서버
+  eu,       // 유럽 서버
+}
+
 class TournamentModel extends Equatable {
   final String id;
   final String title;
@@ -20,7 +35,7 @@ class TournamentModel extends Equatable {
   final String? hostProfileImageUrl;
   final String? hostNickname;
   final Timestamp startsAt;
-  final String location;
+  final String location; // 게임 서버 지역 정보로 사용
   final bool isPaid;
   final int? price;
   final int? ovrLimit;
@@ -36,6 +51,12 @@ class TournamentModel extends Equatable {
   final Map<String, dynamic>? rules;
   final Map<String, dynamic>? results;
   final double? distance;
+  
+  // 리그 오브 레전드 특화 필드
+  final GameFormat gameFormat; // 경기 방식
+  final GameServer gameServer; // 게임 서버
+  final String? customRoomName; // 커스텀 방 이름
+  final String? customRoomPassword; // 커스텀 방 비밀번호
   
   // hostId 대신 hostUid를 사용할 수 있도록 게터 추가
   String get hostUid => hostId;
@@ -65,6 +86,10 @@ class TournamentModel extends Equatable {
     this.rules,
     this.results,
     this.distance,
+    this.gameFormat = GameFormat.single,
+    this.gameServer = GameServer.kr,
+    this.customRoomName,
+    this.customRoomPassword,
   });
   
   // 기본 값으로 역할별 슬롯을 생성하는 팩토리 메서드
@@ -91,13 +116,18 @@ class TournamentModel extends Equatable {
     Map<String, dynamic>? rules,
     Map<String, dynamic>? results,
     double? distance,
+    GameFormat gameFormat = GameFormat.single,
+    GameServer gameServer = GameServer.kr,
+    String? customRoomName,
+    String? customRoomPassword,
   }) {
+    // 리그 오브 레전드 내전을 위한 기본 슬롯 - 각 라인 2명씩
     final defaultSlotsByRole = <String, int>{
-      'top': 1,
-      'jungle': 1,
-      'mid': 1,
-      'adc': 1,
-      'support': 1,
+      'top': 2,
+      'jungle': 2,
+      'mid': 2,
+      'adc': 2,
+      'support': 2,
     };
     
     final defaultFilledSlotsByRole = <String, int>{
@@ -133,6 +163,10 @@ class TournamentModel extends Equatable {
       rules: rules,
       results: results,
       distance: distance,
+      gameFormat: gameFormat,
+      gameServer: gameServer,
+      customRoomName: customRoomName,
+      customRoomPassword: customRoomPassword,
     );
   }
   
@@ -140,12 +174,13 @@ class TournamentModel extends Equatable {
   factory TournamentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     
+    // 롤 내전을 위한 기본 슬롯 - 각 라인 2명씩
     final defaultSlotsByRole = <String, int>{
-      'top': 1,
-      'jungle': 1,
-      'mid': 1,
-      'adc': 1,
-      'support': 1,
+      'top': 2,
+      'jungle': 2,
+      'mid': 2,
+      'adc': 2,
+      'support': 2,
     };
     
     final defaultFilledSlotsByRole = <String, int>{
@@ -181,6 +216,10 @@ class TournamentModel extends Equatable {
       rules: data['rules'],
       results: data['results'],
       distance: data['distance']?.toDouble(),
+      gameFormat: GameFormat.values[data['gameFormat'] ?? 0],
+      gameServer: GameServer.values[data['gameServer'] ?? 0],
+      customRoomName: data['customRoomName'],
+      customRoomPassword: data['customRoomPassword'],
     );
   }
   
@@ -210,6 +249,10 @@ class TournamentModel extends Equatable {
       'rules': rules,
       'results': results,
       'distance': distance,
+      'gameFormat': gameFormat.index,
+      'gameServer': gameServer.index,
+      'customRoomName': customRoomName,
+      'customRoomPassword': customRoomPassword,
     };
   }
   
@@ -237,6 +280,10 @@ class TournamentModel extends Equatable {
     Map<String, dynamic>? rules,
     Map<String, dynamic>? results,
     double? distance,
+    GameFormat? gameFormat,
+    GameServer? gameServer,
+    String? customRoomName,
+    String? customRoomPassword,
   }) {
     return TournamentModel(
       id: id,
@@ -254,7 +301,7 @@ class TournamentModel extends Equatable {
       premiumBadge: premiumBadge ?? this.premiumBadge,
       status: status ?? this.status,
       createdAt: createdAt,
-      updatedAt: updatedAt ?? DateTime.now(),
+      updatedAt: updatedAt ?? this.updatedAt,
       slots: slots ?? this.slots,
       filledSlots: filledSlots ?? this.filledSlots,
       slotsByRole: slotsByRole ?? this.slotsByRole,
@@ -263,6 +310,10 @@ class TournamentModel extends Equatable {
       rules: rules ?? this.rules,
       results: results ?? this.results,
       distance: distance ?? this.distance,
+      gameFormat: gameFormat ?? this.gameFormat,
+      gameServer: gameServer ?? this.gameServer,
+      customRoomName: customRoomName ?? this.customRoomName,
+      customRoomPassword: customRoomPassword ?? this.customRoomPassword,
     );
   }
   
@@ -297,6 +348,6 @@ class TournamentModel extends Equatable {
     id, title, description, hostId, hostName, hostProfileImageUrl, hostNickname,
     startsAt, location, isPaid, price, ovrLimit, premiumBadge, status, createdAt, 
     updatedAt, slots, filledSlots, slotsByRole, filledSlotsByRole,
-    participants, rules, results, distance
+    participants, rules, results, distance, gameFormat, gameServer, customRoomName, customRoomPassword
   ];
 } 

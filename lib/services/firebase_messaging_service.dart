@@ -113,9 +113,6 @@ class FirebaseMessagingService {
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
-      onDidReceiveLocalNotification: (int id, String? title, String? body, String? payload) async {
-        debugPrint('iOS foreground notification: $title, $body, $payload');
-      }
     );
     
     final InitializationSettings initializationSettings = InitializationSettings(

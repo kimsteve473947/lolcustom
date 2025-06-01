@@ -59,6 +59,14 @@ class AuthProvider extends ChangeNotifier {
         password: password,
       );
       _clearError();
+    } on FirebaseAuthException catch (e) {
+      // Firebase Auth 오류 처리
+      if (e.code == 'billing-not-enabled') {
+        _setError('Firebase 결제 계정이 필요합니다. Firebase Console에서 Blaze 플랜으로 업그레이드하세요.');
+      } else {
+        _setError(authService.getKoreanErrorMessage(e));
+      }
+      rethrow;
     } catch (e) {
       _setError(e.toString());
       rethrow;
@@ -77,6 +85,17 @@ class AuthProvider extends ChangeNotifier {
         nickname: nickname,
       );
       _clearError();
+      
+      // 회원가입 성공 후 이메일 인증 안내 메시지 설정
+      _setMessage('회원가입이 완료되었습니다. 이메일 인증 메일을 확인해주세요.');
+    } on FirebaseAuthException catch (e) {
+      // Firebase Auth 오류 처리
+      if (e.code == 'billing-not-enabled') {
+        _setError('Firebase 결제 계정이 필요합니다. Firebase Console에서 Blaze 플랜으로 업그레이드하세요.');
+      } else {
+        _setError(authService.getKoreanErrorMessage(e));
+      }
+      rethrow;
     } catch (e) {
       _setError(e.toString());
       rethrow;
@@ -105,9 +124,61 @@ class AuthProvider extends ChangeNotifier {
     try {
       await authService.sendPasswordResetEmail(email);
       _clearError();
+      _setMessage('비밀번호 재설정 이메일이 전송되었습니다. 이메일을 확인해주세요.');
+    } on FirebaseAuthException catch (e) {
+      _setError(authService.getKoreanErrorMessage(e));
+      rethrow;
     } catch (e) {
       _setError(e.toString());
       rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // 비밀번호 재설정 코드 확인
+  Future<void> confirmPasswordReset(String code, String newPassword) async {
+    _setLoading(true);
+    try {
+      await authService.confirmPasswordReset(code, newPassword);
+      _clearError();
+      _setMessage('비밀번호가 성공적으로 변경되었습니다.');
+    } on FirebaseAuthException catch (e) {
+      _setError(authService.getKoreanErrorMessage(e));
+      rethrow;
+    } catch (e) {
+      _setError(e.toString());
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // 이메일 인증 메일 재전송
+  Future<void> resendEmailVerification() async {
+    _setLoading(true);
+    try {
+      await authService.resendEmailVerification();
+      _clearError();
+      _setMessage('이메일 인증 메일이 재전송되었습니다. 이메일을 확인해주세요.');
+    } catch (e) {
+      _setError(e.toString());
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // 이메일 인증 상태 확인
+  Future<bool> checkEmailVerified() async {
+    _setLoading(true);
+    try {
+      final isVerified = await authService.checkEmailVerified();
+      _clearError();
+      return isVerified;
+    } catch (e) {
+      _setError(e.toString());
+      return false;
     } finally {
       _setLoading(false);
     }
@@ -140,12 +211,24 @@ class AuthProvider extends ChangeNotifier {
   // 에러 설정
   void _setError(String error) {
     _error = error;
+    _message = null;
     notifyListeners();
   }
   
-  // 에러 초기화
+  // 메시지 설정
+  String? _message;
+  String? get message => _message;
+  
+  void _setMessage(String message) {
+    _message = message;
+    _error = null;
+    notifyListeners();
+  }
+  
+  // 에러 및 메시지 초기화
   void _clearError() {
     _error = null;
+    _message = null;
     notifyListeners();
   }
 } 

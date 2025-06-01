@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/providers/auth_provider.dart';
 import 'package:provider/provider.dart';
+import 'package:go_router/go_router.dart';
 
 class MyPageScreen extends StatefulWidget {
   const MyPageScreen({Key? key}) : super(key: key);
@@ -212,9 +213,13 @@ class _MyPageScreenState extends State<MyPageScreen> {
             child: const Text('취소'),
           ),
           TextButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.of(context).pop();
-              Provider.of<AuthProvider>(context, listen: false).signOut();
+              await Provider.of<AuthProvider>(context, listen: false).signOut();
+              // 로그아웃 후 로그인 페이지로 이동
+              if (context.mounted) {
+                context.go('/login');
+              }
             },
             child: const Text('로그아웃'),
           ),

@@ -4,6 +4,7 @@ import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/providers/auth_provider.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class LoginScreen extends StatefulWidget {
   final String? redirectUrl;
@@ -50,6 +51,15 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } catch (e) {
       // 오류는 AuthProvider에서 처리하므로 여기서는 별도 처리 필요 없음
+    }
+  }
+
+  Future<void> _launchFirebaseConsole() async {
+    final Uri url = Uri.parse('https://console.firebase.google.com/');
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('URL을 열 수 없습니다')),
+      );
     }
   }
 
@@ -184,6 +194,24 @@ class _LoginScreenState extends State<LoginScreen> {
                   ),
                   const SizedBox(height: 24),
                   
+                  // Success message
+                  if (authProvider.message != null)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.green.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: Text(
+                        authProvider.message!,
+                        style: const TextStyle(
+                          color: Colors.green,
+                          fontSize: 14,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  
                   // Error message
                   if (authProvider.error != null)
                     Container(
@@ -192,13 +220,44 @@ class _LoginScreenState extends State<LoginScreen> {
                         color: AppColors.error.withOpacity(0.1),
                         borderRadius: BorderRadius.circular(8),
                       ),
-                      child: Text(
-                        authProvider.error!,
-                        style: const TextStyle(
-                          color: AppColors.error,
-                          fontSize: 14,
-                        ),
-                        textAlign: TextAlign.center,
+                      child: Column(
+                        children: [
+                          Text(
+                            authProvider.error!,
+                            style: const TextStyle(
+                              color: AppColors.error,
+                              fontSize: 14,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                          // BILLING_NOT_ENABLED 오류 발생 시 해결 방법 안내
+                          if (authProvider.error!.contains('결제 계정'))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: OutlinedButton.icon(
+                                icon: const Icon(Icons.open_in_new),
+                                label: const Text('Firebase Console 열기'),
+                                onPressed: _launchFirebaseConsole,
+                              ),
+                            ),
+                          // 이메일 인증 관련 오류일 경우 이메일 인증 재발송 버튼 표시
+                          if (authProvider.error!.contains('이메일 인증') || 
+                              authProvider.error!.contains('이메일을 확인'))
+                            Padding(
+                              padding: const EdgeInsets.only(top: 8.0),
+                              child: TextButton.icon(
+                                icon: const Icon(Icons.email_outlined),
+                                label: const Text('이메일 인증 메일 재전송'),
+                                onPressed: () async {
+                                  try {
+                                    await authProvider.resendEmailVerification();
+                                  } catch (e) {
+                                    // 에러는 provider에서 처리됨
+                                  }
+                                },
+                              ),
+                            ),
+                        ],
                       ),
                     ),
                   const SizedBox(height: 24),
