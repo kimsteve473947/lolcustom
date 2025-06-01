@@ -31,7 +31,7 @@ class AuthService {
         final newUser = UserModel(
           uid: user.uid,
           nickname: user.displayName ?? 'User${user.uid.substring(0, 4)}',
-          joinedAt: DateTime.now(),
+          joinedAt: Timestamp.now(),
         );
         
         await _firestore.collection('users').doc(user.uid).set(newUser.toMap());

@@ -1,5 +1,6 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
+import 'package:lol_custom_game_manager/models/user_model.dart';
 
 class MercenaryModel extends Equatable {
   final String id;
@@ -12,6 +13,11 @@ class MercenaryModel extends Equatable {
   final double averageRating;
   final int totalRatings;
   final double averageRoleStat;
+  final String nickname;
+  final String? profileImageUrl;
+  final PlayerTier tier;
+  final bool isAvailable;
+  final Timestamp lastActiveAt;
 
   const MercenaryModel({
     required this.id,
@@ -24,6 +30,11 @@ class MercenaryModel extends Equatable {
     this.averageRating = 0.0,
     this.totalRatings = 0,
     required this.averageRoleStat,
+    required this.nickname,
+    this.profileImageUrl,
+    required this.tier,
+    this.isAvailable = true,
+    required this.lastActiveAt,
   });
 
   factory MercenaryModel.fromFirestore(DocumentSnapshot doc) {
@@ -54,6 +65,11 @@ class MercenaryModel extends Equatable {
       averageRating: (data['averageRating'] ?? 0.0).toDouble(),
       totalRatings: data['totalRatings'] ?? 0,
       averageRoleStat: averageRoleStat,
+      nickname: data['nickname'] ?? '',
+      profileImageUrl: data['profileImageUrl'],
+      tier: UserModel.tierFromString(data['tier']),
+      isAvailable: data['isAvailable'] ?? true,
+      lastActiveAt: data['lastActiveAt'] ?? Timestamp.now(),
     );
   }
 
@@ -67,6 +83,11 @@ class MercenaryModel extends Equatable {
       'skillStats': skillStats,
       'averageRating': averageRating,
       'totalRatings': totalRatings,
+      'nickname': nickname,
+      'profileImageUrl': profileImageUrl,
+      'tier': tier.toString().split('.').last,
+      'isAvailable': isAvailable,
+      'lastActiveAt': lastActiveAt,
     };
   }
 
@@ -80,6 +101,11 @@ class MercenaryModel extends Equatable {
     double? averageRating,
     int? totalRatings,
     double? averageRoleStat,
+    String? nickname,
+    String? profileImageUrl,
+    PlayerTier? tier,
+    bool? isAvailable,
+    Timestamp? lastActiveAt,
   }) {
     return MercenaryModel(
       id: id,
@@ -92,12 +118,18 @@ class MercenaryModel extends Equatable {
       averageRating: averageRating ?? this.averageRating,
       totalRatings: totalRatings ?? this.totalRatings,
       averageRoleStat: averageRoleStat ?? this.averageRoleStat,
+      nickname: nickname ?? this.nickname,
+      profileImageUrl: profileImageUrl ?? this.profileImageUrl,
+      tier: tier ?? this.tier,
+      isAvailable: isAvailable ?? this.isAvailable,
+      lastActiveAt: lastActiveAt ?? this.lastActiveAt,
     );
   }
 
   @override
   List<Object?> get props => [
     id, userUid, createdAt, description, preferredPositions, 
-    roleStats, skillStats, averageRating, totalRatings, averageRoleStat
+    roleStats, skillStats, averageRating, totalRatings, averageRoleStat,
+    nickname, profileImageUrl, tier, isAvailable, lastActiveAt
   ];
 } 

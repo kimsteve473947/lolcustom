@@ -30,10 +30,10 @@ class AppRouter {
     refreshListenable: GoRouterRefreshStream(authService.authStateChanges()),
     redirect: (BuildContext context, GoRouterState state) {
       final isLoggedIn = authService.isLoggedIn;
-      final isInitializing = state.location == '/';
-      final isLoggingIn = state.location == '/login';
-      final isSigningUp = state.location == '/signup';
-      final isPasswordReset = state.location == '/password-reset';
+      final isInitializing = state.uri.path == '/';
+      final isLoggingIn = state.uri.path == '/login';
+      final isSigningUp = state.uri.path == '/signup';
+      final isPasswordReset = state.uri.path == '/password-reset';
       
       // 인증이 필요하지 않은 경로 목록
       final publicPaths = [
@@ -54,8 +54,8 @@ class AppRouter {
       }
       
       // 로그인하지 않은 사용자가 보호된 경로에 접근하면 로그인 페이지로 리다이렉트
-      if (!isLoggedIn && !publicPaths.contains(state.location)) {
-        return '/login?redirect=${state.location}';
+      if (!isLoggedIn && !publicPaths.contains(state.uri.path)) {
+        return '/login?redirect=${state.uri.path}';
       }
       
       // 그 외의 경우 정상 진행
@@ -69,7 +69,7 @@ class AppRouter {
       GoRoute(
         path: '/login',
         builder: (context, state) => LoginScreen(
-          redirectUrl: state.queryParams['redirect'],
+          redirectUrl: state.uri.queryParameters['redirect'],
         ),
       ),
       GoRoute(
@@ -91,15 +91,15 @@ class AppRouter {
       GoRoute(
         path: '/tournaments/:id',
         builder: (context, state) {
-          final tournamentId = state.params['id']!;
+          final tournamentId = state.pathParameters['id']!;
           return TournamentDetailScreen(tournamentId: tournamentId);
         },
       ),
       GoRoute(
         path: '/mercenaries/:id',
         builder: (context, state) {
-          final userId = state.params['id']!;
-          return MercenaryDetailScreen(userId: userId);
+          final userId = state.pathParameters['id']!;
+          return MercenaryDetailScreen(mercenaryId: userId);
         },
       ),
       GoRoute(
@@ -113,8 +113,8 @@ class AppRouter {
       GoRoute(
         path: '/chat/:id',
         builder: (context, state) {
-          final chatId = state.params['id']!;
-          return ChatRoomScreen(chatId: chatId);
+          final chatId = state.pathParameters['id']!;
+          return ChatRoomScreen(chatRoomId: chatId);
         },
       ),
       GoRoute(
@@ -153,7 +153,7 @@ class GoRouterRefreshStream extends ChangeNotifier {
   
   GoRouterRefreshStream(Stream<dynamic> stream) 
       : _subscription = stream.asBroadcastStream().listen((dynamic _) {
-          notifyListeners();
+          // 최신 버전의 go_router에서는 ChangeNotifier를 사용하지 않으므로 여기서 notifyListeners()를 직접 호출하지 않음
         });
   
   @override

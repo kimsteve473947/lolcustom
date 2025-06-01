@@ -20,7 +20,8 @@ class FirebaseService {
   Future<UserModel?> getCurrentUser() async {
     if (currentUser == null) return null;
     try {
-      DocumentSnapshot doc = await _firestore.collection('users').doc(currentUser!.uid).get();
+      DocumentSnapshot doc =
+          await _firestore.collection('users').doc(currentUser!.uid).get();
       if (doc.exists) {
         return UserModel.fromFirestore(doc);
       }
@@ -59,16 +60,23 @@ class FirebaseService {
     int? ovrLimit,
   }) async {
     try {
-      Query query = _firestore.collection('tournaments')
+      Query query = _firestore
+          .collection('tournaments')
           .orderBy('startsAt', descending: false)
           .where('status', isEqualTo: TournamentStatus.open.index);
 
       if (startDate != null) {
-        query = query.where('startsAt', isGreaterThanOrEqualTo: Timestamp.fromDate(startDate));
+        query = query.where(
+          'startsAt',
+          isGreaterThanOrEqualTo: Timestamp.fromDate(startDate),
+        );
       }
 
       if (endDate != null) {
-        query = query.where('startsAt', isLessThanOrEqualTo: Timestamp.fromDate(endDate));
+        query = query.where(
+          'startsAt',
+          isLessThanOrEqualTo: Timestamp.fromDate(endDate),
+        );
       }
 
       if (isPaid != null) {
@@ -88,7 +96,9 @@ class FirebaseService {
       }
 
       final snapshot = await query.get();
-      return snapshot.docs.map((doc) => TournamentModel.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => TournamentModel.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting tournaments: $e');
       return [];
@@ -97,7 +107,8 @@ class FirebaseService {
 
   Future<TournamentModel?> getTournament(String id) async {
     try {
-      DocumentSnapshot doc = await _firestore.collection('tournaments').doc(id).get();
+      DocumentSnapshot doc =
+          await _firestore.collection('tournaments').doc(id).get();
       if (doc.exists) {
         return TournamentModel.fromFirestore(doc);
       }
@@ -110,7 +121,8 @@ class FirebaseService {
 
   Future<String> createTournament(TournamentModel tournament) async {
     try {
-      DocumentReference ref = await _firestore.collection('tournaments').add(tournament.toFirestore());
+      DocumentReference ref =
+          await _firestore.collection('tournaments').add(tournament.toFirestore());
       return ref.id;
     } catch (e) {
       debugPrint('Error creating tournament: $e');
@@ -120,7 +132,10 @@ class FirebaseService {
 
   Future<void> updateTournament(TournamentModel tournament) async {
     try {
-      await _firestore.collection('tournaments').doc(tournament.id).update(tournament.toFirestore());
+      await _firestore
+          .collection('tournaments')
+          .doc(tournament.id)
+          .update(tournament.toFirestore());
     } catch (e) {
       debugPrint('Error updating tournament: $e');
       throw e;
@@ -130,7 +145,8 @@ class FirebaseService {
   // Application methods
   Future<String> applyToTournament(ApplicationModel application) async {
     try {
-      DocumentReference ref = await _firestore.collection('applications').add(application.toFirestore());
+      DocumentReference ref =
+          await _firestore.collection('applications').add(application.toFirestore());
       return ref.id;
     } catch (e) {
       debugPrint('Error applying to tournament: $e');
@@ -140,10 +156,13 @@ class FirebaseService {
 
   Future<List<ApplicationModel>> getTournamentApplications(String tournamentId) async {
     try {
-      final snapshot = await _firestore.collection('applications')
+      final snapshot = await _firestore
+          .collection('applications')
           .where('tournamentId', isEqualTo: tournamentId)
           .get();
-      return snapshot.docs.map((doc) => ApplicationModel.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => ApplicationModel.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting tournament applications: $e');
       return [];
@@ -152,7 +171,10 @@ class FirebaseService {
 
   Future<void> updateApplicationStatus(String id, ApplicationStatus status) async {
     try {
-      await _firestore.collection('applications').doc(id).update({'status': status.index});
+      await _firestore
+          .collection('applications')
+          .doc(id)
+          .update({'status': status.index});
     } catch (e) {
       debugPrint('Error updating application status: $e');
       throw e;
@@ -167,7 +189,8 @@ class FirebaseService {
     int? minOvr,
   }) async {
     try {
-      Query query = _firestore.collection('mercenaries')
+      Query query = _firestore
+          .collection('mercenaries')
           .where('isAvailable', isEqualTo: true)
           .orderBy('lastActiveAt', descending: true);
 
@@ -184,13 +207,16 @@ class FirebaseService {
       }
 
       final snapshot = await query.get();
-      List<MercenaryModel> mercenaries = snapshot.docs.map((doc) => MercenaryModel.fromFirestore(doc)).toList();
-      
+      List<MercenaryModel> mercenaries = snapshot.docs
+          .map((doc) => MercenaryModel.fromFirestore(doc))
+          .toList();
+
       // Filter by minOvr if provided (this can't be done in the query)
       if (minOvr != null) {
-        mercenaries = mercenaries.where((m) => m.averageRoleStat >= minOvr).toList();
+        mercenaries =
+            mercenaries.where((m) => m.averageRoleStat >= minOvr).toList();
       }
-      
+
       return mercenaries;
     } catch (e) {
       debugPrint('Error getting mercenaries: $e');
@@ -200,7 +226,8 @@ class FirebaseService {
 
   Future<String> createMercenaryProfile(MercenaryModel mercenary) async {
     try {
-      DocumentReference ref = await _firestore.collection('mercenaries').add(mercenary.toFirestore());
+      DocumentReference ref =
+          await _firestore.collection('mercenaries').add(mercenary.toFirestore());
       return ref.id;
     } catch (e) {
       debugPrint('Error creating mercenary profile: $e');
@@ -210,7 +237,10 @@ class FirebaseService {
 
   Future<void> updateMercenaryProfile(MercenaryModel mercenary) async {
     try {
-      await _firestore.collection('mercenaries').doc(mercenary.id).update(mercenary.toFirestore());
+      await _firestore
+          .collection('mercenaries')
+          .doc(mercenary.id)
+          .update(mercenary.toFirestore());
     } catch (e) {
       debugPrint('Error updating mercenary profile: $e');
       throw e;
@@ -219,7 +249,8 @@ class FirebaseService {
 
   Future<MercenaryModel?> getMercenary(String id) async {
     try {
-      DocumentSnapshot doc = await _firestore.collection('mercenaries').doc(id).get();
+      DocumentSnapshot doc =
+          await _firestore.collection('mercenaries').doc(id).get();
       if (doc.exists) {
         return MercenaryModel.fromFirestore(doc);
       }
@@ -232,7 +263,8 @@ class FirebaseService {
 
   Future<UserModel?> getUserById(String userId) async {
     try {
-      DocumentSnapshot doc = await _firestore.collection('users').doc(userId).get();
+      DocumentSnapshot doc =
+          await _firestore.collection('users').doc(userId).get();
       if (doc.exists) {
         return UserModel.fromFirestore(doc);
       }
@@ -246,7 +278,8 @@ class FirebaseService {
   // Rating methods
   Future<String> rateUser(RatingModel rating) async {
     try {
-      DocumentReference ref = await _firestore.collection('ratings').add(rating.toFirestore());
+      DocumentReference ref =
+          await _firestore.collection('ratings').add(rating.toFirestore());
       return ref.id;
     } catch (e) {
       debugPrint('Error rating user: $e');
@@ -256,7 +289,8 @@ class FirebaseService {
 
   Future<List<RatingModel>> getUserRatings(String userId) async {
     try {
-      final snapshot = await _firestore.collection('ratings')
+      final snapshot = await _firestore
+          .collection('ratings')
           .where('targetId', isEqualTo: userId)
           .get();
       return snapshot.docs.map((doc) {
@@ -273,7 +307,8 @@ class FirebaseService {
   // Chat methods
   Future<String> createChatRoom(ChatRoomModel chatRoom) async {
     try {
-      DocumentReference ref = await _firestore.collection('chatRooms').add(chatRoom.toFirestore());
+      DocumentReference ref =
+          await _firestore.collection('chatRooms').add(chatRoom.toFirestore());
       return ref.id;
     } catch (e) {
       debugPrint('Error creating chat room: $e');
@@ -283,11 +318,14 @@ class FirebaseService {
 
   Future<List<ChatRoomModel>> getUserChatRooms(String userId) async {
     try {
-      final snapshot = await _firestore.collection('chatRooms')
+      final snapshot = await _firestore
+          .collection('chatRooms')
           .where('participantIds', arrayContains: userId)
           .orderBy('lastMessageTime', descending: true)
           .get();
-      return snapshot.docs.map((doc) => ChatRoomModel.fromFirestore(doc)).toList();
+      return snapshot.docs
+          .map((doc) => ChatRoomModel.fromFirestore(doc))
+          .toList();
     } catch (e) {
       debugPrint('Error getting user chat rooms: $e');
       return [];
@@ -297,14 +335,15 @@ class FirebaseService {
   Future<String> sendMessage(MessageModel message) async {
     try {
       // Add the message
-      DocumentReference ref = await _firestore.collection('messages').add(message.toFirestore());
-      
+      DocumentReference ref =
+          await _firestore.collection('messages').add(message.toFirestore());
+
       // Update the chat room with last message
       await _firestore.collection('chatRooms').doc(message.chatRoomId).update({
         'lastMessageText': message.text,
         'lastMessageTime': message.timestamp,
       });
-      
+
       return ref.id;
     } catch (e) {
       debugPrint('Error sending message: $e');
@@ -313,12 +352,13 @@ class FirebaseService {
   }
 
   Stream<List<MessageModel>> getChatMessages(String chatRoomId) {
-    return _firestore.collection('messages')
+    return _firestore
+        .collection('messages')
         .where('chatRoomId', isEqualTo: chatRoomId)
         .orderBy('timestamp', descending: true)
         .limit(50)
         .snapshots()
-        .map((snapshot) => 
+        .map((snapshot) =>
             snapshot.docs.map((doc) => MessageModel.fromFirestore(doc)).toList());
   }
 
@@ -327,7 +367,7 @@ class FirebaseService {
     try {
       // Handle web vs mobile differently if needed
       final ref = _storage.ref().child(path);
-      
+
       if (kIsWeb) {
         // Web specific upload
         final metadata = SettableMetadata(
@@ -338,7 +378,7 @@ class FirebaseService {
         // Mobile upload
         await ref.putData(bytes);
       }
-      
+
       return await ref.getDownloadURL();
     } catch (e) {
       debugPrint('Error uploading image: $e');
@@ -347,54 +387,55 @@ class FirebaseService {
   }
 
   // Generic methods to fetch document by ID with proper typing
-  Future<DocumentSnapshot<Map<String, dynamic>>> getDocumentById(String collection, String id) async {
+  Future<DocumentSnapshot<Map<String, dynamic>>> getDocumentById(
+      String collection, String id) async {
     return await _firestore.collection(collection).doc(id).get();
   }
-  
-  // Example method for fetching tournaments
-  Future<List<Map<String, dynamic>>> getTournaments() async {
-    final QuerySnapshot<Map<String, dynamic>> snapshot = 
+
+  // Renamed method for raw Firestore data
+  Future<List<Map<String, dynamic>>> fetchRawTournamentDocs() async {
+    final QuerySnapshot<Map<String, dynamic>> snapshot =
         await _firestore.collection('tournaments').get();
-    
+
     return snapshot.docs.map((doc) {
       final data = doc.data();
       data['id'] = doc.id;
       return data;
     }).toList();
   }
-  
+
   // Example method for fetching a user profile
   Future<Map<String, dynamic>?> getUserProfile(String userId) async {
     final doc = await _firestore.collection('users').doc(userId).get();
     if (!doc.exists) return null;
-    
+
     final data = doc.data();
     return data;
   }
-  
+
   // Example method to calculate average rating
   Future<double> calculateAverageRating(String userId) async {
     final ratings = await getUserRatings(userId);
     if (ratings.isEmpty) return 0.0;
-    
+
     final totalStars = ratings.fold<int>(0, (sum, rating) => sum + rating.stars);
     return totalStars / ratings.length;
   }
-  
+
   // Example of a storage upload method
   Future<String> uploadFile(String path, Uint8List bytes) async {
     final ref = _storage.ref().child(path);
     await ref.putData(bytes);
     return await ref.getDownloadURL();
   }
-  
+
   // Example of working with timestamps
   DateTime? convertTimestampToDateTime(Timestamp? timestamp) {
     return timestamp?.toDate();
   }
-  
+
   String formatLastMessageTime(DateTime dateTime) {
     // Implementation of formatting logic
     return dateTime.toString();
   }
-} 
+}

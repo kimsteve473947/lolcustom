@@ -31,6 +31,7 @@ class UserModel extends Equatable {
   final String? riotId;
   final PlayerTier tier;
   final bool isPremium;
+  final double? averageRating;
 
   const UserModel({
     required this.uid,
@@ -43,6 +44,7 @@ class UserModel extends Equatable {
     this.riotId,
     this.tier = PlayerTier.unranked,
     this.isPremium = false,
+    this.averageRating,
   });
 
   // 파이어스토어에서 데이터 불러오기
@@ -54,11 +56,12 @@ class UserModel extends Equatable {
       nickname: data['nickname'] ?? '',
       profileImageUrl: data['profileImageUrl'] ?? '',
       joinedAt: data['joinedAt'] ?? Timestamp.now(),
-      role: _roleFromString(data['role']),
+      role: roleFromString(data['role']),
       additionalInfo: data['additionalInfo'] as Map<String, dynamic>?,
       riotId: data['riotId'],
-      tier: _tierFromString(data['tier']),
+      tier: tierFromString(data['tier']),
       isPremium: data['isPremium'] ?? false,
+      averageRating: data['averageRating'] != null ? (data['averageRating'] as num).toDouble() : null,
     );
   }
 
@@ -74,18 +77,24 @@ class UserModel extends Equatable {
       'riotId': riotId,
       'tier': tier.toString().split('.').last,
       'isPremium': isPremium,
+      'averageRating': averageRating,
     };
+  }
+  
+  // toMap은 toFirestore와 동일하게 동작
+  Map<String, dynamic> toMap() {
+    return toFirestore();
   }
 
   // role 문자열 -> enum 변환 헬퍼
-  static UserRole _roleFromString(String? roleStr) {
+  static UserRole roleFromString(String? roleStr) {
     if (roleStr == 'admin') return UserRole.admin;
     if (roleStr == 'moderator') return UserRole.moderator;
     return UserRole.user;
   }
   
   // tier 문자열 -> enum 변환 헬퍼
-  static PlayerTier _tierFromString(String? tierStr) {
+  static PlayerTier tierFromString(String? tierStr) {
     if (tierStr == null) return PlayerTier.unranked;
     
     switch (tierStr.toLowerCase()) {
@@ -114,6 +123,7 @@ class UserModel extends Equatable {
     String? riotId,
     PlayerTier? tier,
     bool? isPremium,
+    double? averageRating,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -126,6 +136,7 @@ class UserModel extends Equatable {
       riotId: riotId ?? this.riotId,
       tier: tier ?? this.tier,
       isPremium: isPremium ?? this.isPremium,
+      averageRating: averageRating ?? this.averageRating,
     );
   }
 
@@ -141,5 +152,6 @@ class UserModel extends Equatable {
         riotId,
         tier,
         isPremium,
+        averageRating,
       ];
 } 

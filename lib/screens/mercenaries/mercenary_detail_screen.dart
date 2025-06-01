@@ -30,6 +30,23 @@ class _MercenaryDetailScreenState extends State<MercenaryDetailScreen> {
   UserModel? _user;
   List<RatingModel> _ratings = [];
   
+  // PlayerTier enum을 한글 티어 문자열로 변환하는 헬퍼 메소드
+  String _tierToString(PlayerTier tier) {
+    switch (tier) {
+      case PlayerTier.unranked: return '언랭';
+      case PlayerTier.iron: return '아이언';
+      case PlayerTier.bronze: return '브론즈';
+      case PlayerTier.silver: return '실버';
+      case PlayerTier.gold: return '골드';
+      case PlayerTier.platinum: return '플래티넘';
+      case PlayerTier.diamond: return '다이아몬드';
+      case PlayerTier.master: return '마스터';
+      case PlayerTier.grandmaster: return '그랜드마스터';
+      case PlayerTier.challenger: return '챌린저';
+      default: return '언랭';
+    }
+  }
+  
   @override
   void initState() {
     super.initState();
@@ -202,7 +219,7 @@ class _MercenaryDetailScreenState extends State<MercenaryDetailScreen> {
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: Text(
-                              _mercenary!.tier,
+                              _tierToString(_mercenary!.tier),
                               style: TextStyle(
                                 fontSize: 12,
                                 fontWeight: FontWeight.bold,

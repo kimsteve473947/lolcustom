@@ -34,6 +34,7 @@ class AppStateProvider extends ChangeNotifier {
 
   // Expose services for direct access when needed
   CloudFunctionsService get cloudFunctionsService => _cloudFunctionsService;
+  FirebaseService get firebaseService => _firebaseService;
   
   // Initialize app state
   Future<void> _initializeApp() async {
@@ -135,10 +136,16 @@ class AppStateProvider extends ChangeNotifier {
     _clearError();
     
     try {
+      // tier 문자열에서 PlayerTier 열거형으로 변환
+      PlayerTier? playerTier;
+      if (tier != null) {
+        playerTier = UserModel.tierFromString(tier);
+      }
+      
       UserModel updatedUser = _currentUser!.copyWith(
         nickname: nickname,
         riotId: riotId,
-        tier: tier,
+        tier: playerTier,
         profileImageUrl: profileImageUrl,
       );
       
@@ -172,26 +179,45 @@ class AppStateProvider extends ChangeNotifier {
     _clearError();
     
     try {
+      // 기본 슬롯 맵 생성
+      final Map<String, int> slots = {
+        'team1': 5,
+        'team2': 5,
+      };
+      
+      // 각 역할별 빈 슬롯 맵 생성
+      final Map<String, int> filledSlotsByRole = {
+        'top': 0,
+        'jungle': 0,
+        'mid': 0,
+        'adc': 0,
+        'support': 0,
+      };
+      
+      // 빈 슬롯 맵 생성
+      final Map<String, int> filledSlots = {
+        'team1': 0,
+        'team2': 0,
+      };
+      
       TournamentModel tournament = TournamentModel(
         id: '',  // Will be set by Firestore
         title: '${_currentUser!.nickname}의 내전',
         description: description ?? '',
         hostId: _currentUser!.uid,
         hostName: _currentUser!.nickname,
-        startsAt: startsAt,
+        hostNickname: _currentUser!.nickname,
+        hostProfileImageUrl: _currentUser!.profileImageUrl,
+        startsAt: Timestamp.fromDate(startsAt),
         location: location,
         isPaid: isPaid,
         price: price,
         status: TournamentStatus.open,
         createdAt: DateTime.now(),
-        slots: slotsByRole,
-        filledSlots: {
-          'top': 0,
-          'jungle': 0,
-          'mid': 0,
-          'adc': 0,
-          'support': 0,
-        },
+        slots: slots,
+        filledSlots: filledSlots,
+        slotsByRole: slotsByRole,
+        filledSlotsByRole: filledSlotsByRole,
         participants: [],
         // Additional fields can be added to extras if needed
         rules: {
@@ -319,19 +345,26 @@ class AppStateProvider extends ChangeNotifier {
     _clearError();
     
     try {
+      // Calculate average role stat
+      double averageRoleStat = 0;
+      if (roleStats.isNotEmpty) {
+        final sum = roleStats.values.fold(0, (sum, stat) => sum + stat);
+        averageRoleStat = sum / roleStats.length;
+      }
+      
       MercenaryModel mercenary = MercenaryModel(
         id: '',  // Will be set by Firestore
         userUid: _currentUser!.uid,
         nickname: _currentUser!.nickname,
         profileImageUrl: _currentUser!.profileImageUrl,
         tier: _currentUser!.tier,
-        roleStats: roleStats,
-        skillStats: skillStats,
-        isAvailable: true,
-        preferredPositions: preferredPositions,
-        description: description,
         createdAt: Timestamp.now(),
         lastActiveAt: Timestamp.now(),
+        roleStats: roleStats,
+        skillStats: skillStats,
+        preferredPositions: preferredPositions,
+        description: description,
+        averageRoleStat: averageRoleStat,
         averageRating: _currentUser!.averageRating ?? 0.0,
       );
       

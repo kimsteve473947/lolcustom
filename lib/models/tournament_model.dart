@@ -37,6 +37,9 @@ class TournamentModel extends Equatable {
   final Map<String, dynamic>? results;
   final double? distance;
   
+  // hostId 대신 hostUid를 사용할 수 있도록 게터 추가
+  String get hostUid => hostId;
+  
   const TournamentModel({
     required this.id,
     required this.title,

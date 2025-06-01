@@ -1,7 +1,7 @@
-# Uncomment this line to define a global platform for your project
-platform :ios, '14.0'
+# iOS 최소 버전 설정
+platform :ios, '13.0'
 
-# CocoaPods analytics sends network stats synchronously affecting flutter build latency.
+# CocoaPods 통계 비활성화
 ENV['COCOAPODS_DISABLE_STATS'] = 'true'
 
 project 'Runner', {
@@ -15,17 +15,14 @@ def flutter_root
     File.join('..', 'Flutter', 'Generated.xcconfig'), __FILE__
   )
   unless File.exist?(generated_xcode_build_settings_path)
-    raise "#{generated_xcode_build_settings_path} must exist. " \
-          "If you're running pod install manually, make sure flutter pub get is executed first"
+    raise "#{generated_xcode_build_settings_path} must exist. "           "If you're running pod install manually, make sure flutter pub get is executed first"
   end
 
   File.foreach(generated_xcode_build_settings_path) do |line|
     matches = line.match(/FLUTTER_ROOT\=(.*)/)
     return matches[1].strip if matches
   end
-
-  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. " \
-        "Try deleting Generated.xcconfig, then run flutter pub get"
+  raise "FLUTTER_ROOT not found in #{generated_xcode_build_settings_path}. "         "Try deleting Generated.xcconfig, then run flutter pub get"
 end
 
 require File.expand_path(
@@ -48,38 +45,17 @@ end
 post_install do |installer|
   installer.pods_project.targets.each do |target|
     flutter_additional_ios_build_settings(target)
-    
+
+    # 모든 Pod 타겟에 공통 설정 적용
     target.build_configurations.each do |config|
-      # 기본 설정
-      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '14.0'
+      config.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '13.0'
       config.build_settings['ENABLE_BITCODE'] = 'NO'
-      config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)', 'PERMISSION_CAMERA=1']
       
-      # Xcode 15 이상에서 필요한 설정
-      config.build_settings['SWIFT_VERSION'] = '5.0'
-      config.build_settings['DEVELOPMENT_TEAM'] = '' # 개발팀 ID 필요시 설정
-      
-      # M1/M2 Mac의 시뮬레이터 설정
-      config.build_settings['EXCLUDED_ARCHS[sdk=iphonesimulator*]'] = 'i386'
-      config.build_settings['ONLY_ACTIVE_ARCH'] = 'YES'
-      
-      # Firebase 관련 문제 해결
-      if ['gRPC-Core', 'BoringSSL-GRPC', 'Firebase', 'FirebaseFirestore'].include?(target.name)
-        config.build_settings['BUILD_LIBRARY_FOR_DISTRIBUTION'] = 'YES'
-        
-        # 경고 및 컴파일러 오류 처리
+      # gRPC 관련 경고 억제
+      if target.name.match(/gRPC/) || target.name.match(/BoringSSL/)
         config.build_settings['GCC_WARN_INHIBIT_ALL_WARNINGS'] = 'YES'
-        config.build_settings['CLANG_ALLOW_NON_MODULAR_INCLUDES_IN_FRAMEWORK_MODULES'] = 'YES'
-        
-        # BoringSSL 관련 문제 해결
-        if ['BoringSSL-GRPC'].include?(target.name)
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] ||= ['$(inherited)']
-          config.build_settings['GCC_PREPROCESSOR_DEFINITIONS'] << 'OPENSSL_NO_ASM=1'
-        end
+        config.build_settings['CLANG_WARN_EVERYTHING'] = 'NO'
       end
     end
   end
-  
-  # Firebase 및 gRPC 관련 문제 수정 스크립트 실행
-  system("../Flutter/fix_firebase_dependencies.sh #{Dir.pwd}/..")
 end

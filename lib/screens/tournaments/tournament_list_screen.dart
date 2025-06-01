@@ -92,15 +92,19 @@ class _TournamentListScreenState extends State<TournamentListScreen> {
         filters: filterMap,
       );
       
+      DocumentSnapshot? lastDoc;
+      if (tournaments.isNotEmpty) {
+        lastDoc = await FirebaseFirestore.instance
+            .collection('tournaments')
+            .doc(tournaments.last.id)
+            .get();
+      }
+      
       setState(() {
         _tournaments = tournaments;
         _isLoading = false;
         _hasMoreTournaments = tournaments.length == 20;
-        _lastDocument = tournaments.isNotEmpty 
-          ? FirebaseFirestore.instance
-              .collection('tournaments')
-              .doc(tournaments.last.id)
-          : null;
+        _lastDocument = lastDoc;
       });
     } catch (e) {
       setState(() {
@@ -129,15 +133,19 @@ class _TournamentListScreenState extends State<TournamentListScreen> {
         filters: _filters,
       );
       
+      DocumentSnapshot? lastDoc;
+      if (tournaments.isNotEmpty) {
+        lastDoc = await FirebaseFirestore.instance
+            .collection('tournaments')
+            .doc(tournaments.last.id)
+            .get();
+      }
+      
       setState(() {
         _tournaments.addAll(tournaments);
         _isLoading = false;
         _hasMoreTournaments = tournaments.length == 20;
-        _lastDocument = tournaments.isNotEmpty 
-          ? FirebaseFirestore.instance
-              .collection('tournaments')
-              .doc(tournaments.last.id)
-          : _lastDocument;
+        _lastDocument = lastDoc ?? _lastDocument;
       });
     } catch (e) {
       setState(() {

@@ -294,11 +294,14 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   
   String _getStatusText() {
     switch (_tournament!.status) {
+      case TournamentStatus.draft:
+        return '초안';
       case TournamentStatus.open:
         return '모집 중';
       case TournamentStatus.full:
         return '모집 완료';
       case TournamentStatus.inProgress:
+      case TournamentStatus.ongoing:
         return '진행 중';
       case TournamentStatus.completed:
         return '완료됨';
@@ -309,11 +312,14 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   
   Color _getStatusColor() {
     switch (_tournament!.status) {
+      case TournamentStatus.draft:
+        return Colors.grey;
       case TournamentStatus.open:
         return AppColors.success;
       case TournamentStatus.full:
         return AppColors.primary;
       case TournamentStatus.inProgress:
+      case TournamentStatus.ongoing:
         return AppColors.warning;
       case TournamentStatus.completed:
         return AppColors.textSecondary;
@@ -646,7 +652,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Text(
-                    _tournament!.hostNickname,
+                    _tournament!.hostNickname ?? _tournament!.hostName,
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -654,7 +660,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                   ),
                   const SizedBox(height: 4),
                   Text(
-                    '주최: ${DateFormat('yyyy.MM.dd').format(_tournament!.createdAt.toDate())}',
+                    '주최: ${DateFormat('yyyy.MM.dd').format(_tournament!.createdAt)}',
                     style: const TextStyle(
                       fontSize: 14,
                       color: AppColors.textSecondary,
