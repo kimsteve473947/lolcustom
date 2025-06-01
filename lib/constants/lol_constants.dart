@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lol_custom_game_manager/models/tournament_model.dart';
 
 // 롤 라인 정보
 enum LolLane {
@@ -62,19 +63,4 @@ class LolGameServers {
     GameServer.na: '북미 서버',
     GameServer.eu: '유럽 서버',
   };
-}
-
-// 게임 형식 열거형 (TournamentModel.dart에서 가져온 것)
-enum GameFormat {
-  single,
-  bestOfThree,
-  bestOfFive,
-}
-
-// 게임 서버 열거형 (TournamentModel.dart에서 가져온 것)
-enum GameServer {
-  kr,
-  jp,
-  na,
-  eu,
 } 
