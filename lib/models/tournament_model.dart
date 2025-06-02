@@ -27,6 +27,12 @@ enum GameServer {
   eu,       // 유럽 서버
 }
 
+// 토너먼트 타입 정의
+enum TournamentType {
+  casual,   // 일반전 (무료)
+  competitive,  // 경쟁전 (크레딧 사용)
+}
+
 class TournamentModel extends Equatable {
   final String id;
   final String title;
@@ -37,8 +43,8 @@ class TournamentModel extends Equatable {
   final String? hostNickname;
   final Timestamp startsAt;
   final String location; // 게임 서버 지역 정보로 사용
-  final bool isPaid;
-  final int? price;
+  final TournamentType tournamentType; // 토너먼트 타입 (일반전/경쟁전)
+  final int? creditCost; // 경쟁전 참가 시 필요한 크레딧 (경쟁전인 경우에만 사용)
   final int? ovrLimit; // 기존 제한 필드 (하위 호환성 유지)
   final PlayerTier? tierLimit; // 추가: 티어 제한
   final bool premiumBadge;
@@ -50,6 +56,7 @@ class TournamentModel extends Equatable {
   final Map<String, int> slotsByRole;
   final Map<String, int> filledSlotsByRole;
   final List<String> participants;
+  final Map<String, List<String>> participantsByRole; // 역할별 참가자 목록
   final Map<String, dynamic>? rules;
   final Map<String, dynamic>? results;
   final double? distance;
@@ -60,8 +67,17 @@ class TournamentModel extends Equatable {
   final String? customRoomName; // 커스텀 방 이름
   final String? customRoomPassword; // 커스텀 방 비밀번호
   
+  // 심판 기능 관련 필드
+  final List<String> referees; // 심판 권한이 있는 사용자 목록
+  final bool isRefereed; // 심판이 필요한 토너먼트인지 여부 (경쟁전인 경우 true)
+  
   // hostId 대신 hostUid를 사용할 수 있도록 게터 추가
   String get hostUid => hostId;
+  
+  // 하위 호환성을 위한 게터 추가
+  bool get isPaid => tournamentType == TournamentType.competitive;
+  
+  int? get price => creditCost;
   
   const TournamentModel({
     required this.id,
@@ -73,8 +89,8 @@ class TournamentModel extends Equatable {
     this.hostNickname,
     required this.startsAt,
     required this.location,
-    required this.isPaid,
-    this.price,
+    required this.tournamentType,
+    this.creditCost,
     this.ovrLimit,
     this.tierLimit,
     this.premiumBadge = false,
@@ -86,6 +102,7 @@ class TournamentModel extends Equatable {
     required this.slotsByRole,
     required this.filledSlotsByRole,
     required this.participants,
+    required this.participantsByRole,
     this.rules,
     this.results,
     this.distance,
@@ -93,6 +110,8 @@ class TournamentModel extends Equatable {
     this.gameServer = GameServer.kr,
     this.customRoomName,
     this.customRoomPassword,
+    this.referees = const [],
+    this.isRefereed = false,
   });
   
   // 기본 값으로 역할별 슬롯을 생성하는 팩토리 메서드
@@ -106,8 +125,8 @@ class TournamentModel extends Equatable {
     String? hostNickname,
     required Timestamp startsAt,
     required String location,
-    required bool isPaid,
-    int? price,
+    required TournamentType tournamentType,
+    int? creditCost,
     int? ovrLimit,
     bool premiumBadge = false,
     required TournamentStatus status,
@@ -123,6 +142,8 @@ class TournamentModel extends Equatable {
     GameServer gameServer = GameServer.kr,
     String? customRoomName,
     String? customRoomPassword,
+    List<String> referees = const [],
+    bool isRefereed = false,
   }) {
     // 리그 오브 레전드 내전을 위한 기본 슬롯 - 각 라인 2명씩
     final defaultSlotsByRole = <String, int>{
@@ -140,6 +161,14 @@ class TournamentModel extends Equatable {
       'adc': 0,
       'support': 0,
     };
+
+    final defaultParticipantsByRole = <String, List<String>>{
+      'top': [],
+      'jungle': [],
+      'mid': [],
+      'adc': [],
+      'support': [],
+    };
     
     return TournamentModel(
       id: id,
@@ -151,8 +180,8 @@ class TournamentModel extends Equatable {
       hostNickname: hostNickname,
       startsAt: startsAt,
       location: location,
-      isPaid: isPaid,
-      price: price,
+      tournamentType: tournamentType,
+      creditCost: creditCost,
       ovrLimit: ovrLimit,
       premiumBadge: premiumBadge,
       status: status,
@@ -163,6 +192,7 @@ class TournamentModel extends Equatable {
       slotsByRole: defaultSlotsByRole,
       filledSlotsByRole: defaultFilledSlotsByRole,
       participants: participants,
+      participantsByRole: defaultParticipantsByRole,
       rules: rules,
       results: results,
       distance: distance,
@@ -170,6 +200,8 @@ class TournamentModel extends Equatable {
       gameServer: gameServer,
       customRoomName: customRoomName,
       customRoomPassword: customRoomPassword,
+      referees: referees,
+      isRefereed: isRefereed || tournamentType == TournamentType.competitive,
     );
   }
   
@@ -193,6 +225,14 @@ class TournamentModel extends Equatable {
       'adc': 0,
       'support': 0,
     };
+
+    final defaultParticipantsByRole = <String, List<String>>{
+      'top': [],
+      'jungle': [],
+      'mid': [],
+      'adc': [],
+      'support': [],
+    };
     
     // tierLimit을 문자열에서 PlayerTier enum으로 변환
     PlayerTier? tierLimit;
@@ -202,6 +242,84 @@ class TournamentModel extends Equatable {
       } else if (data['tierLimit'] is String) {
         tierLimit = UserModel.tierFromString(data['tierLimit'] as String);
       }
+    }
+
+    // 이전 버전 호환성 유지를 위한 코드
+    // isPaid 필드가 있으면 그에 따라 tournamentType 설정
+    TournamentType tournamentType;
+    if (data.containsKey('isPaid')) {
+      tournamentType = data['isPaid'] == true 
+          ? TournamentType.competitive 
+          : TournamentType.casual;
+    } else {
+      tournamentType = data['tournamentType'] != null
+          ? TournamentType.values[data['tournamentType'] as int]
+          : TournamentType.casual;
+    }
+
+    // 참가비를 크레딧으로 변환
+    int? creditCost;
+    if (tournamentType == TournamentType.competitive) {
+      if (data.containsKey('price')) {
+        creditCost = data['creditCost'] ?? data['price'] ?? 20; // 기본값 20 크레딧
+      } else {
+        creditCost = data['creditCost'] ?? 20;
+      }
+    }
+
+    // 참가자 목록 처리 - List<dynamic>을 List<String>으로 안전하게 변환
+    List<String> participants = [];
+    if (data['participants'] != null) {
+      participants = (data['participants'] as List)
+          .map((item) => item.toString())
+          .toList();
+    }
+
+    // 역할별 참가자 목록 변환
+    Map<String, List<String>> participantsByRole = {};
+    if (data['participantsByRole'] != null) {
+      try {
+        final rawMap = data['participantsByRole'] as Map<String, dynamic>;
+        for (final entry in rawMap.entries) {
+          if (entry.value is List) {
+            participantsByRole[entry.key] = (entry.value as List)
+                .map((item) => item.toString())
+                .toList();
+          } else {
+            participantsByRole[entry.key] = [];
+          }
+        }
+      } catch (e) {
+        print('Error parsing participantsByRole: $e');
+        participantsByRole = defaultParticipantsByRole;
+      }
+    } else {
+      participantsByRole = defaultParticipantsByRole;
+    }
+    
+    // 이전 데이터 구조에서 업데이트 (참가자 배열이 있지만 역할별 참가자 목록이 없는 경우)
+    if (participants.isNotEmpty && 
+        participantsByRole.values.every((list) => list.isEmpty)) {
+      participantsByRole = defaultParticipantsByRole;
+    }
+    
+    // 심판 관련 데이터 추출
+    List<String> referees = [];
+    if (data['rules'] != null && data['rules']['referees'] is List) {
+      try {
+        referees = (data['rules']['referees'] as List)
+            .map((item) => item.toString())
+            .toList();
+      } catch (e) {
+        print('Error parsing referees: $e');
+      }
+    }
+    
+    bool isRefereed = false;
+    if (data['rules'] != null && data['rules']['isRefereed'] is bool) {
+      isRefereed = data['rules']['isRefereed'];
+    } else {
+      isRefereed = tournamentType == TournamentType.competitive;
     }
     
     return TournamentModel(
@@ -214,8 +332,8 @@ class TournamentModel extends Equatable {
       hostNickname: data['hostNickname'] ?? data['hostName'] ?? '',
       startsAt: data['startsAt'] as Timestamp,
       location: data['location'] ?? '',
-      isPaid: data['isPaid'] ?? false,
-      price: data['price'],
+      tournamentType: tournamentType,
+      creditCost: creditCost,
       ovrLimit: data['ovrLimit'],
       tierLimit: tierLimit,
       premiumBadge: data['premiumBadge'] ?? false,
@@ -226,7 +344,8 @@ class TournamentModel extends Equatable {
       filledSlots: Map<String, int>.from(data['filledSlots'] ?? {}),
       slotsByRole: Map<String, int>.from(data['slotsByRole'] ?? defaultSlotsByRole),
       filledSlotsByRole: Map<String, int>.from(data['filledSlotsByRole'] ?? defaultFilledSlotsByRole),
-      participants: List<String>.from(data['participants'] ?? []),
+      participants: participants,
+      participantsByRole: participantsByRole,
       rules: data['rules'],
       results: data['results'],
       distance: data['distance']?.toDouble(),
@@ -234,11 +353,18 @@ class TournamentModel extends Equatable {
       gameServer: GameServer.values[data['gameServer'] ?? 0],
       customRoomName: data['customRoomName'],
       customRoomPassword: data['customRoomPassword'],
+      referees: referees,
+      isRefereed: isRefereed,
     );
   }
   
   // Firestore에 저장할 데이터 변환
   Map<String, dynamic> toFirestore() {
+    // 현재 rules 맵에 referees와 isRefereed 추가
+    final Map<String, dynamic> updatedRules = Map<String, dynamic>.from(rules ?? {});
+    updatedRules['referees'] = referees;
+    updatedRules['isRefereed'] = isRefereed;
+    
     return {
       'title': title,
       'description': description,
@@ -248,8 +374,8 @@ class TournamentModel extends Equatable {
       'hostNickname': hostNickname,
       'startsAt': startsAt,
       'location': location,
-      'isPaid': isPaid,
-      'price': price,
+      'tournamentType': tournamentType.index,
+      'creditCost': creditCost,
       'ovrLimit': ovrLimit,
       'tierLimit': tierLimit?.index,
       'premiumBadge': premiumBadge,
@@ -261,7 +387,8 @@ class TournamentModel extends Equatable {
       'slotsByRole': slotsByRole,
       'filledSlotsByRole': filledSlotsByRole,
       'participants': participants,
-      'rules': rules,
+      'participantsByRole': participantsByRole,
+      'rules': updatedRules,
       'results': results,
       'distance': distance,
       'gameFormat': gameFormat.index,
@@ -281,8 +408,8 @@ class TournamentModel extends Equatable {
     String? hostNickname,
     Timestamp? startsAt,
     String? location,
-    bool? isPaid,
-    int? price,
+    TournamentType? tournamentType,
+    int? creditCost,
     int? ovrLimit,
     PlayerTier? tierLimit,
     bool? premiumBadge,
@@ -293,6 +420,7 @@ class TournamentModel extends Equatable {
     Map<String, int>? slotsByRole,
     Map<String, int>? filledSlotsByRole,
     List<String>? participants,
+    Map<String, List<String>>? participantsByRole,
     Map<String, dynamic>? rules,
     Map<String, dynamic>? results,
     double? distance,
@@ -300,6 +428,8 @@ class TournamentModel extends Equatable {
     GameServer? gameServer,
     String? customRoomName,
     String? customRoomPassword,
+    List<String>? referees,
+    bool? isRefereed,
   }) {
     return TournamentModel(
       id: id,
@@ -311,8 +441,8 @@ class TournamentModel extends Equatable {
       hostNickname: hostNickname ?? this.hostNickname,
       startsAt: startsAt ?? this.startsAt,
       location: location ?? this.location,
-      isPaid: isPaid ?? this.isPaid,
-      price: price ?? this.price,
+      tournamentType: tournamentType ?? this.tournamentType,
+      creditCost: creditCost ?? this.creditCost,
       ovrLimit: ovrLimit ?? this.ovrLimit,
       tierLimit: tierLimit ?? this.tierLimit,
       premiumBadge: premiumBadge ?? this.premiumBadge,
@@ -324,6 +454,7 @@ class TournamentModel extends Equatable {
       slotsByRole: slotsByRole ?? this.slotsByRole,
       filledSlotsByRole: filledSlotsByRole ?? this.filledSlotsByRole,
       participants: participants ?? this.participants,
+      participantsByRole: participantsByRole ?? this.participantsByRole,
       rules: rules ?? this.rules,
       results: results ?? this.results,
       distance: distance ?? this.distance,
@@ -331,6 +462,8 @@ class TournamentModel extends Equatable {
       gameServer: gameServer ?? this.gameServer,
       customRoomName: customRoomName ?? this.customRoomName,
       customRoomPassword: customRoomPassword ?? this.customRoomPassword,
+      referees: referees ?? this.referees,
+      isRefereed: isRefereed ?? this.isRefereed,
     );
   }
   
@@ -344,11 +477,18 @@ class TournamentModel extends Equatable {
     });
   }
   
-  // 예약 가능 여부 확인
-  bool canJoin(String position) {
-    final totalSlots = slots[position] ?? 0;
-    final filled = filledSlots[position] ?? 0;
+  // 역할별 참가 가능 여부 확인
+  bool canJoinRole(String role) {
+    final totalSlots = slotsByRole[role] ?? 0;
+    final filled = filledSlotsByRole[role] ?? 0;
     return filled < totalSlots && status == TournamentStatus.open;
+  }
+  
+  // 특정 역할에 참가자 추가 가능 여부 확인
+  bool hasSpaceForRole(String role) {
+    final maxParticipants = slotsByRole[role] ?? 0;
+    final currentParticipants = participantsByRole[role]?.length ?? 0;
+    return currentParticipants < maxParticipants;
   }
   
   // 누락된 게터 추가
@@ -363,8 +503,10 @@ class TournamentModel extends Equatable {
   @override
   List<Object?> get props => [
     id, title, description, hostId, hostName, hostProfileImageUrl, hostNickname,
-    startsAt, location, isPaid, price, ovrLimit, tierLimit, premiumBadge, status, createdAt, 
-    updatedAt, slots, filledSlots, slotsByRole, filledSlotsByRole,
-    participants, rules, results, distance, gameFormat, gameServer, customRoomName, customRoomPassword
+    startsAt, location, tournamentType, creditCost, ovrLimit, tierLimit, premiumBadge, 
+    status, createdAt, updatedAt, slots, filledSlots, slotsByRole, filledSlotsByRole,
+    participants, participantsByRole, rules, results, distance, 
+    gameFormat, gameServer, customRoomName, customRoomPassword,
+    referees, isRefereed
   ];
 } 

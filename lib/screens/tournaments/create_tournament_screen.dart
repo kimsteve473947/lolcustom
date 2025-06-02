@@ -21,12 +21,11 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
-  final _priceController = TextEditingController();
   
   DateTime _selectedDate = DateTime.now().add(const Duration(days: 1));
   TimeOfDay _selectedTime = TimeOfDay.now();
   
-  bool _isPaid = false;
+  TournamentType _tournamentType = TournamentType.casual;
   
   // 리그 오브 레전드 특화 필드
   GameFormat _gameFormat = GameFormat.single;
@@ -49,7 +48,6 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   void dispose() {
     _titleController.dispose();
     _descriptionController.dispose();
-    _priceController.dispose();
     super.dispose();
   }
   
@@ -124,17 +122,6 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       _titleController.text = '리그 오브 레전드 내전';
     }
     
-    // If tournament is paid, ensure price is set
-    if (_isPaid && (_priceController.text.isEmpty || int.parse(_priceController.text) <= 0)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('유료 내전인 경우 참가비를 입력해주세요'),
-          backgroundColor: AppColors.error,
-        ),
-      );
-      return;
-    }
-    
     setState(() {
       _isLoading = true;
     });
@@ -145,10 +132,10 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
         location: '한국 서버', // 기본값으로 한국 서버 고정
         startsAt: _selectedDate,
         slotsByRole: _slotsByRole,
-        isPaid: _isPaid,
-        price: _isPaid ? int.parse(_priceController.text) : null,
+        tournamentType: _tournamentType,
         tierLimit: _selectedTierLimit,
-        description: _descriptionController.text.isNotEmpty ? _descriptionController.text : '리그 오브 레전드 내전입니다',
+        description: _descriptionController.text.isNotEmpty ? 
+                     _descriptionController.text : '리그 오브 레전드 내전입니다',
         gameFormat: _gameFormat,
       );
       
@@ -384,50 +371,108 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          '참가비',
+          '내전 유형',
           style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
           ),
         ),
         const SizedBox(height: 16),
-        SwitchListTile(
-          title: const Text('참가비 내전'),
-          subtitle: const Text('참가자들로부터 참가비를 받습니다'),
-          value: _isPaid,
-          activeColor: AppColors.primary,
-          contentPadding: EdgeInsets.zero,
-          onChanged: (value) {
-            setState(() {
-              _isPaid = value;
-            });
-          },
-        ),
-        if (_isPaid)
+        _buildTournamentTypeSelector(),
+        if (_tournamentType == TournamentType.competitive)
           Column(
             children: [
               const SizedBox(height: 16),
-              TextFormField(
-                controller: _priceController,
-                decoration: const InputDecoration(
-                  labelText: '참가비 (원)',
-                  border: OutlineInputBorder(),
-                  prefixText: '₩ ',
+              const SizedBox(height: 8),
+              const Text(
+                '* 경쟁전은 참가자에게 20 크레딧을 요구합니다. 참가자는 참가 시 크레딧을 소모합니다.\n* 경쟁전은 앱 내 심판 권한이 있는 사용자가 심판을 봐주는 구조입니다.',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppColors.textSecondary,
+                  fontStyle: FontStyle.italic,
                 ),
-                keyboardType: TextInputType.number,
-                inputFormatters: [
-                  FilteringTextInputFormatter.digitsOnly,
-                ],
-                validator: (value) {
-                  if (_isPaid && (value == null || value.isEmpty)) {
-                    return '참가비를 입력하세요';
-                  }
-                  return null;
-                },
               ),
             ],
           ),
       ],
+    );
+  }
+  
+  Widget _buildTournamentTypeSelector() {
+    return Row(
+      children: [
+        _buildTournamentTypeOption(
+          TournamentType.casual, 
+          '일반전', 
+          '무료로 참가 가능한 일반 내전입니다.',
+          Icons.sports_esports,
+        ),
+        const SizedBox(width: 16),
+        _buildTournamentTypeOption(
+          TournamentType.competitive, 
+          '경쟁전', 
+          '참가자는 20 크레딧을 소모하며, 심판이 배정되는 경쟁적인 내전입니다.',
+          Icons.emoji_events,
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildTournamentTypeOption(
+    TournamentType type, 
+    String title, 
+    String description, 
+    IconData icon,
+  ) {
+    final isSelected = _tournamentType == type;
+    
+    return Expanded(
+      child: InkWell(
+        onTap: () {
+          setState(() {
+            _tournamentType = type;
+          });
+        },
+        borderRadius: BorderRadius.circular(8),
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: isSelected ? AppColors.primary : Colors.grey.shade300,
+              width: isSelected ? 2 : 1,
+            ),
+          ),
+          child: Column(
+            children: [
+              Icon(
+                icon,
+                color: isSelected ? AppColors.primary : Colors.grey.shade500,
+                size: 32,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                title,
+                style: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                  color: isSelected ? AppColors.primary : Colors.grey.shade700,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                description,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: isSelected ? AppColors.primary.withOpacity(0.8) : Colors.grey.shade600,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+      ),
     );
   }
   

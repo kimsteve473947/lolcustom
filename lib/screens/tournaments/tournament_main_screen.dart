@@ -7,6 +7,8 @@ import 'package:lol_custom_game_manager/screens/tournaments/match_list_tab.dart'
 import 'package:lol_custom_game_manager/screens/tournaments/mercenary_search_tab.dart';
 // Removed the import for clan_battles_tab.dart since it was deleted
 import 'package:go_router/go_router.dart';
+import 'package:provider/provider.dart';
+import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 
 // Adding a temporary ClanBattlesTab widget until it's properly implemented
 class ClanBattlesTab extends StatelessWidget {
@@ -52,13 +54,14 @@ class TournamentMainScreen extends StatefulWidget {
   State<TournamentMainScreen> createState() => _TournamentMainScreenState();
 }
 
-class _TournamentMainScreenState extends State<TournamentMainScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _TournamentMainScreenState extends State<TournamentMainScreen> with TickerProviderStateMixin {
+  late TabController _mainTabController;
   final PageController _pageController = PageController(initialPage: 0, viewportFraction: 0.95);
   Timer? _autoSlideTimer;
   int _currentCarouselIndex = 0;
   int _selectedDateIndex = 0;
   final List<DateTime> _dates = [];
+  DateTime? _selectedDate;
   
   // 더미 프로모션 카드 데이터
   final List<Map<String, dynamic>> _promotionCards = [
@@ -85,14 +88,14 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Single
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _mainTabController = TabController(length: 3, vsync: this);
     _setupDates();
     _startAutoSlide();
   }
   
   @override
   void dispose() {
-    _tabController.dispose();
+    _mainTabController.dispose();
     _pageController.dispose();
     _autoSlideTimer?.cancel();
     super.dispose();
@@ -100,6 +103,8 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Single
   
   // 날짜 리스트 초기화 - 오늘부터 14일까지만 표시
   void _setupDates() {
+    _dates.clear();
+    
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     
@@ -107,12 +112,16 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Single
     for (int i = 0; i <= 14; i++) {
       _dates.add(today.add(Duration(days: i)));
     }
+    
+    // 기본적으로 오늘 날짜 선택
+    _selectedDateIndex = 0;
+    _selectedDate = _dates[_selectedDateIndex];
   }
   
   // 자동 슬라이드 타이머 설정
   void _startAutoSlide() {
     _autoSlideTimer?.cancel();
-    _autoSlideTimer = Timer.periodic(const Duration(seconds: 5), (timer) {
+    _autoSlideTimer = Timer.periodic(const Duration(milliseconds: 2500), (timer) {
       if (_promotionCards.isNotEmpty && _pageController.hasClients) {
         final nextIndex = (_currentCarouselIndex + 1) % _promotionCards.length;
         _pageController.animateToPage(
@@ -128,19 +137,25 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Single
   void _onDateSelected(int index) {
     setState(() {
       _selectedDateIndex = index;
+      _selectedDate = _dates[_selectedDateIndex];
     });
     
-    // 여기에 선택된 날짜에 해당하는 대회 정보를 필터링하는 로직 추가
-    // 예: selectedDate = _dates[_selectedDateIndex]
-    final selectedDate = _dates[_selectedDateIndex];
-    
-    // 실제 구현에서는 Provider나 BLoC을 통해 날짜 선택 이벤트를 전달하고
-    // 해당 날짜의 대회 목록을 불러오는 로직을 구현해야 함
-    debugPrint('Selected date: ${DateFormat('yyyy-MM-dd').format(selectedDate)}');
+    // 날짜 선택 정보 출력
+    debugPrint('Selected date: ${DateFormat('yyyy-MM-dd').format(_selectedDate!)}');
   }
 
   @override
   Widget build(BuildContext context) {
+    // 매일 자정에 날짜 목록을 업데이트하기 위한 로직
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    if (_dates.isNotEmpty && _dates[0].day != today.day) {
+      // 날짜가 변경되었다면 날짜 목록 업데이트
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _setupDates();
+      });
+    }
+    
     return Scaffold(
       appBar: AppBar(
         title: const Text(
@@ -165,53 +180,63 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Single
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // Tab Bar
-          Container(
-            decoration: const BoxDecoration(
-              color: Colors.white,
-              border: Border(
-                bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1),
+      body: NestedScrollView(
+        headerSliverBuilder: (context, innerBoxIsScrolled) {
+          return [
+            SliverToBoxAdapter(
+              child: Column(
+                children: [
+                  // 메인 탭 바 (개인전/클랜전/용병 찾기)
+                  Container(
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1),
+                      ),
+                    ),
+                    child: TabBar(
+                      controller: _mainTabController,
+                      indicatorColor: AppColors.primary,
+                      indicatorWeight: 3,
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: Colors.grey,
+                      tabs: const [
+                        Tab(text: '개인전'),
+                        Tab(text: '클랜전'),
+                        Tab(text: '용병 찾기'),
+                      ],
+                    ),
+                  ),
+                  
+                  // 프로모션 카드 영역 (Carousel)
+                  _buildPromotionCarousel(),
+                  
+                  // 날짜 선택기 (Date Selector)
+                  _buildDateSelector(),
+                ],
               ),
             ),
-            child: TabBar(
-              controller: _tabController,
-              indicatorColor: AppColors.primary,
-              indicatorWeight: 3,
-              labelColor: AppColors.primary,
-              unselectedLabelColor: Colors.grey,
-              tabs: const [
-                Tab(text: '개인 매칭'),
-                Tab(text: '용병 찾기'),
-                Tab(text: '클랜전'),
-              ],
+          ];
+        },
+        body: Column(
+          children: [
+            Expanded(
+              child: TabBarView(
+                controller: _mainTabController,
+                children: [
+                  // 개인전 탭
+                  MatchListTab(selectedDate: _selectedDate),
+                  
+                  // 클랜전 탭
+                  const ClanBattlesTab(),
+                  
+                  // 용병 찾기 탭
+                  const MercenarySearchTab(),
+                ],
+              ),
             ),
-          ),
-          
-          // 프로모션 카드 영역 (Carousel)
-          _buildPromotionCarousel(),
-          
-          // 날짜 선택기 (Date Selector)
-          _buildDateSelector(),
-          
-          // Tab Views
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: const [
-                // 개인 매칭 탭 (매치 찾기)
-                MatchListTab(),
-                
-                // 용병 찾기 탭
-                MercenarySearchTab(),
-                
-                // 클랜전 탭
-                ClanBattlesTab(),
-              ],
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
       // 내전 생성 버튼 추가
       floatingActionButton: FloatingActionButton(
@@ -317,7 +342,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Single
   // 날짜 선택기
   Widget _buildDateSelector() {
     return Container(
-      height: 85,
+      height: 95,
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(
@@ -343,7 +368,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Single
               _onDateSelected(index);
             },
             child: Container(
-              width: 60,
+              width: 65,
               margin: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.primary : Colors.white,
@@ -357,45 +382,49 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Single
                   width: 1.5,
                 ),
               ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text(
-                    dayFormat.format(date),
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: isSelected 
-                          ? Colors.white 
-                          : isToday 
-                              ? AppColors.primary 
-                              : Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    weekdayFormat.format(date),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isSelected 
-                          ? Colors.white 
-                          : isToday 
-                              ? AppColors.primary 
-                              : Colors.grey,
-                    ),
-                  ),
-                  if (isToday && !isSelected)
-                    const SizedBox(height: 4),
-                  if (isToday && !isSelected)
-                    Container(
-                      width: 4,
-                      height: 4,
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
-                        color: AppColors.primary,
+              child: Padding(
+                padding: const EdgeInsets.symmetric(vertical: 4.0),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      dayFormat.format(date),
+                      style: TextStyle(
+                        fontSize: 17,
+                        fontWeight: FontWeight.bold,
+                        color: isSelected 
+                            ? Colors.white 
+                            : isToday 
+                                ? AppColors.primary 
+                                : Colors.black,
                       ),
                     ),
-                ],
+                    const SizedBox(height: 2),
+                    Text(
+                      weekdayFormat.format(date),
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: isSelected 
+                            ? Colors.white 
+                            : isToday 
+                                ? AppColors.primary 
+                                : Colors.grey,
+                      ),
+                    ),
+                    if (isToday && !isSelected)
+                      const SizedBox(height: 2),
+                    if (isToday && !isSelected)
+                      Container(
+                        width: 3,
+                        height: 3,
+                        decoration: const BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                  ],
+                ),
               ),
             ),
           );

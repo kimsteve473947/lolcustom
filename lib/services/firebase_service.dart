@@ -456,4 +456,206 @@ class FirebaseService {
       return [];
     }
   }
+  
+  // Tournament participation methods - delegating to transaction-safe operations
+  Future<void> joinTournamentByRole(String tournamentId, String role) async {
+    try {
+      // Method to join a tournament with a specific role (top, jungle, mid, etc.)
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('로그인이 필요합니다.');
+      
+      await _firestore.runTransaction((transaction) async {
+        // Get the tournament document
+        final docRef = _firestore.collection('tournaments').doc(tournamentId);
+        final docSnapshot = await transaction.get(docRef);
+        
+        if (!docSnapshot.exists) {
+          throw Exception('토너먼트를 찾을 수 없습니다.');
+        }
+        
+        // Convert to tournament model
+        final tournament = TournamentModel.fromFirestore(docSnapshot);
+        
+        // Check if already a participant
+        if (tournament.participants.contains(userId)) {
+          throw Exception('이미 참가 중인 토너먼트입니다.');
+        }
+        
+        // Check if can join the role
+        if (!tournament.canJoinRole(role)) {
+          throw Exception('해당 포지션은 이미 가득 찼거나 참가할 수 없습니다.');
+        }
+        
+        // Get user information
+        final userDoc = await _firestore.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+          throw Exception('사용자 정보를 찾을 수 없습니다.');
+        }
+        
+        // Check credits for competitive tournaments
+        if (tournament.tournamentType == TournamentType.competitive) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final userCredits = userData['credits'] as int? ?? 0;
+          final requiredCredits = tournament.creditCost ?? 20;
+          
+          if (userCredits < requiredCredits) {
+            throw Exception('크레딧이 부족합니다. 필요 크레딧: $requiredCredits, 보유 크레딧: $userCredits');
+          }
+          
+          // Deduct credits
+          transaction.update(_firestore.collection('users').doc(userId), {
+            'credits': userCredits - requiredCredits
+          });
+        }
+        
+        // Update fields
+        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
+        updatedFilledSlots[role] = (updatedFilledSlots[role] ?? 0) + 1;
+        
+        final updatedFilledSlotsByRole = Map<String, int>.from(tournament.filledSlotsByRole);
+        updatedFilledSlotsByRole[role] = (updatedFilledSlotsByRole[role] ?? 0) + 1;
+        
+        final updatedParticipants = List<String>.from(tournament.participants)..add(userId);
+        
+        // Update participants by role
+        final updatedParticipantsByRole = Map<String, List<String>>.from(tournament.participantsByRole);
+        if (updatedParticipantsByRole[role] == null) {
+          updatedParticipantsByRole[role] = [];
+        }
+        updatedParticipantsByRole[role]!.add(userId);
+        
+        // Check if tournament will be full after joining
+        TournamentStatus updatedStatus = tournament.status;
+        final willBeFull = updatedFilledSlotsByRole.entries.every((entry) {
+          final totalSlots = tournament.slotsByRole[entry.key] ?? 0;
+          return entry.value >= totalSlots;
+        });
+        
+        if (willBeFull) {
+          updatedStatus = TournamentStatus.full;
+        }
+        
+        // Update tournament document
+        transaction.update(docRef, {
+          'filledSlots': updatedFilledSlots,
+          'filledSlotsByRole': updatedFilledSlotsByRole,
+          'participants': updatedParticipants,
+          'participantsByRole': updatedParticipantsByRole,
+          'status': updatedStatus.index,
+          'updatedAt': Timestamp.now(),
+        });
+      });
+    } catch (e) {
+      debugPrint('Error joining tournament: $e');
+      rethrow;
+    }
+  }
+  
+  Future<void> leaveTournamentByRole(String tournamentId, String role) async {
+    try {
+      // Method to leave a tournament with a specific role
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) throw Exception('로그인이 필요합니다.');
+      
+      await _firestore.runTransaction((transaction) async {
+        // Get the tournament document
+        final docRef = _firestore.collection('tournaments').doc(tournamentId);
+        final docSnapshot = await transaction.get(docRef);
+        
+        if (!docSnapshot.exists) {
+          throw Exception('토너먼트를 찾을 수 없습니다.');
+        }
+        
+        // Convert to tournament model
+        final tournament = TournamentModel.fromFirestore(docSnapshot);
+        
+        // Check if user is a participant
+        if (!tournament.participants.contains(userId)) {
+          throw Exception('참가하지 않은 토너먼트입니다.');
+        }
+        
+        // Check if user is in the specified role
+        final roleParticipants = tournament.participantsByRole[role] ?? [];
+        if (!roleParticipants.contains(userId)) {
+          throw Exception('해당 역할로 참가하지 않았습니다.');
+        }
+        
+        // Update fields
+        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
+        updatedFilledSlots[role] = (updatedFilledSlots[role] ?? 1) - 1;
+        if (updatedFilledSlots[role]! < 0) updatedFilledSlots[role] = 0;
+        
+        final updatedFilledSlotsByRole = Map<String, int>.from(tournament.filledSlotsByRole);
+        updatedFilledSlotsByRole[role] = (updatedFilledSlotsByRole[role] ?? 1) - 1;
+        if (updatedFilledSlotsByRole[role]! < 0) updatedFilledSlotsByRole[role] = 0;
+        
+        final updatedParticipants = List<String>.from(tournament.participants)..remove(userId);
+        
+        // Update participants by role
+        final updatedParticipantsByRole = Map<String, List<String>>.from(tournament.participantsByRole);
+        updatedParticipantsByRole[role] = roleParticipants.where((id) => id != userId).toList();
+        
+        // Update status if needed
+        TournamentStatus updatedStatus = tournament.status;
+        if (tournament.status == TournamentStatus.full) {
+          updatedStatus = TournamentStatus.open;
+        }
+        
+        // Update tournament document
+        transaction.update(docRef, {
+          'filledSlots': updatedFilledSlots,
+          'filledSlotsByRole': updatedFilledSlotsByRole,
+          'participants': updatedParticipants,
+          'participantsByRole': updatedParticipantsByRole,
+          'status': updatedStatus.index,
+          'updatedAt': Timestamp.now(),
+        });
+      });
+    } catch (e) {
+      debugPrint('Error leaving tournament: $e');
+      rethrow;
+    }
+  }
+  
+  // Credit management methods
+  Future<void> addCredits(String userId, int amount) async {
+    try {
+      // Get user document
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (!userDoc.exists) {
+        throw Exception('사용자 정보를 찾을 수 없습니다.');
+      }
+      
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final currentCredits = userData['credits'] as int? ?? 0;
+      
+      // Add credits
+      await _firestore.collection('users').doc(userId).update({
+        'credits': currentCredits + amount
+      });
+    } catch (e) {
+      debugPrint('Error adding credits: $e');
+      rethrow;
+    }
+  }
+  
+  Future<int> getUserCredits() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('로그인이 필요합니다.');
+      }
+      
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (!userDoc.exists) {
+        throw Exception('사용자 정보를 찾을 수 없습니다.');
+      }
+      
+      final userData = userDoc.data() as Map<String, dynamic>;
+      return userData['credits'] as int? ?? 0;
+    } catch (e) {
+      debugPrint('Error getting user credits: $e');
+      rethrow;
+    }
+  }
 }

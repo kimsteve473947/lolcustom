@@ -14,9 +14,15 @@ import 'package:provider/provider.dart';
 import 'package:shimmer/shimmer.dart';
 import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:lol_custom_game_manager/widgets/tournament_card_simplified.dart';
+import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_screen.dart';
 
 class MatchListTab extends StatefulWidget {
-  const MatchListTab({Key? key}) : super(key: key);
+  final DateTime? selectedDate;
+  
+  const MatchListTab({
+    Key? key,
+    this.selectedDate,
+  }) : super(key: key);
 
   @override
   State<MatchListTab> createState() => _MatchListTabState();
@@ -37,11 +43,6 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
   DocumentSnapshot? _lastFreeDocument;
   DocumentSnapshot? _lastPaidDocument;
   
-  // Filters
-  bool _ovrToggle = false;
-  DateTime? _selectedDate;
-  int _currentDateIndex = 0;
-  
   // Scroll controllers for pagination
   final ScrollController _freeScrollController = ScrollController();
   final ScrollController _paidScrollController = ScrollController();
@@ -53,20 +54,10 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     'premiumBadge': null,  // null: 모두, true: 프리미엄만
   };
   
-  // 날짜 범위
-  DateTime? _startDate;
-  DateTime? _endDate;
-  
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    
-    // 무료 내전 로드
-    _loadFreeTournaments();
-    
-    // 유료 내전 로드
-    _loadPaidTournaments();
     
     // Set up scroll listeners for pagination
     _freeScrollController.addListener(() {
@@ -91,7 +82,32 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
         // 필터 업데이트
         _filters['isPaid'] = _tabController.index == 0 ? false : true;
       });
+      
+      // 초기 데이터 로드
+      _loadTournaments();
     });
+    
+    // 초기 데이터 로드
+    _loadTournaments();
+  }
+  
+  @override
+  void didUpdateWidget(MatchListTab oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    
+    // 날짜가 변경되었으면 대회 목록 다시 로드
+    if (widget.selectedDate != oldWidget.selectedDate) {
+      _loadTournaments();
+    }
+  }
+
+  // 선택된 탭에 따라 대회 로드
+  void _loadTournaments() {
+    if (_tabController.index == 0) {
+      _loadFreeTournaments();
+    } else {
+      _loadPaidTournaments();
+    }
   }
 
   @override
@@ -114,14 +130,23 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     try {
       // 날짜 필터 적용
       Map<String, dynamic> filterMap = {..._filters, 'isPaid': false};
-      if (_startDate != null && _endDate != null) {
-        filterMap['startDate'] = _startDate;
-        filterMap['endDate'] = _endDate;
+      
+      // 선택된 날짜가 있으면 해당 날짜의 시작과 끝을 설정
+      if (widget.selectedDate != null) {
+        // 해당 날짜의 시작 (00:00:00)
+        final startDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day);
+        // 해당 날짜의 끝 (23:59:59)
+        final endDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day, 23, 59, 59);
+        
+        filterMap['startDate'] = startDate;
+        filterMap['endDate'] = endDate;
       }
       
       final tournaments = await _tournamentService.getTournaments(
         limit: 20,
         filters: filterMap,
+        orderBy: 'startsAt',
+        descending: true, // 최신순(내림차순) 정렬
       );
       
       DocumentSnapshot? lastDoc;
@@ -179,14 +204,23 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     try {
       // 날짜 필터 적용
       Map<String, dynamic> filterMap = {..._filters, 'isPaid': true};
-      if (_startDate != null && _endDate != null) {
-        filterMap['startDate'] = _startDate;
-        filterMap['endDate'] = _endDate;
+      
+      // 선택된 날짜가 있으면 해당 날짜의 시작과 끝을 설정
+      if (widget.selectedDate != null) {
+        // 해당 날짜의 시작 (00:00:00)
+        final startDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day);
+        // 해당 날짜의 끝 (23:59:59)
+        final endDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day, 23, 59, 59);
+        
+        filterMap['startDate'] = startDate;
+        filterMap['endDate'] = endDate;
       }
       
       final tournaments = await _tournamentService.getTournaments(
         limit: 20,
         filters: filterMap,
+        orderBy: 'startsAt',
+        descending: true, // 최신순(내림차순) 정렬
       );
       
       DocumentSnapshot? lastDoc;
@@ -227,15 +261,24 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     try {
       // 날짜 필터 적용
       Map<String, dynamic> filterMap = {..._filters, 'isPaid': false};
-      if (_startDate != null && _endDate != null) {
-        filterMap['startDate'] = _startDate;
-        filterMap['endDate'] = _endDate;
+      
+      // 선택된 날짜가 있으면 해당 날짜의 시작과 끝을 설정
+      if (widget.selectedDate != null) {
+        // 해당 날짜의 시작 (00:00:00)
+        final startDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day);
+        // 해당 날짜의 끝 (23:59:59)
+        final endDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day, 23, 59, 59);
+        
+        filterMap['startDate'] = startDate;
+        filterMap['endDate'] = endDate;
       }
       
       final tournaments = await _tournamentService.getTournaments(
         limit: 20,
         startAfter: _lastFreeDocument,
         filters: filterMap,
+        orderBy: 'startsAt',
+        descending: true, // 최신순(내림차순) 정렬
       );
       
       DocumentSnapshot? lastDoc;
@@ -270,15 +313,24 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     try {
       // 날짜 필터 적용
       Map<String, dynamic> filterMap = {..._filters, 'isPaid': true};
-      if (_startDate != null && _endDate != null) {
-        filterMap['startDate'] = _startDate;
-        filterMap['endDate'] = _endDate;
+      
+      // 선택된 날짜가 있으면 해당 날짜의 시작과 끝을 설정
+      if (widget.selectedDate != null) {
+        // 해당 날짜의 시작 (00:00:00)
+        final startDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day);
+        // 해당 날짜의 끝 (23:59:59)
+        final endDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day, 23, 59, 59);
+        
+        filterMap['startDate'] = startDate;
+        filterMap['endDate'] = endDate;
       }
       
       final tournaments = await _tournamentService.getTournaments(
         limit: 20,
         startAfter: _lastPaidDocument,
         filters: filterMap,
+        orderBy: 'startsAt',
+        descending: true, // 최신순(내림차순) 정렬
       );
       
       DocumentSnapshot? lastDoc;
@@ -301,49 +353,12 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
       });
     }
   }
-  
-  // 날짜 필터 설정
-  void _setDateFilter(int index) {
-    setState(() {
-      _currentDateIndex = index;
-      
-      // 오늘 날짜
-      final today = DateTime.now();
-      
-      switch (index) {
-        case 0: // 모든 날짜
-          _startDate = null;
-          _endDate = null;
-          break;
-        case 1: // 오늘
-          _startDate = DateTime(today.year, today.month, today.day);
-          _endDate = DateTime(today.year, today.month, today.day, 23, 59, 59);
-          break;
-        case 2: // 이번 주
-          final weekDay = today.weekday;
-          _startDate = today.subtract(Duration(days: weekDay - 1));
-          _startDate = DateTime(_startDate!.year, _startDate!.month, _startDate!.day);
-          _endDate = _startDate!.add(const Duration(days: 6));
-          _endDate = DateTime(_endDate!.year, _endDate!.month, _endDate!.day, 23, 59, 59);
-          break;
-        case 3: // 이번 달
-          _startDate = DateTime(today.year, today.month, 1);
-          _endDate = DateTime(today.year, today.month + 1, 0, 23, 59, 59);
-          break;
-      }
-      
-      // 필터 업데이트
-      _loadFreeTournaments();
-      _loadPaidTournaments();
-    });
-  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       body: Column(
         children: [
-          _buildDateFilter(),
           _buildTabBar(),
           Expanded(
             child: TabBarView(
@@ -359,40 +374,6 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     );
   }
   
-  Widget _buildDateFilter() {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: Row(
-          children: [
-            _buildDateChip(0, '모든 날짜'),
-            _buildDateChip(1, '오늘'),
-            _buildDateChip(2, '이번 주'),
-            _buildDateChip(3, '이번 달'),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildDateChip(int index, String label) {
-    final isSelected = _currentDateIndex == index;
-    
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (value) {
-          _setDateFilter(index);
-        },
-        selectedColor: AppColors.primary.withOpacity(0.2),
-        checkmarkColor: AppColors.primary,
-      ),
-    );
-  }
-  
   Widget _buildTabBar() {
     return TabBar(
       controller: _tabController,
@@ -400,8 +381,8 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
       unselectedLabelColor: Colors.grey,
       indicatorColor: AppColors.primary,
       tabs: const [
-        Tab(text: '무료 내전'),
-        Tab(text: '유료 내전'),
+        Tab(text: '일반전'),
+        Tab(text: '경쟁전'),
       ],
     );
   }
@@ -430,7 +411,9 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
             ),
             const SizedBox(height: 16),
             Text(
-              '내전이 없습니다',
+              widget.selectedDate != null 
+                  ? '${DateFormat('M월 d일', 'ko_KR').format(widget.selectedDate!)}에 일반전이 없습니다'
+                  : '일반전이 없습니다',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey.shade700,
@@ -494,7 +477,9 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
             ),
             const SizedBox(height: 16),
             Text(
-              '유료 내전이 없습니다',
+              widget.selectedDate != null 
+                  ? '${DateFormat('M월 d일', 'ko_KR').format(widget.selectedDate!)}에 경쟁전이 없습니다'
+                  : '경쟁전이 없습니다',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.grey.shade700,

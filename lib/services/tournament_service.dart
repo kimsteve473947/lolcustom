@@ -8,12 +8,14 @@ class TournamentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final String _collectionPath = 'tournaments';
+  final String _usersPath = 'users';
   
   // 사용자 ID 가져오기
   String? get _userId => _auth.currentUser?.uid;
   
   // 콜렉션 참조
   CollectionReference get _tournamentsRef => _firestore.collection(_collectionPath);
+  CollectionReference get _usersRef => _firestore.collection(_usersPath);
   
   // 모든 토너먼트 조회 (최신순)
   Stream<List<TournamentModel>> getTournamentsStream() {
@@ -85,15 +87,26 @@ class TournamentService {
     int? limit,
     DocumentSnapshot? startAfter,
     Map<String, dynamic>? filters,
+    String orderBy = 'startsAt',
+    bool descending = false,
   }) async {
     try {
-      Query query = _tournamentsRef.orderBy('startsAt', descending: false);
+      Query query = _tournamentsRef.orderBy(orderBy, descending: descending);
       
       // 필터 적용
       if (filters != null) {
-        // 유료/무료 필터
+        // 토너먼트 타입 필터 (일반전/경쟁전)
+        if (filters['tournamentType'] != null) {
+          query = query.where('tournamentType', isEqualTo: filters['tournamentType']);
+        }
+        
+        // 이전 버전 호환성을 위한 코드
+        // isPaid 필터가 있으면 그에 따라 tournamentType 필터 적용
         if (filters['isPaid'] != null) {
-          query = query.where('isPaid', isEqualTo: filters['isPaid']);
+          final tournamentType = filters['isPaid'] 
+              ? TournamentType.competitive.index
+              : TournamentType.casual.index;
+          query = query.where('tournamentType', isEqualTo: tournamentType);
         }
         
         // 날짜 범위 필터
@@ -147,8 +160,15 @@ class TournamentService {
           
           // 필터가 있으면 클라이언트 측에서 필터링
           if (filters != null) {
-            if (filters['isPaid'] != null) {
-              tournaments = tournaments.where((t) => t.isPaid == filters['isPaid']).toList();
+            if (filters['tournamentType'] != null) {
+              tournaments = tournaments.where((t) => 
+                  t.tournamentType.index == filters['tournamentType']).toList();
+            } else if (filters['isPaid'] != null) {
+              final tournamentType = filters['isPaid'] 
+                  ? TournamentType.competitive
+                  : TournamentType.casual;
+              tournaments = tournaments.where((t) => 
+                  t.tournamentType == tournamentType).toList();
             }
             
             if (filters['premiumBadge'] != null) {
@@ -160,13 +180,29 @@ class TournamentService {
               final endDate = filters['endDate'] as DateTime;
               tournaments = tournaments.where((t) {
                 final tournamentDate = t.startsAt.toDate();
-                return tournamentDate.isAfter(startDate) && tournamentDate.isBefore(endDate);
+                return tournamentDate.isAfter(startDate.subtract(const Duration(minutes: 1))) && 
+                       tournamentDate.isBefore(endDate.add(const Duration(minutes: 1)));
               }).toList();
             }
           }
           
-          // 필요한 경우 정렬
-          tournaments.sort((a, b) => a.startsAt.toDate().compareTo(b.startsAt.toDate()));
+          // 정렬 적용
+          if (orderBy == 'startsAt') {
+            tournaments.sort((a, b) {
+              final comparison = a.startsAt.toDate().compareTo(b.startsAt.toDate());
+              return descending ? -comparison : comparison;
+            });
+          } else if (orderBy == 'createdAt') {
+            tournaments.sort((a, b) {
+              final comparison = a.createdAt.compareTo(b.createdAt);
+              return descending ? -comparison : comparison;
+            });
+          } else if (orderBy == 'title') {
+            tournaments.sort((a, b) {
+              final comparison = a.title.compareTo(b.title);
+              return descending ? -comparison : comparison;
+            });
+          }
           
           return tournaments;
         }
@@ -247,8 +283,8 @@ class TournamentService {
     }
   }
   
-  // 토너먼트 참가
-  Future<void> joinTournament(String tournamentId, String position) async {
+  // 토너먼트 특정 라인 참가 (라인별 참가 시스템)
+  Future<void> joinTournamentByRole(String tournamentId, String role) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('로그인이 필요합니다.');
     
@@ -271,20 +307,52 @@ class TournamentService {
         }
         
         // 참가 가능한지 확인
-        if (!tournament.canJoin(position)) {
+        if (!tournament.canJoinRole(role)) {
           throw Exception('해당 포지션은 이미 가득 찼거나 참가할 수 없습니다.');
+        }
+        
+        // 사용자 정보 가져오기
+        final userDoc = await _usersRef.doc(userId).get();
+        if (!userDoc.exists) {
+          throw Exception('사용자 정보를 찾을 수 없습니다.');
+        }
+        
+        // 경쟁전인 경우 크레딧 확인 및 차감
+        if (tournament.tournamentType == TournamentType.competitive) {
+          final userData = userDoc.data() as Map<String, dynamic>;
+          final userCredits = userData['credits'] as int? ?? 0;
+          final requiredCredits = tournament.creditCost ?? 20;
+          
+          if (userCredits < requiredCredits) {
+            throw Exception('크레딧이 부족합니다. 필요 크레딧: $requiredCredits, 보유 크레딧: $userCredits');
+          }
+          
+          // 크레딧 차감
+          transaction.update(_usersRef.doc(userId), {
+            'credits': userCredits - requiredCredits
+          });
         }
         
         // 필드 값 업데이트
         final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
-        updatedFilledSlots[position] = (updatedFilledSlots[position] ?? 0) + 1;
+        updatedFilledSlots[role] = (updatedFilledSlots[role] ?? 0) + 1;
+        
+        final updatedFilledSlotsByRole = Map<String, int>.from(tournament.filledSlotsByRole);
+        updatedFilledSlotsByRole[role] = (updatedFilledSlotsByRole[role] ?? 0) + 1;
         
         final updatedParticipants = List<String>.from(tournament.participants)..add(userId);
         
+        // 역할별 참가자 목록 업데이트
+        final updatedParticipantsByRole = Map<String, List<String>>.from(tournament.participantsByRole);
+        if (updatedParticipantsByRole[role] == null) {
+          updatedParticipantsByRole[role] = [];
+        }
+        updatedParticipantsByRole[role]!.add(userId);
+        
         // 모든 슬롯이 채워졌는지 확인하여 상태 업데이트
         TournamentStatus updatedStatus = tournament.status;
-        final willBeFull = updatedFilledSlots.entries.every((entry) {
-          final totalSlots = tournament.slots[entry.key] ?? 0;
+        final willBeFull = updatedFilledSlotsByRole.entries.every((entry) {
+          final totalSlots = tournament.slotsByRole[entry.key] ?? 0;
           return entry.value >= totalSlots;
         });
         
@@ -295,7 +363,9 @@ class TournamentService {
         // 트랜잭션 업데이트
         transaction.update(docRef, {
           'filledSlots': updatedFilledSlots,
+          'filledSlotsByRole': updatedFilledSlotsByRole,
           'participants': updatedParticipants,
+          'participantsByRole': updatedParticipantsByRole,
           'status': updatedStatus.index,
           'updatedAt': Timestamp.now(),
         });
@@ -307,7 +377,7 @@ class TournamentService {
   }
   
   // 토너먼트 참가 취소
-  Future<void> leaveTournament(String tournamentId, String position) async {
+  Future<void> leaveTournamentByRole(String tournamentId, String role) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('로그인이 필요합니다.');
     
@@ -329,12 +399,26 @@ class TournamentService {
           throw Exception('참가하지 않은 토너먼트입니다.');
         }
         
+        // 실제로 해당 역할에 참가했는지 확인
+        final roleParticipants = tournament.participantsByRole[role] ?? [];
+        if (!roleParticipants.contains(userId)) {
+          throw Exception('해당 역할로 참가하지 않았습니다.');
+        }
+        
         // 필드 값 업데이트
         final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
-        updatedFilledSlots[position] = (updatedFilledSlots[position] ?? 1) - 1;
-        if (updatedFilledSlots[position]! < 0) updatedFilledSlots[position] = 0;
+        updatedFilledSlots[role] = (updatedFilledSlots[role] ?? 1) - 1;
+        if (updatedFilledSlots[role]! < 0) updatedFilledSlots[role] = 0;
+        
+        final updatedFilledSlotsByRole = Map<String, int>.from(tournament.filledSlotsByRole);
+        updatedFilledSlotsByRole[role] = (updatedFilledSlotsByRole[role] ?? 1) - 1;
+        if (updatedFilledSlotsByRole[role]! < 0) updatedFilledSlotsByRole[role] = 0;
         
         final updatedParticipants = List<String>.from(tournament.participants)..remove(userId);
+        
+        // 역할별 참가자 목록 업데이트
+        final updatedParticipantsByRole = Map<String, List<String>>.from(tournament.participantsByRole);
+        updatedParticipantsByRole[role] = roleParticipants.where((id) => id != userId).toList();
         
         // 상태 업데이트
         TournamentStatus updatedStatus = tournament.status;
@@ -345,10 +429,15 @@ class TournamentService {
         // 트랜잭션 업데이트
         transaction.update(docRef, {
           'filledSlots': updatedFilledSlots,
+          'filledSlotsByRole': updatedFilledSlotsByRole,
           'participants': updatedParticipants,
+          'participantsByRole': updatedParticipantsByRole,
           'status': updatedStatus.index,
           'updatedAt': Timestamp.now(),
         });
+        
+        // 경쟁전인 경우 취소 시 크레딧 환불은 정책에 따라 결정
+        // 이 예제에서는 환불하지 않음
       });
     } catch (e) {
       print('Error leaving tournament: $e');
@@ -365,6 +454,49 @@ class TournamentService {
       });
     } catch (e) {
       print('Error updating tournament status: $e');
+      rethrow;
+    }
+  }
+  
+  // 크레딧 충전
+  Future<void> addCredits(String userId, int amount) async {
+    try {
+      // 사용자 문서 가져오기
+      final userDoc = await _usersRef.doc(userId).get();
+      if (!userDoc.exists) {
+        throw Exception('사용자 정보를 찾을 수 없습니다.');
+      }
+      
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final currentCredits = userData['credits'] as int? ?? 0;
+      
+      // 크레딧 추가
+      await _usersRef.doc(userId).update({
+        'credits': currentCredits + amount
+      });
+    } catch (e) {
+      print('Error adding credits: $e');
+      rethrow;
+    }
+  }
+  
+  // 현재 로그인한 사용자의 크레딧 조회
+  Future<int> getUserCredits() async {
+    try {
+      final userId = _auth.currentUser?.uid;
+      if (userId == null) {
+        throw Exception('로그인이 필요합니다.');
+      }
+      
+      final userDoc = await _usersRef.doc(userId).get();
+      if (!userDoc.exists) {
+        throw Exception('사용자 정보를 찾을 수 없습니다.');
+      }
+      
+      final userData = userDoc.data() as Map<String, dynamic>;
+      return userData['credits'] as int? ?? 0;
+    } catch (e) {
+      print('Error getting user credits: $e');
       rethrow;
     }
   }

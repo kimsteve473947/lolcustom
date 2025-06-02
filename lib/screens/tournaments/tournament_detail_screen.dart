@@ -110,12 +110,56 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       return;
     }
     
+    // Check credits for competitive tournaments
+    if (_tournament!.tournamentType == TournamentType.competitive) {
+      final requiredCredits = _tournament!.creditCost ?? 20;
+      
+      if (appState.currentUser!.credits < requiredCredits) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('크레딧이 부족합니다. 필요: $requiredCredits, 보유: ${appState.currentUser!.credits}'),
+            backgroundColor: AppColors.error,
+            action: SnackBarAction(
+              label: '충전하기',
+              textColor: Colors.white,
+              onPressed: () {
+                // Navigate to credit purchase screen
+                context.push('/credits/purchase');
+              },
+            ),
+          ),
+        );
+        return;
+      }
+      
+      // Ask for confirmation before spending credits
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('크레딧 사용 확인'),
+          content: Text('이 경쟁전에 참가하기 위해 $requiredCredits 크레딧이 소모됩니다. 계속하시겠습니까?'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('취소'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      ) ?? false;
+      
+      if (!confirmed) return;
+    }
+    
     setState(() {
       _isLoading = true;
     });
     
     try {
-      final success = await appState.applyToTournament(
+      final success = await appState.joinTournamentByRole(
         tournamentId: widget.tournamentId,
         role: _selectedRole,
         message: _messageController.text.trim().isNotEmpty ? _messageController.text.trim() : null,
@@ -127,6 +171,13 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
         );
         _messageController.clear();
         _loadTournament();
+      } else if (appState.errorMessage != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(appState.errorMessage!),
+            backgroundColor: AppColors.error,
+          ),
+        );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -239,6 +290,13 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
         const SizedBox(height: 24),
         _buildDescription(),
         const SizedBox(height: 24),
+        if (_tournament!.tournamentType == TournamentType.competitive)
+          Column(
+            children: [
+              _buildRefereeInfo(),
+              const SizedBox(height: 24),
+            ],
+          ),
         _buildRolesList(),
         const SizedBox(height: 24),
         _buildPlayersList(),
@@ -386,7 +444,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             ),
           ],
         ),
-        if (_tournament!.isPaid) ...[
+        if (_tournament!.tournamentType == TournamentType.competitive) ...[
           const SizedBox(height: 12),
           Row(
             children: [
@@ -396,9 +454,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                 color: AppColors.warning,
               ),
               const SizedBox(width: 12),
-              Text(
-                '참가비: ${NumberFormat('#,###').format(_tournament!.price ?? 0)}원',
-                style: const TextStyle(
+              const Text(
+                '참가 비용: 20 크레딧',
+                style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
                   color: AppColors.warning,
@@ -455,6 +513,70 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
     );
   }
   
+  Widget _buildRefereeInfo() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '심판 정보',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
+        const SizedBox(height: 16),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.05),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(
+                    Icons.gavel,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  const Text(
+                    '심판 배정 정보',
+                    style: TextStyle(
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Text(
+                _tournament!.referees.isEmpty
+                    ? '아직 심판이 배정되지 않았습니다. 경쟁전이 시작되기 전에 자동으로 심판이 배정됩니다.'
+                    : '${_tournament!.referees.length}명의 심판이 배정되었습니다.',
+                style: const TextStyle(
+                  fontSize: 14,
+                ),
+              ),
+              const SizedBox(height: 8),
+              const Text(
+                '* 경쟁전은 공정한 진행을 위해 심판이 배정됩니다.',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontStyle: FontStyle.italic,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+  
   Widget _buildRolesList() {
     // Define role data
     final roles = [
@@ -479,7 +601,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
               ),
             ),
             Text(
-              '${_tournament!.totalFilledSlots}/${_tournament!.totalSlots}명',
+              '${_tournament!.participants.length}/${_tournament!.slotsByRole.values.fold(0, (sum, count) => sum + count)}명',
               style: const TextStyle(
                 fontSize: 16,
                 fontWeight: FontWeight.bold,
@@ -496,6 +618,13 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             final filled = _tournament!.filledSlotsByRole[key] ?? 0;
             final total = _tournament!.slotsByRole[key] ?? 2;
             final isFull = filled >= total;
+            
+            // Get participants for this role
+            final roleParticipants = _tournament!.participantsByRole[key] ?? [];
+            final participantNames = _applications
+                .where((app) => app.role == key && app.status == ApplicationStatus.accepted)
+                .map((app) => app.userName)
+                .toList();
             
             return Column(
               children: [
@@ -543,6 +672,25 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                     color: isFull ? AppColors.textDisabled : AppColors.primary,
                   ),
                 ),
+                if (participantNames.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade200,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      participantNames.join(', '),
+                      style: TextStyle(
+                        fontSize: 10,
+                        color: Colors.grey.shade700,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 1,
+                    ),
+                  ),
+                ],
               ],
             );
           }).toList(),
@@ -552,12 +700,17 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
   
   Widget _buildPlayersList() {
-    // Filter applications by role and accepted status
-    final acceptedApplications = _applications
-        .where((app) => app.status == ApplicationStatus.accepted)
-        .toList();
+    // Group applications by role
+    final Map<String, List<ApplicationModel>> applicationsByRole = {};
     
-    if (acceptedApplications.isEmpty) {
+    for (final app in _applications.where((app) => app.status == ApplicationStatus.accepted)) {
+      if (!applicationsByRole.containsKey(app.role)) {
+        applicationsByRole[app.role] = [];
+      }
+      applicationsByRole[app.role]!.add(app);
+    }
+    
+    if (applicationsByRole.isEmpty) {
       return const SizedBox.shrink();
     }
     
@@ -572,9 +725,49 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
           ),
         ),
         const SizedBox(height: 16),
-        ...acceptedApplications.map((app) => _buildPlayerItem(app)),
+        ...applicationsByRole.entries.map((entry) {
+          final roleName = _getRoleName(entry.key);
+          return Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                roleName,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: _getRoleColor(entry.key),
+                ),
+              ),
+              const SizedBox(height: 8),
+              ...entry.value.map((app) => _buildPlayerItem(app)),
+              const SizedBox(height: 16),
+            ],
+          );
+        }).toList(),
       ],
     );
+  }
+  
+  String _getRoleName(String role) {
+    switch (role) {
+      case 'top': return '탑';
+      case 'jungle': return '정글';
+      case 'mid': return '미드';
+      case 'adc': return '원딜';
+      case 'support': return '서포터';
+      default: return role;
+    }
+  }
+  
+  Color _getRoleColor(String role) {
+    switch (role) {
+      case 'top': return AppColors.roleTop;
+      case 'jungle': return AppColors.roleJungle;
+      case 'mid': return AppColors.roleMid;
+      case 'adc': return AppColors.roleAdc;
+      case 'support': return AppColors.roleSupport;
+      default: return AppColors.primary;
+    }
   }
   
   Widget _buildPlayerItem(ApplicationModel application) {
@@ -700,10 +893,6 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
         app.status != ApplicationStatus.cancelled && 
         app.status != ApplicationStatus.rejected);
       
-      final statusText = application.status == ApplicationStatus.pending
-          ? '신청 검토 중'
-          : '신청 완료됨';
-      
       return Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -716,12 +905,26 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             ),
           ],
         ),
-        child: ElevatedButton(
-          onPressed: null,
-          style: ElevatedButton.styleFrom(
-            backgroundColor: AppColors.success.withOpacity(0.7),
-          ),
-          child: Text(statusText),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Text(
+              '${_getRoleName(application.role)} 역할로 참가 중',
+              style: TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+                color: _getRoleColor(application.role),
+              ),
+            ),
+            const SizedBox(height: 12),
+            ElevatedButton(
+              onPressed: _isLoading ? null : () => _cancelRegistration(application.role),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.error,
+              ),
+              child: const Text('참가 취소하기'),
+            ),
+          ],
         ),
       );
     }
@@ -741,6 +944,28 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
+          if (_tournament!.tournamentType == TournamentType.competitive && appState.currentUser != null) ...[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.monetization_on,
+                  size: 20,
+                  color: AppColors.warning,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '필요 크레딧: ${_tournament!.creditCost} / 보유 크레딧: ${appState.currentUser!.credits}',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.warning,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+          ],
           TextField(
             controller: _messageController,
             decoration: const InputDecoration(
@@ -762,10 +987,72 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                : const Text('내전 신청하기'),
+                : Text('${_getRoleName(_selectedRole)} 역할로 신청하기'),
           ),
         ],
       ),
     );
+  }
+  
+  Future<void> _cancelRegistration(String role) async {
+    if (_tournament == null) return;
+    
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('참가 취소 확인'),
+        content: const Text('정말로 참가를 취소하시겠습니까? 경쟁전인 경우 크레딧은 환불되지 않습니다.'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('아니오'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: const Text('예, 취소합니다'),
+          ),
+        ],
+      ),
+    ) ?? false;
+    
+    if (!confirmed) return;
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    final appState = Provider.of<AppStateProvider>(context, listen: false);
+    
+    try {
+      final success = await appState.leaveTournamentByRole(
+        tournamentId: widget.tournamentId,
+        role: role,
+      );
+      
+      if (success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('참가가 취소되었습니다')),
+        );
+        _loadTournament();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('참가 취소 중 오류가 발생했습니다'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('참가 취소 중 오류가 발생했습니다: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
   }
 } 

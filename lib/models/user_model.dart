@@ -36,6 +36,7 @@ class UserModel extends Equatable {
   final int? participatedTournamentsCount;
   final String? position;
   final int? totalRatingsCount;
+  final int credits;
 
   const UserModel({
     required this.uid,
@@ -53,6 +54,7 @@ class UserModel extends Equatable {
     this.participatedTournamentsCount,
     this.position,
     this.totalRatingsCount,
+    this.credits = 0,
   });
 
   // 파이어스토어에서 데이터 불러오기
@@ -74,6 +76,7 @@ class UserModel extends Equatable {
       participatedTournamentsCount: data['participatedTournamentsCount'] as int?,
       position: data['position'] as String?,
       totalRatingsCount: data['totalRatingsCount'] as int?,
+      credits: data['credits'] as int? ?? 0,
     );
   }
 
@@ -94,6 +97,7 @@ class UserModel extends Equatable {
       'participatedTournamentsCount': participatedTournamentsCount,
       'position': position,
       'totalRatingsCount': totalRatingsCount,
+      'credits': credits,
     };
   }
   
@@ -127,6 +131,16 @@ class UserModel extends Equatable {
     }
   }
 
+  // Check if user has enough credits
+  bool hasEnoughCredits(int requiredCredits) {
+    return credits >= requiredCredits;
+  }
+  
+  // Create a new user model with updated credits
+  UserModel withUpdatedCredits(int newCredits) {
+    return copyWith(credits: newCredits);
+  }
+
   // UserModel 복사 메서드 (불변성 유지)
   UserModel copyWith({
     String? uid,
@@ -144,6 +158,7 @@ class UserModel extends Equatable {
     int? participatedTournamentsCount,
     String? position,
     int? totalRatingsCount,
+    int? credits,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -161,6 +176,7 @@ class UserModel extends Equatable {
       participatedTournamentsCount: participatedTournamentsCount ?? this.participatedTournamentsCount,
       position: position ?? this.position,
       totalRatingsCount: totalRatingsCount ?? this.totalRatingsCount,
+      credits: credits ?? this.credits,
     );
   }
 
@@ -181,5 +197,6 @@ class UserModel extends Equatable {
         participatedTournamentsCount,
         position,
         totalRatingsCount,
+        credits,
       ];
 } 

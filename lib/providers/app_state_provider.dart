@@ -167,8 +167,7 @@ class AppStateProvider extends ChangeNotifier {
     required String location,
     required DateTime startsAt,
     required Map<String, int> slotsByRole,
-    required bool isPaid,
-    int? price,
+    required TournamentType tournamentType,
     int? ovrLimit,
     PlayerTier? tierLimit,
     String? description,
@@ -199,6 +198,15 @@ class AppStateProvider extends ChangeNotifier {
         'support': 0,
       };
       
+      // 역할별 참가자 목록 초기화
+      final Map<String, List<String>> participantsByRole = {
+        'top': [],
+        'jungle': [],
+        'mid': [],
+        'adc': [],
+        'support': [],
+      };
+      
       // 빈 슬롯 맵 생성
       final Map<String, int> filledSlots = {
         'team1': 0,
@@ -207,6 +215,9 @@ class AppStateProvider extends ChangeNotifier {
       
       // 프리미엄 멤버십 확인하여 자동으로 프리미엄 배지 설정
       final bool hasPremiumBadge = premiumBadge ?? _currentUser!.isPremium;
+      
+      // 경쟁전용 심판 목록 (초기에는 비어있음)
+      final List<String> referees = [];
       
       TournamentModel tournament = TournamentModel(
         id: '',  // Will be set by Firestore
@@ -218,8 +229,8 @@ class AppStateProvider extends ChangeNotifier {
         hostProfileImageUrl: _currentUser!.profileImageUrl,
         startsAt: Timestamp.fromDate(startsAt),
         location: location,
-        isPaid: isPaid,
-        price: price,
+        tournamentType: tournamentType,
+        creditCost: tournamentType == TournamentType.competitive ? 20 : null, // 항상 20 크레딧으로 고정
         status: TournamentStatus.open,
         createdAt: DateTime.now(),
         slots: slots,
@@ -227,6 +238,7 @@ class AppStateProvider extends ChangeNotifier {
         slotsByRole: slotsByRole,
         filledSlotsByRole: filledSlotsByRole,
         participants: [],
+        participantsByRole: participantsByRole,
         ovrLimit: ovrLimit,
         tierLimit: tierLimit,
         premiumBadge: hasPremiumBadge,
@@ -243,6 +255,8 @@ class AppStateProvider extends ChangeNotifier {
           } : null,
           'customRoomName': customRoomName,
           'customRoomPassword': customRoomPassword,
+          'referees': referees, // 심판 목록 추가
+          'isRefereed': tournamentType == TournamentType.competitive, // 경쟁전인 경우 심판 필요
         },
       );
       
@@ -270,8 +284,8 @@ class AppStateProvider extends ChangeNotifier {
     }
   }
   
-  // Apply to tournament
-  Future<bool> applyToTournament({
+  // 토너먼트 특정 라인 참가
+  Future<bool> joinTournamentByRole({
     required String tournamentId,
     required String role,
     String? message,
@@ -282,6 +296,32 @@ class AppStateProvider extends ChangeNotifier {
     _clearError();
     
     try {
+      // 토너먼트 정보 조회
+      final tournament = await _firebaseService.getTournament(tournamentId);
+      if (tournament == null) {
+        _setError('토너먼트를 찾을 수 없습니다');
+        return false;
+      }
+      
+      // 라인 참가 가능 여부 확인
+      if (!tournament.canJoinRole(role)) {
+        _setError('해당 라인은 이미 가득 찼거나 참가할 수 없습니다');
+        return false;
+      }
+      
+      // 경쟁전인 경우 크레딧 확인
+      if (tournament.tournamentType == TournamentType.competitive) {
+        final requiredCredits = tournament.creditCost ?? 20;
+        if (!_currentUser!.hasEnoughCredits(requiredCredits)) {
+          _setError('크레딧이 부족합니다. 필요 크레딧: $requiredCredits, 보유 크레딧: ${_currentUser!.credits}');
+          return false;
+        }
+      }
+      
+      // 토너먼트 참가 처리
+      await _firebaseService.joinTournamentByRole(tournamentId, role);
+      
+      // 신청 정보 생성
       ApplicationModel application = ApplicationModel(
         id: '',  // Will be set by Firestore
         tournamentId: tournamentId,
@@ -292,30 +332,102 @@ class AppStateProvider extends ChangeNotifier {
         userOvr: null,  // TODO: Get user OVR for this role if available
         appliedAt: Timestamp.now(),
         message: message,
-        status: ApplicationStatus.pending,
+        status: ApplicationStatus.accepted, // 자동 승인으로 변경
       );
       
       await _firebaseService.applyToTournament(application);
       
-      // Process application through cloud function (will handle notifications)
-      try {
-        await _cloudFunctionsService.processTournamentApplication(
-          tournamentId: tournamentId,
-          userId: _currentUser!.uid,
-          role: role,
-        );
-      } catch (e) {
-        // Non-critical error, just log it
-        debugPrint('Failed to process application: $e');
+      // 크레딧 차감 알림 (이미 서비스에서 처리했으므로 여기서는 UI 업데이트만)
+      if (tournament.tournamentType == TournamentType.competitive) {
+        final requiredCredits = tournament.creditCost ?? 20;
+        _currentUser = _currentUser!.withUpdatedCredits(_currentUser!.credits - requiredCredits);
+        notifyListeners();
       }
       
       return true;
     } catch (e) {
-      _setError('Failed to apply to tournament: $e');
+      _setError('토너먼트 참가 중 오류가 발생했습니다: $e');
       return false;
     } finally {
       _setLoading(false);
     }
+  }
+  
+  // 토너먼트 참가 취소
+  Future<bool> leaveTournamentByRole({
+    required String tournamentId,
+    required String role,
+  }) async {
+    if (_currentUser == null) return false;
+    
+    _setLoading(true);
+    _clearError();
+    
+    try {
+      await _firebaseService.leaveTournamentByRole(tournamentId, role);
+      return true;
+    } catch (e) {
+      _setError('토너먼트 참가 취소 중 오류가 발생했습니다: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // 크레딧 충전
+  Future<bool> addCredits(int amount) async {
+    if (_currentUser == null) return false;
+    
+    _setLoading(true);
+    _clearError();
+    
+    try {
+      await _firebaseService.addCredits(_currentUser!.uid, amount);
+      
+      // 로컬 상태 업데이트
+      _currentUser = _currentUser!.withUpdatedCredits(_currentUser!.credits + amount);
+      notifyListeners();
+      
+      return true;
+    } catch (e) {
+      _setError('크레딧 충전 중 오류가 발생했습니다: $e');
+      return false;
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // 크레딧 조회
+  Future<int> getUserCredits() async {
+    if (_currentUser == null) return 0;
+    
+    try {
+      final credits = await _firebaseService.getUserCredits();
+      
+      // 로컬 상태 업데이트
+      if (_currentUser!.credits != credits) {
+        _currentUser = _currentUser!.withUpdatedCredits(credits);
+        notifyListeners();
+      }
+      
+      return credits;
+    } catch (e) {
+      _setError('크레딧 조회 중 오류가 발생했습니다: $e');
+      return _currentUser!.credits;
+    }
+  }
+  
+  // Apply to tournament (이전 호환성 유지)
+  Future<bool> applyToTournament({
+    required String tournamentId,
+    required String role,
+    String? message,
+  }) async {
+    return joinTournamentByRole(
+      tournamentId: tournamentId,
+      role: role,
+      message: message,
+    );
   }
   
   // Create chat room with notifications
