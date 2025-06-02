@@ -2,6 +2,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lol_custom_game_manager/models/tournament_model.dart';
+import 'package:lol_custom_game_manager/models/user_model.dart';
 import 'package:uuid/uuid.dart';
 
 class TournamentService {
@@ -317,11 +318,11 @@ class TournamentService {
           throw Exception('사용자 정보를 찾을 수 없습니다.');
         }
         
-        // 경쟁전인 경우 크레딧 확인 및 차감
+        // 경쟁전인 경우 항상 20 크레딧 차감
         if (tournament.tournamentType == TournamentType.competitive) {
           final userData = userDoc.data() as Map<String, dynamic>;
           final userCredits = userData['credits'] as int? ?? 0;
-          final requiredCredits = tournament.creditCost ?? 20;
+          const requiredCredits = 20; // 항상 고정 20 크레딧
           
           if (userCredits < requiredCredits) {
             throw Exception('크레딧이 부족합니다. 필요 크레딧: $requiredCredits, 보유 크레딧: $userCredits');
@@ -497,6 +498,129 @@ class TournamentService {
       return userData['credits'] as int? ?? 0;
     } catch (e) {
       print('Error getting user credits: $e');
+      rethrow;
+    }
+  }
+  
+  // 심판 추가하기
+  Future<void> addReferee(String tournamentId, String refereeId) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('로그인이 필요합니다.');
+    
+    try {
+      await _firestore.runTransaction((transaction) async {
+        // 토너먼트 문서 가져오기
+        final docRef = _tournamentsRef.doc(tournamentId);
+        final docSnapshot = await transaction.get(docRef);
+        
+        if (!docSnapshot.exists) {
+          throw Exception('토너먼트를 찾을 수 없습니다.');
+        }
+        
+        // 토너먼트 모델로 변환
+        final tournament = TournamentModel.fromFirestore(docSnapshot);
+        
+        // 본인이 주최자인지 확인
+        if (tournament.hostId != userId) {
+          throw Exception('토너먼트 주최자만 심판을 추가할 수 있습니다.');
+        }
+        
+        // 이미 심판인지 확인
+        final referees = tournament.referees ?? [];
+        if (referees.contains(refereeId)) {
+          throw Exception('이미 심판으로 등록된 사용자입니다.');
+        }
+        
+        // 심판 목록 업데이트
+        final updatedReferees = List<String>.from(referees)..add(refereeId);
+        
+        // 경쟁전이 아닌 경우 심판 추가 불가
+        if (tournament.tournamentType != TournamentType.competitive) {
+          throw Exception('일반전에는 심판을 추가할 수 없습니다. 경쟁전만 심판을 추가할 수 있습니다.');
+        }
+        
+        // 트랜잭션 업데이트
+        transaction.update(docRef, {
+          'referees': updatedReferees,
+          'isRefereed': true,
+          'updatedAt': Timestamp.now(),
+        });
+      });
+    } catch (e) {
+      print('Error adding referee: $e');
+      rethrow;
+    }
+  }
+  
+  // 심판 제거하기
+  Future<void> removeReferee(String tournamentId, String refereeId) async {
+    final userId = _auth.currentUser?.uid;
+    if (userId == null) throw Exception('로그인이 필요합니다.');
+    
+    try {
+      await _firestore.runTransaction((transaction) async {
+        // 토너먼트 문서 가져오기
+        final docRef = _tournamentsRef.doc(tournamentId);
+        final docSnapshot = await transaction.get(docRef);
+        
+        if (!docSnapshot.exists) {
+          throw Exception('토너먼트를 찾을 수 없습니다.');
+        }
+        
+        // 토너먼트 모델로 변환
+        final tournament = TournamentModel.fromFirestore(docSnapshot);
+        
+        // 본인이 주최자인지 확인
+        if (tournament.hostId != userId) {
+          throw Exception('토너먼트 주최자만 심판을 제거할 수 있습니다.');
+        }
+        
+        // 심판 목록에 있는지 확인
+        final referees = tournament.referees ?? [];
+        if (!referees.contains(refereeId)) {
+          throw Exception('심판으로 등록되지 않은 사용자입니다.');
+        }
+        
+        // 심판 목록 업데이트
+        final updatedReferees = List<String>.from(referees)..remove(refereeId);
+        
+        // 트랜잭션 업데이트
+        transaction.update(docRef, {
+          'referees': updatedReferees,
+          'isRefereed': updatedReferees.isNotEmpty,
+          'updatedAt': Timestamp.now(),
+        });
+      });
+    } catch (e) {
+      print('Error removing referee: $e');
+      rethrow;
+    }
+  }
+  
+  // 모든 심판 가져오기
+  Future<List<UserModel>> getTournamentReferees(String tournamentId) async {
+    try {
+      final tournament = await getTournament(tournamentId);
+      if (tournament == null) {
+        throw Exception('토너먼트를 찾을 수 없습니다.');
+      }
+      
+      final referees = tournament.referees ?? [];
+      if (referees.isEmpty) {
+        return [];
+      }
+      
+      final List<UserModel> refereeUsers = [];
+      for (final refereeId in referees) {
+        final userDoc = await _usersRef.doc(refereeId).get();
+        if (userDoc.exists) {
+          refereeUsers.add(UserModel.fromFirestore(userDoc));
+        }
+      }
+      
+      return refereeUsers;
+    } catch (e) {
+      print('Error getting tournament referees: $e');
       rethrow;
     }
   }

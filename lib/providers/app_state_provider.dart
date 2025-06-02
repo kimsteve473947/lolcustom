@@ -331,7 +331,7 @@ class AppStateProvider extends ChangeNotifier {
         role: role,
         userOvr: null,  // TODO: Get user OVR for this role if available
         appliedAt: Timestamp.now(),
-        message: message,
+        message: message, // This is now fully optional and can be null
         status: ApplicationStatus.accepted, // 자동 승인으로 변경
       );
       

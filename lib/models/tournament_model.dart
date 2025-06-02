@@ -77,7 +77,7 @@ class TournamentModel extends Equatable {
   // 하위 호환성을 위한 게터 추가
   bool get isPaid => tournamentType == TournamentType.competitive;
   
-  int? get price => creditCost;
+  int? get price => tournamentType == TournamentType.competitive ? 20 : null;
   
   const TournamentModel({
     required this.id,

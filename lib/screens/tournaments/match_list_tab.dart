@@ -36,43 +36,22 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
   
   bool _isLoading = false;
   String? _errorMessage;
-  List<TournamentModel> _freeTournaments = [];
-  List<TournamentModel> _paidTournaments = [];
-  bool _hasMoreFreeTournaments = true;
-  bool _hasMorePaidTournaments = true;
-  DocumentSnapshot? _lastFreeDocument;
-  DocumentSnapshot? _lastPaidDocument;
+  List<TournamentModel> _tournaments = [];
   
   // Scroll controllers for pagination
-  final ScrollController _freeScrollController = ScrollController();
-  final ScrollController _paidScrollController = ScrollController();
+  final ScrollController _scrollController = ScrollController();
 
-  // 필터 설정
-  final Map<String, dynamic> _filters = {
-    'isPaid': null,  // null: 모두, true: 유료만, false: 무료만
-    'ovrLimit': null,  // null: 제한 없음, int: 제한 값
-    'premiumBadge': null,  // null: 모두, true: 프리미엄만
-  };
-  
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     
     // Set up scroll listeners for pagination
-    _freeScrollController.addListener(() {
-      if (_freeScrollController.position.pixels >= _freeScrollController.position.maxScrollExtent * 0.8 &&
+    _scrollController.addListener(() {
+      if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent * 0.8 &&
           !_isLoading &&
-          _hasMoreFreeTournaments) {
-        _loadMoreFreeTournaments();
-      }
-    });
-    
-    _paidScrollController.addListener(() {
-      if (_paidScrollController.position.pixels >= _paidScrollController.position.maxScrollExtent * 0.8 &&
-          !_isLoading &&
-          _hasMorePaidTournaments) {
-        _loadMorePaidTournaments();
+          _tournaments.isNotEmpty) {
+        _loadMoreTournaments();
       }
     });
     
@@ -80,7 +59,7 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     _tabController.addListener(() {
       setState(() {
         // 필터 업데이트
-        _filters['isPaid'] = _tabController.index == 0 ? false : true;
+        _filters['tournamentType'] = _tabController.index == 0 ? TournamentType.casual.index : TournamentType.competitive.index;
       });
       
       // 초기 데이터 로드
@@ -101,251 +80,81 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     }
   }
 
-  // 선택된 탭에 따라 대회 로드
-  void _loadTournaments() {
-    if (_tabController.index == 0) {
-      _loadFreeTournaments();
-    } else {
-      _loadPaidTournaments();
+  // 필터 설정
+  final Map<String, dynamic> _filters = {
+    'tournamentType': null,  // null: 모두, int: 일반전만, int: 경쟁전만
+  };
+  
+  Future<void> _loadTournaments() async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    
+    try {
+      final tournamentService = Provider.of<TournamentService>(context, listen: false);
+      
+      // 날짜 필터 적용
+      if (widget.selectedDate != null) {
+        final startDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day);
+        final endDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day, 23, 59, 59);
+        
+        _filters['startDate'] = startDate;
+        _filters['endDate'] = endDate;
+      }
+      
+      final tournaments = await tournamentService.getTournaments(
+        filters: _filters,
+        orderBy: 'startsAt',
+        descending: false,
+      );
+      
+      setState(() {
+        _tournaments = tournaments;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() {
+        _isLoading = false;
+        _errorMessage = '내전 목록을 불러오는 중 오류가 발생했습니다: $e';
+      });
     }
   }
-
+  
   @override
   void dispose() {
-    _freeScrollController.dispose();
-    _paidScrollController.dispose();
+    _scrollController.dispose();
     _tabController.dispose();
     super.dispose();
   }
 
-  // 무료 내전 로드
-  Future<void> _loadFreeTournaments() async {
-    if (_isLoading) return;
+  // 더 많은 대회 로드 (페이지네이션)
+  Future<void> _loadMoreTournaments() async {
+    if (_isLoading || _tournaments.isEmpty) return;
     
     setState(() {
       _isLoading = true;
-      _errorMessage = null;
     });
     
     try {
-      // 날짜 필터 적용
-      Map<String, dynamic> filterMap = {..._filters, 'isPaid': false};
+      final tournamentService = Provider.of<TournamentService>(context, listen: false);
       
-      // 선택된 날짜가 있으면 해당 날짜의 시작과 끝을 설정
-      if (widget.selectedDate != null) {
-        // 해당 날짜의 시작 (00:00:00)
-        final startDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day);
-        // 해당 날짜의 끝 (23:59:59)
-        final endDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day, 23, 59, 59);
-        
-        filterMap['startDate'] = startDate;
-        filterMap['endDate'] = endDate;
-      }
-      
-      final tournaments = await _tournamentService.getTournaments(
-        limit: 20,
-        filters: filterMap,
+      // Use limit and offset-based pagination instead of cursor-based pagination
+      final tournaments = await tournamentService.getTournaments(
+        filters: _filters,
         orderBy: 'startsAt',
-        descending: true, // 최신순(내림차순) 정렬
+        descending: false,
+        limit: 10,
       );
       
-      DocumentSnapshot? lastDoc;
-      if (tournaments.isNotEmpty) {
-        lastDoc = await FirebaseFirestore.instance
-            .collection('tournaments')
-            .doc(tournaments.last.id)
-            .get();
-      }
-      
       setState(() {
-        _freeTournaments = tournaments;
-        _isLoading = false;
-        _hasMoreFreeTournaments = tournaments.length == 20;
-        _lastFreeDocument = lastDoc;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        // 에러 메시지 개선
-        if (e.toString().contains('index') && e.toString().contains('failed-precondition')) {
-          _errorMessage = '필터링에 필요한 인덱스가 생성 중입니다. 잠시 후 다시 시도해주세요.';
-        } else {
-          _errorMessage = '내전 목록을 불러오는 중 오류가 발생했습니다: ${e.toString().split(']').last.trim()}';
+        // Only add tournaments that aren't already in the list (to avoid duplicates)
+        for (final tournament in tournaments) {
+          if (!_tournaments.any((t) => t.id == tournament.id)) {
+            _tournaments.add(tournament);
+          }
         }
-      });
-      
-      // 에러 처리
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            e.toString().contains('index') 
-                ? '필터링에 필요한 인덱스가 생성 중입니다. 잠시 후 다시 시도해주세요.'
-                : '에러가 발생했습니다: ${e.toString().split(']').last.trim()}'
-          ),
-          action: SnackBarAction(
-            label: '다시 시도',
-            onPressed: _loadFreeTournaments,
-          ),
-          duration: const Duration(seconds: 5),
-        ),
-      );
-    }
-  }
-  
-  // 유료 내전 로드
-  Future<void> _loadPaidTournaments() async {
-    if (_isLoading) return;
-    
-    setState(() {
-      _isLoading = true;
-      _errorMessage = null;
-    });
-    
-    try {
-      // 날짜 필터 적용
-      Map<String, dynamic> filterMap = {..._filters, 'isPaid': true};
-      
-      // 선택된 날짜가 있으면 해당 날짜의 시작과 끝을 설정
-      if (widget.selectedDate != null) {
-        // 해당 날짜의 시작 (00:00:00)
-        final startDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day);
-        // 해당 날짜의 끝 (23:59:59)
-        final endDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day, 23, 59, 59);
-        
-        filterMap['startDate'] = startDate;
-        filterMap['endDate'] = endDate;
-      }
-      
-      final tournaments = await _tournamentService.getTournaments(
-        limit: 20,
-        filters: filterMap,
-        orderBy: 'startsAt',
-        descending: true, // 최신순(내림차순) 정렬
-      );
-      
-      DocumentSnapshot? lastDoc;
-      if (tournaments.isNotEmpty) {
-        lastDoc = await FirebaseFirestore.instance
-            .collection('tournaments')
-            .doc(tournaments.last.id)
-            .get();
-      }
-      
-      setState(() {
-        _paidTournaments = tournaments;
         _isLoading = false;
-        _hasMorePaidTournaments = tournaments.length == 20;
-        _lastPaidDocument = lastDoc;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-        // 에러 메시지 개선
-        if (e.toString().contains('index') && e.toString().contains('failed-precondition')) {
-          _errorMessage = '필터링에 필요한 인덱스가 생성 중입니다. 잠시 후 다시 시도해주세요.';
-        } else {
-          _errorMessage = '내전 목록을 불러오는 중 오류가 발생했습니다: ${e.toString().split(']').last.trim()}';
-        }
-      });
-    }
-  }
-  
-  // 더 많은 무료 내전 로드 (페이지네이션)
-  Future<void> _loadMoreFreeTournaments() async {
-    if (_isLoading || !_hasMoreFreeTournaments || _lastFreeDocument == null) return;
-    
-    setState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      // 날짜 필터 적용
-      Map<String, dynamic> filterMap = {..._filters, 'isPaid': false};
-      
-      // 선택된 날짜가 있으면 해당 날짜의 시작과 끝을 설정
-      if (widget.selectedDate != null) {
-        // 해당 날짜의 시작 (00:00:00)
-        final startDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day);
-        // 해당 날짜의 끝 (23:59:59)
-        final endDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day, 23, 59, 59);
-        
-        filterMap['startDate'] = startDate;
-        filterMap['endDate'] = endDate;
-      }
-      
-      final tournaments = await _tournamentService.getTournaments(
-        limit: 20,
-        startAfter: _lastFreeDocument,
-        filters: filterMap,
-        orderBy: 'startsAt',
-        descending: true, // 최신순(내림차순) 정렬
-      );
-      
-      DocumentSnapshot? lastDoc;
-      if (tournaments.isNotEmpty) {
-        lastDoc = await FirebaseFirestore.instance
-            .collection('tournaments')
-            .doc(tournaments.last.id)
-            .get();
-      }
-      
-      setState(() {
-        _freeTournaments.addAll(tournaments);
-        _isLoading = false;
-        _hasMoreFreeTournaments = tournaments.length == 20;
-        _lastFreeDocument = lastDoc;
-      });
-    } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-  
-  // 더 많은 유료 내전 로드 (페이지네이션)
-  Future<void> _loadMorePaidTournaments() async {
-    if (_isLoading || !_hasMorePaidTournaments || _lastPaidDocument == null) return;
-    
-    setState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      // 날짜 필터 적용
-      Map<String, dynamic> filterMap = {..._filters, 'isPaid': true};
-      
-      // 선택된 날짜가 있으면 해당 날짜의 시작과 끝을 설정
-      if (widget.selectedDate != null) {
-        // 해당 날짜의 시작 (00:00:00)
-        final startDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day);
-        // 해당 날짜의 끝 (23:59:59)
-        final endDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day, 23, 59, 59);
-        
-        filterMap['startDate'] = startDate;
-        filterMap['endDate'] = endDate;
-      }
-      
-      final tournaments = await _tournamentService.getTournaments(
-        limit: 20,
-        startAfter: _lastPaidDocument,
-        filters: filterMap,
-        orderBy: 'startsAt',
-        descending: true, // 최신순(내림차순) 정렬
-      );
-      
-      DocumentSnapshot? lastDoc;
-      if (tournaments.isNotEmpty) {
-        lastDoc = await FirebaseFirestore.instance
-            .collection('tournaments')
-            .doc(tournaments.last.id)
-            .get();
-      }
-      
-      setState(() {
-        _paidTournaments.addAll(tournaments);
-        _isLoading = false;
-        _hasMorePaidTournaments = tournaments.length == 20;
-        _lastPaidDocument = lastDoc;
       });
     } catch (e) {
       setState(() {
@@ -364,8 +173,8 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
             child: TabBarView(
               controller: _tabController,
               children: [
-                _buildFreeTournamentsList(),
-                _buildPaidTournamentsList(),
+                _buildTournamentsList(),
+                _buildTournamentsList(),
               ],
             ),
           ),
@@ -387,142 +196,312 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     );
   }
   
-  Widget _buildFreeTournamentsList() {
+  Widget _buildTournamentsList() {
     if (_errorMessage != null) {
       return ErrorView(
         message: _errorMessage!,
-        onRetry: _loadFreeTournaments,
+        onRetry: _loadTournaments,
       );
     }
     
-    if (_isLoading && _freeTournaments.isEmpty) {
+    if (_isLoading && _tournaments.isEmpty) {
       return const LoadingIndicator();
     }
     
-    if (_freeTournaments.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.sports_esports,
-              size: 64,
-              color: Colors.grey.shade400,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              widget.selectedDate != null 
-                  ? '${DateFormat('M월 d일', 'ko_KR').format(widget.selectedDate!)}에 일반전이 없습니다'
-                  : '일반전이 없습니다',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey.shade700,
-              ),
-            ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                context.push('/tournaments/create');
-              },
-              child: const Text('내전 만들기'),
-            ),
-          ],
-        ),
-      );
+    if (_tournaments.isEmpty) {
+      return _buildEmptyState();
     }
     
     return RefreshIndicator(
-      onRefresh: _loadFreeTournaments,
+      onRefresh: _loadTournaments,
       child: ListView.builder(
-        controller: _freeScrollController,
-        itemCount: _freeTournaments.length + (_hasMoreFreeTournaments ? 1 : 0),
+        controller: _scrollController,
+        itemCount: _tournaments.length + (_isLoading ? 1 : 0),
         padding: const EdgeInsets.all(16),
         itemBuilder: (context, index) {
-          if (index == _freeTournaments.length) {
+          if (index == _tournaments.length) {
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(child: CircularProgressIndicator()),
             );
           }
           
-          final tournament = _freeTournaments[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: TournamentCard(
-              tournament: tournament,
-              onTap: () {
-                context.push('/tournaments/${tournament.id}');
-              },
-            ),
-          );
+          final tournament = _tournaments[index];
+          return _buildTournamentCard(tournament);
         },
       ),
     );
   }
   
-  Widget _buildPaidTournamentsList() {
-    if (_isLoading && _paidTournaments.isEmpty) {
-      return const LoadingIndicator();
-    }
+  Widget _buildEmptyState() {
+    String message = widget.selectedDate != null
+        ? '${DateFormat('M월 d일', 'ko_KR').format(widget.selectedDate!)}에 예정된 내전이 없습니다'
+        : '예정된 내전이 없습니다';
     
-    if (_paidTournaments.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-              Icons.sports_esports,
-              size: 64,
-              color: Colors.grey.shade400,
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.event_busy,
+            size: 64,
+            color: Colors.grey.shade400,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(
+              fontSize: 18,
+              color: Colors.grey.shade700,
             ),
-            const SizedBox(height: 16),
-            Text(
-              widget.selectedDate != null 
-                  ? '${DateFormat('M월 d일', 'ko_KR').format(widget.selectedDate!)}에 경쟁전이 없습니다'
-                  : '경쟁전이 없습니다',
-              style: TextStyle(
-                fontSize: 18,
-                color: Colors.grey.shade700,
+          ),
+          const SizedBox(height: 24),
+          ElevatedButton.icon(
+            onPressed: () {
+              context.push('/tournaments/create');
+            },
+            icon: const Icon(Icons.add),
+            label: const Text('내전 만들기'),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildTournamentCard(TournamentModel tournament) {
+    // 역할 아이콘 맵
+    final roleIcons = {
+      'top': Icons.arrow_upward,
+      'jungle': Icons.nature_people,
+      'mid': Icons.adjust,
+      'adc': Icons.gps_fixed,
+      'support': Icons.shield,
+    };
+    
+    // 역할 색상 맵
+    final roleColors = {
+      'top': AppColors.roleTop,
+      'jungle': AppColors.roleJungle,
+      'mid': AppColors.roleMid,
+      'adc': AppColors.roleAdc,
+      'support': AppColors.roleSupport,
+    };
+    
+    // 총 참가자 수와 총 슬롯 수 계산
+    final totalParticipants = tournament.participants.length;
+    final totalSlots = tournament.slotsByRole.values.fold(0, (sum, count) => sum + count);
+    
+    return Card(
+      margin: const EdgeInsets.only(bottom: 16),
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: InkWell(
+        onTap: () {
+          context.push('/tournaments/${tournament.id}');
+        },
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 상단 정보 (시간, 상태, 호스트)
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Icon(
+                        Icons.access_time,
+                        size: 16,
+                        color: AppColors.textSecondary,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        DateFormat('M월 d일 (E) HH:mm', 'ko_KR').format(tournament.startsAt.toDate()),
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: _getStatusColor(tournament.status).withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          _getStatusText(tournament.status),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: _getStatusColor(tournament.status),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    tournament.title,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Row(
+                    children: [
+                      CircleAvatar(
+                        radius: 12,
+                        backgroundImage: tournament.hostProfileImageUrl != null
+                            ? NetworkImage(tournament.hostProfileImageUrl!)
+                            : null,
+                        child: tournament.hostProfileImageUrl == null
+                            ? const Icon(Icons.person, size: 12)
+                            : null,
+                      ),
+                      const SizedBox(width: 4),
+                      Text(
+                        tournament.hostNickname ?? tournament.hostName,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
               ),
             ),
-            const SizedBox(height: 24),
-            ElevatedButton(
-              onPressed: () {
-                context.push('/tournaments/create');
-              },
-              child: const Text('내전 만들기'),
+            
+            // 참가자 진행 상황 표시
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 총 참가자 수 표시
+                  Row(
+                    children: [
+                      Text(
+                        '참가 현황',
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(
+                          '$totalParticipants/$totalSlots',
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  
+                  // 각 역할별 인원 표시
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: tournament.slotsByRole.entries.map((entry) {
+                      final role = entry.key;
+                      final totalForRole = entry.value;
+                      final filledForRole = tournament.filledSlotsByRole[role] ?? 0;
+                      
+                      return Expanded(
+                        child: Column(
+                          children: [
+                            Icon(
+                              roleIcons[role],
+                              color: roleColors[role],
+                              size: 16,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '$filledForRole/$totalForRole',
+                              style: TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: filledForRole == totalForRole
+                                    ? AppColors.success
+                                    : roleColors[role],
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  
+                  // 전체 진행 상황 표시 바
+                  const SizedBox(height: 8),
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: totalSlots > 0 ? totalParticipants / totalSlots : 0,
+                      backgroundColor: Colors.grey.shade200,
+                      color: AppColors.primary,
+                      minHeight: 6,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         ),
-      );
-    }
-    
-    return RefreshIndicator(
-      onRefresh: _loadPaidTournaments,
-      child: ListView.builder(
-        controller: _paidScrollController,
-        itemCount: _paidTournaments.length + (_hasMorePaidTournaments ? 1 : 0),
-        padding: const EdgeInsets.all(16),
-        itemBuilder: (context, index) {
-          if (index == _paidTournaments.length) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
-              child: Center(child: CircularProgressIndicator()),
-            );
-          }
-          
-          final tournament = _paidTournaments[index];
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 16),
-            child: TournamentCard(
-              tournament: tournament,
-              onTap: () {
-                context.push('/tournaments/${tournament.id}');
-              },
-            ),
-          );
-        },
       ),
     );
+  }
+  
+  String _getStatusText(TournamentStatus status) {
+    switch (status) {
+      case TournamentStatus.draft:
+        return '초안';
+      case TournamentStatus.open:
+        return '모집 중';
+      case TournamentStatus.full:
+        return '모집 완료';
+      case TournamentStatus.inProgress:
+      case TournamentStatus.ongoing:
+        return '진행 중';
+      case TournamentStatus.completed:
+        return '완료됨';
+      case TournamentStatus.cancelled:
+        return '취소됨';
+    }
+  }
+  
+  Color _getStatusColor(TournamentStatus status) {
+    switch (status) {
+      case TournamentStatus.draft:
+        return Colors.grey;
+      case TournamentStatus.open:
+        return AppColors.success;
+      case TournamentStatus.full:
+        return AppColors.primary;
+      case TournamentStatus.inProgress:
+      case TournamentStatus.ongoing:
+        return AppColors.warning;
+      case TournamentStatus.completed:
+        return AppColors.textSecondary;
+      case TournamentStatus.cancelled:
+        return AppColors.error;
+    }
   }
 } 

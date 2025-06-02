@@ -63,6 +63,9 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
   final List<DateTime> _dates = [];
   DateTime? _selectedDate;
   
+  // 현재 선택된 탭 인덱스
+  int _currentTabIndex = 0;
+  
   // 더미 프로모션 카드 데이터
   final List<Map<String, dynamic>> _promotionCards = [
     {
@@ -89,16 +92,27 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
   void initState() {
     super.initState();
     _mainTabController = TabController(length: 3, vsync: this);
+    _mainTabController.addListener(_handleTabChange);
     _setupDates();
     _startAutoSlide();
   }
   
   @override
   void dispose() {
+    _mainTabController.removeListener(_handleTabChange);
     _mainTabController.dispose();
     _pageController.dispose();
     _autoSlideTimer?.cancel();
     super.dispose();
+  }
+  
+  // 탭 변경 리스너
+  void _handleTabChange() {
+    if (_mainTabController.indexIsChanging) {
+      setState(() {
+        _currentTabIndex = _mainTabController.index;
+      });
+    }
   }
   
   // 날짜 리스트 초기화 - 오늘부터 14일까지만 표시
@@ -211,8 +225,9 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
                   // 프로모션 카드 영역 (Carousel)
                   _buildPromotionCarousel(),
                   
-                  // 날짜 선택기 (Date Selector)
-                  _buildDateSelector(),
+                  // 날짜 선택기 (Date Selector) - 용병 찾기 탭에서는 표시하지 않음
+                  if (_currentTabIndex != 2)
+                    _buildDateSelector(),
                 ],
               ),
             ),
@@ -238,15 +253,15 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
           ],
         ),
       ),
-      // 내전 생성 버튼 추가
-      floatingActionButton: FloatingActionButton(
+      // 내전 생성 버튼 추가 - 용병 찾기 탭에서는 표시하지 않음
+      floatingActionButton: _currentTabIndex != 2 ? FloatingActionButton(
         onPressed: () {
           // 내전 생성 화면으로 이동 - 경로 수정
           context.push('/tournaments/create');
         },
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add),
-      ),
+      ) : null,
     );
   }
   

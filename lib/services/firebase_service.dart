@@ -496,7 +496,7 @@ class FirebaseService {
         if (tournament.tournamentType == TournamentType.competitive) {
           final userData = userDoc.data() as Map<String, dynamic>;
           final userCredits = userData['credits'] as int? ?? 0;
-          final requiredCredits = tournament.creditCost ?? 20;
+          const requiredCredits = 20; // 항상 고정 20 크레딧
           
           if (userCredits < requiredCredits) {
             throw Exception('크레딧이 부족합니다. 필요 크레딧: $requiredCredits, 보유 크레딧: $userCredits');

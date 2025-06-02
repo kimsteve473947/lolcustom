@@ -19,7 +19,6 @@ class _MercenarySearchTabState extends State<MercenarySearchTab> {
   bool _isLoading = false;
   String? _errorMessage;
   List<MercenaryModel> _mercenaries = [];
-  bool _ovrToggle = true;
   
   @override
   void initState() {
@@ -36,7 +35,6 @@ class _MercenarySearchTabState extends State<MercenarySearchTab> {
     try {
       final mercenaries = await _firebaseService.getAvailableMercenaries(
         limit: 20,
-        minOvr: _ovrToggle ? null : 0,
       );
       
       setState(() {
@@ -56,7 +54,6 @@ class _MercenarySearchTabState extends State<MercenarySearchTab> {
     return Scaffold(
       body: Column(
         children: [
-          _buildFilters(),
           Expanded(
             child: _errorMessage != null
                 ? ErrorView(
@@ -77,31 +74,6 @@ class _MercenarySearchTabState extends State<MercenarySearchTab> {
         },
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add),
-      ),
-    );
-  }
-  
-  Widget _buildFilters() {
-    return Padding(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          // OVR Filter toggle
-          FilterChip(
-            label: const Text('OVR 표시'),
-            selected: _ovrToggle,
-            onSelected: (value) {
-              setState(() {
-                _ovrToggle = value;
-              });
-              _loadMercenaries();
-            },
-            selectedColor: AppColors.primary.withOpacity(0.2),
-            checkmarkColor: AppColors.primary,
-          ),
-          const SizedBox(width: 8),
-          // Additional filters can be added here
-        ],
       ),
     );
   }
@@ -188,38 +160,6 @@ class _MercenarySearchTabState extends State<MercenarySearchTab> {
                         ],
                       ),
                     ),
-                    // Stats
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        Container(
-                          width: 40,
-                          height: 40,
-                          decoration: BoxDecoration(
-                            color: AppColors.primary,
-                            shape: BoxShape.circle,
-                          ),
-                          child: Center(
-                            child: Text(
-                              _getTopRoleStat(mercenary).toString(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          _getTopRole(mercenary),
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
-                    ),
                   ],
                 ),
               ),
@@ -274,35 +214,5 @@ class _MercenarySearchTabState extends State<MercenarySearchTab> {
       case PlayerTier.challenger: return '챌린저';
       case PlayerTier.unranked: return '언랭크';
     }
-  }
-  
-  // 헬퍼 메서드: 최고 역할 찾기
-  String _getTopRole(MercenaryModel mercenary) {
-    if (mercenary.roleStats.isEmpty) return '';
-    
-    MapEntry<String, int> topEntry = mercenary.roleStats.entries.first;
-    
-    for (final entry in mercenary.roleStats.entries) {
-      if (entry.value > topEntry.value) {
-        topEntry = entry;
-      }
-    }
-    
-    return topEntry.key;
-  }
-  
-  // 헬퍼 메서드: 최고 역할 스탯 찾기
-  int _getTopRoleStat(MercenaryModel mercenary) {
-    if (mercenary.roleStats.isEmpty) return 0;
-    
-    int topStat = mercenary.roleStats.values.first;
-    
-    for (final stat in mercenary.roleStats.values) {
-      if (stat > topStat) {
-        topStat = stat;
-      }
-    }
-    
-    return topStat;
   }
 } 
