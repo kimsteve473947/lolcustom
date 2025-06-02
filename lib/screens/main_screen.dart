@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:lol_custom_game_manager/screens/chat/chat_list_screen.dart';
-import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_list_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_list_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/my_page_screen.dart';
 import 'package:lol_custom_game_manager/screens/rankings/rankings_screen.dart';
-import 'package:lol_custom_game_manager/screens/tournaments/tournament_list_screen.dart';
+import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_screen.dart';
 
 class MainScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -18,8 +18,8 @@ class _MainScreenState extends State<MainScreen> {
   late int _currentIndex;
   
   final List<Widget> _screens = const [
-    TournamentListScreen(),
-    MercenaryListScreen(),
+    TournamentMainScreen(),
+    ClanListScreen(),
     ChatListScreen(),
     RankingsScreen(),
     MyPageScreen(),
@@ -50,9 +50,9 @@ class _MainScreenState extends State<MainScreen> {
             label: '내전',
           ),
           BottomNavigationBarItem(
-            icon: Icon(Icons.person_search_outlined),
-            activeIcon: Icon(Icons.person_search),
-            label: '용병',
+            icon: Icon(Icons.groups_outlined),
+            activeIcon: Icon(Icons.groups),
+            label: '클랜',
           ),
           BottomNavigationBarItem(
             icon: Icon(Icons.chat_outlined),

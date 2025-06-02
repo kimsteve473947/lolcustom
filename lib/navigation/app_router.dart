@@ -8,14 +8,18 @@ import 'package:lol_custom_game_manager/screens/auth/login_screen.dart';
 import 'package:lol_custom_game_manager/screens/auth/signup_screen.dart';
 import 'package:lol_custom_game_manager/screens/chat/chat_list_screen.dart';
 import 'package:lol_custom_game_manager/screens/chat/chat_room_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_detail_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_list_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/create_clan_screen.dart';
 import 'package:lol_custom_game_manager/screens/main_screen.dart';
+import 'package:lol_custom_game_manager/screens/match_home_screen.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_detail_screen.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_edit_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/my_page_screen.dart';
 import 'package:lol_custom_game_manager/screens/rankings/rankings_screen.dart';
 import 'package:lol_custom_game_manager/screens/splash_screen.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/tournament_detail_screen.dart';
-import 'package:lol_custom_game_manager/screens/tournaments/tournament_list_screen.dart';
+import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_screen.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/create_tournament_screen.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
 
@@ -50,7 +54,7 @@ class AppRouter {
       
       // 로그인한 사용자가 로그인/회원가입 페이지에 접근하면 메인으로 리다이렉트
       if (isLoggedIn && (isLoggingIn || isSigningUp || isPasswordReset)) {
-        return '/main';
+        return '/home';
       }
       
       // 로그인하지 않은 사용자가 보호된 경로에 접근하면 로그인 페이지로 리다이렉트
@@ -77,12 +81,16 @@ class AppRouter {
         builder: (context, state) => const SignupScreen(),
       ),
       GoRoute(
+        path: '/home',
+        builder: (context, state) => const MatchHomeScreen(),
+      ),
+      GoRoute(
         path: '/main',
         builder: (context, state) => const MainScreen(),
       ),
       GoRoute(
         path: '/tournaments',
-        builder: (context, state) => const TournamentListScreen(),
+        builder: (context, state) => const TournamentMainScreen(),
       ),
       GoRoute(
         path: '/tournaments/create',
@@ -105,6 +113,21 @@ class AppRouter {
       GoRoute(
         path: '/mercenaries/edit',
         builder: (context, state) => const MercenaryEditScreen(),
+      ),
+      GoRoute(
+        path: '/clans',
+        builder: (context, state) => const ClanListScreen(),
+      ),
+      GoRoute(
+        path: '/clans/create',
+        builder: (context, state) => const CreateClanScreen(),
+      ),
+      GoRoute(
+        path: '/clans/:id',
+        builder: (context, state) {
+          final clanId = state.pathParameters['id']!;
+          return ClanDetailScreen(clanId: clanId);
+        },
       ),
       GoRoute(
         path: '/chat',
