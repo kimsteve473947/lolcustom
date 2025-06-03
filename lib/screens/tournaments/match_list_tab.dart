@@ -58,13 +58,18 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     // 탭 변경 리스너
     _tabController.addListener(() {
       setState(() {
-        // 필터 업데이트
-        _filters['tournamentType'] = _tabController.index == 0 ? TournamentType.casual.index : TournamentType.competitive.index;
+        // 필터 업데이트 - 명확한 TournamentType 사용
+        _filters['tournamentType'] = _tabController.index == 0 
+            ? TournamentType.casual.index 
+            : TournamentType.competitive.index;
       });
       
       // 초기 데이터 로드
       _loadTournaments();
     });
+    
+    // 초기 필터 설정
+    _filters['tournamentType'] = TournamentType.casual.index;
     
     // 초기 데이터 로드
     _loadTournaments();
@@ -82,7 +87,7 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
 
   // 필터 설정
   final Map<String, dynamic> _filters = {
-    'tournamentType': null,  // null: 모두, int: 일반전만, int: 경쟁전만
+    'tournamentType': TournamentType.casual.index,  // 명확한 기본값 설정
   };
   
   Future<void> _loadTournaments() async {
@@ -105,8 +110,6 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
       
       final tournaments = await tournamentService.getTournaments(
         filters: _filters,
-        orderBy: 'startsAt',
-        descending: false,
       );
       
       setState(() {
@@ -142,8 +145,6 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
       // Use limit and offset-based pagination instead of cursor-based pagination
       final tournaments = await tournamentService.getTournaments(
         filters: _filters,
-        orderBy: 'startsAt',
-        descending: false,
         limit: 10,
       );
       

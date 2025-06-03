@@ -7,8 +7,9 @@ import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_scre
 
 class MainScreen extends StatefulWidget {
   final int initialTabIndex;
+  final Widget? child;
   
-  const MainScreen({Key? key, this.initialTabIndex = 0}) : super(key: key);
+  const MainScreen({Key? key, this.initialTabIndex = 0, this.child}) : super(key: key);
 
   @override
   State<MainScreen> createState() => _MainScreenState();
@@ -33,8 +34,10 @@ class _MainScreenState extends State<MainScreen> {
   
   @override
   Widget build(BuildContext context) {
+    final body = widget.child ?? _screens[_currentIndex];
+    
     return Scaffold(
-      body: _screens[_currentIndex],
+      body: body,
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {

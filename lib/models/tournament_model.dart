@@ -245,26 +245,41 @@ class TournamentModel extends Equatable {
     }
 
     // 이전 버전 호환성 유지를 위한 코드
-    // isPaid 필드가 있으면 그에 따라 tournamentType 설정
+    // 더 명확한 로직으로 tournamentType 설정
     TournamentType tournamentType;
-    if (data.containsKey('isPaid')) {
+    
+    // 1. 명시적 tournamentType 필드가 있는 경우
+    if (data.containsKey('tournamentType') && data['tournamentType'] is int) {
+      final typeIndex = data['tournamentType'] as int;
+      if (typeIndex >= 0 && typeIndex < TournamentType.values.length) {
+        tournamentType = TournamentType.values[typeIndex];
+      } else {
+        // 인덱스가 범위를 벗어나면 기본값 사용
+        tournamentType = TournamentType.casual;
+      }
+    } 
+    // 2. isPaid 필드가 있는 경우 (레거시 호환성)
+    else if (data.containsKey('isPaid')) {
       tournamentType = data['isPaid'] == true 
           ? TournamentType.competitive 
           : TournamentType.casual;
-    } else {
-      tournamentType = data['tournamentType'] != null
-          ? TournamentType.values[data['tournamentType'] as int]
-          : TournamentType.casual;
+    } 
+    // 3. 기본값 설정
+    else {
+      tournamentType = TournamentType.casual;
     }
 
     // 참가비를 크레딧으로 변환
     int? creditCost;
     if (tournamentType == TournamentType.competitive) {
-      if (data.containsKey('price')) {
-        creditCost = data['creditCost'] ?? data['price'] ?? 20; // 기본값 20 크레딧
-      } else {
-        creditCost = data['creditCost'] ?? 20;
+      if (data.containsKey('creditCost')) {
+        creditCost = data['creditCost'] as int?;
+      } else if (data.containsKey('price')) {
+        creditCost = data['price'] as int?;
       }
+      
+      // 경쟁전은 항상 크레딧 비용이 있어야 함 (기본값 20)
+      creditCost ??= 20;
     }
 
     // 참가자 목록 처리 - List<dynamic>을 List<String>으로 안전하게 변환
@@ -322,13 +337,19 @@ class TournamentModel extends Equatable {
       isRefereed = tournamentType == TournamentType.competitive;
     }
     
+    // hostProfileImageUrl 처리 - 빈 문자열이나 유효하지 않은 URL 처리
+    String? hostProfileImageUrl = data['hostProfileImageUrl'];
+    if (hostProfileImageUrl != null && (hostProfileImageUrl.isEmpty || !hostProfileImageUrl.startsWith('http'))) {
+      hostProfileImageUrl = null;
+    }
+    
     return TournamentModel(
       id: doc.id,
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       hostId: data['hostId'] ?? '',
       hostName: data['hostName'] ?? '',
-      hostProfileImageUrl: data['hostProfileImageUrl'],
+      hostProfileImageUrl: hostProfileImageUrl,
       hostNickname: data['hostNickname'] ?? data['hostName'] ?? '',
       startsAt: data['startsAt'] as Timestamp,
       location: data['location'] ?? '',

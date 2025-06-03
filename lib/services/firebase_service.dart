@@ -56,7 +56,7 @@ class FirebaseService {
     DocumentSnapshot? startAfter,
     DateTime? startDate,
     DateTime? endDate,
-    bool? isPaid,
+    TournamentType? tournamentType,
     int? ovrLimit,
   }) async {
     try {
@@ -79,8 +79,8 @@ class FirebaseService {
         );
       }
 
-      if (isPaid != null) {
-        query = query.where('isPaid', isEqualTo: isPaid);
+      if (tournamentType != null) {
+        query = query.where('tournamentType', isEqualTo: tournamentType.index);
       }
 
       if (ovrLimit != null) {
@@ -508,13 +508,7 @@ class FirebaseService {
           });
         }
         
-        // Update fields
-        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
-        updatedFilledSlots[role] = (updatedFilledSlots[role] ?? 0) + 1;
-        
-        final updatedFilledSlotsByRole = Map<String, int>.from(tournament.filledSlotsByRole);
-        updatedFilledSlotsByRole[role] = (updatedFilledSlotsByRole[role] ?? 0) + 1;
-        
+        // Update participants list
         final updatedParticipants = List<String>.from(tournament.participants)..add(userId);
         
         // Update participants by role
@@ -524,23 +518,41 @@ class FirebaseService {
         }
         updatedParticipantsByRole[role]!.add(userId);
         
+        // Update filled slots by role
+        final updatedFilledSlotsByRole = Map<String, int>.from(tournament.filledSlotsByRole);
+        updatedFilledSlotsByRole[role] = (updatedFilledSlotsByRole[role] ?? 0) + 1;
+        
+        // Update overall filled slots
+        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
+        if (role == 'top' || role == 'jungle' || role == 'mid') {
+          updatedFilledSlots['team1'] = (updatedFilledSlots['team1'] ?? 0) + 1;
+        } else {
+          updatedFilledSlots['team2'] = (updatedFilledSlots['team2'] ?? 0) + 1;
+        }
+        
         // Check if tournament will be full after joining
         TournamentStatus updatedStatus = tournament.status;
-        final willBeFull = updatedFilledSlotsByRole.entries.every((entry) {
-          final totalSlots = tournament.slotsByRole[entry.key] ?? 0;
-          return entry.value >= totalSlots;
-        });
+        var willBeFull = true;
+        for (final entry in tournament.slotsByRole.entries) {
+          final roleKey = entry.key;
+          final totalSlots = entry.value;
+          final filledSlots = (updatedFilledSlotsByRole[roleKey] ?? 0);
+          if (filledSlots < totalSlots) {
+            willBeFull = false;
+            break;
+          }
+        }
         
         if (willBeFull) {
           updatedStatus = TournamentStatus.full;
         }
         
-        // Update tournament document
+        // Update tournament document with a simple map to avoid any potential issues
         transaction.update(docRef, {
-          'filledSlots': updatedFilledSlots,
-          'filledSlotsByRole': updatedFilledSlotsByRole,
           'participants': updatedParticipants,
           'participantsByRole': updatedParticipantsByRole,
+          'filledSlotsByRole': updatedFilledSlotsByRole,
+          'filledSlots': updatedFilledSlots,
           'status': updatedStatus.index,
           'updatedAt': Timestamp.now(),
         });
@@ -580,14 +592,20 @@ class FirebaseService {
           throw Exception('해당 역할로 참가하지 않았습니다.');
         }
         
-        // Update fields
-        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
-        updatedFilledSlots[role] = (updatedFilledSlots[role] ?? 1) - 1;
-        if (updatedFilledSlots[role]! < 0) updatedFilledSlots[role] = 0;
-        
+        // Update filled slots by role
         final updatedFilledSlotsByRole = Map<String, int>.from(tournament.filledSlotsByRole);
         updatedFilledSlotsByRole[role] = (updatedFilledSlotsByRole[role] ?? 1) - 1;
         if (updatedFilledSlotsByRole[role]! < 0) updatedFilledSlotsByRole[role] = 0;
+        
+        // Update overall filled slots (team1, team2) based on role
+        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
+        if (role == 'top' || role == 'jungle' || role == 'mid') {
+          updatedFilledSlots['team1'] = (updatedFilledSlots['team1'] ?? 1) - 1;
+          if (updatedFilledSlots['team1']! < 0) updatedFilledSlots['team1'] = 0;
+        } else {
+          updatedFilledSlots['team2'] = (updatedFilledSlots['team2'] ?? 1) - 1;
+          if (updatedFilledSlots['team2']! < 0) updatedFilledSlots['team2'] = 0;
+        }
         
         final updatedParticipants = List<String>.from(tournament.participants)..remove(userId);
         
@@ -610,6 +628,38 @@ class FirebaseService {
           'status': updatedStatus.index,
           'updatedAt': Timestamp.now(),
         });
+        
+        // Find and update application status to cancelled
+        final applicationQuery = await _firestore.collection('applications')
+            .where('tournamentId', isEqualTo: tournamentId)
+            .where('userUid', isEqualTo: userId)
+            .where('role', isEqualTo: role)
+            .limit(1)
+            .get();
+            
+        if (applicationQuery.docs.isNotEmpty) {
+          final applicationDoc = applicationQuery.docs.first;
+          transaction.update(
+            _firestore.collection('applications').doc(applicationDoc.id), 
+            {'status': ApplicationStatus.cancelled.index}
+          );
+        }
+        
+        // Refund credits for competitive tournaments
+        if (tournament.tournamentType == TournamentType.competitive) {
+          // Get user information to check current credits
+          final userDoc = await _firestore.collection('users').doc(userId).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            final currentCredits = userData['credits'] as int? ?? 0;
+            const refundCredits = 20; // Same as required credits
+            
+            // Add refund to user's credits
+            transaction.update(_firestore.collection('users').doc(userId), {
+              'credits': currentCredits + refundCredits
+            });
+          }
+        }
       });
     } catch (e) {
       debugPrint('Error leaving tournament: $e');
@@ -656,6 +706,42 @@ class FirebaseService {
     } catch (e) {
       debugPrint('Error getting user credits: $e');
       rethrow;
+    }
+  }
+
+  // 내전 ID로 채팅방 찾기
+  Future<String?> findChatRoomByTournamentId(String tournamentId) async {
+    try {
+      final querySnapshot = await _firestore
+          .collection('chatRooms')
+          .where('tournamentId', isEqualTo: tournamentId)
+          .limit(1)
+          .get();
+      
+      if (querySnapshot.docs.isNotEmpty) {
+        return querySnapshot.docs.first.id;
+      }
+      
+      return null;
+    } catch (e) {
+      debugPrint('Error finding chat room by tournament ID: $e');
+      return null;
+    }
+  }
+  
+  // 채팅방과 내전 연결
+  Future<void> linkChatRoomToTournament(String chatRoomId, String tournamentId) async {
+    try {
+      await _firestore
+          .collection('chatRooms')
+          .doc(chatRoomId)
+          .update({
+            'tournamentId': tournamentId,
+            'type': ChatRoomType.tournamentRecruitment.index,
+          });
+    } catch (e) {
+      debugPrint('Error linking chat room to tournament: $e');
+      throw Exception('채팅방과 내전을 연결하는 중 오류가 발생했습니다: $e');
     }
   }
 }

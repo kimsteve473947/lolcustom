@@ -85,139 +85,97 @@ class TournamentService {
   
   // 토너먼트 목록 가져오기 (Future 버전, 필터링 기능 포함)
   Future<List<TournamentModel>> getTournaments({
-    int? limit,
+    int limit = 10,
     DocumentSnapshot? startAfter,
     Map<String, dynamic>? filters,
-    String orderBy = 'startsAt',
-    bool descending = false,
   }) async {
     try {
-      Query query = _tournamentsRef.orderBy(orderBy, descending: descending);
+      // 기본 쿼리 - 시작 시간으로 정렬
+      Query query = _firestore
+          .collection('tournaments')
+          .where('status', isEqualTo: TournamentStatus.open.index)
+          .orderBy('startsAt', descending: false);
       
-      // 필터 적용
-      if (filters != null) {
-        // 토너먼트 타입 필터 (일반전/경쟁전)
-        if (filters['tournamentType'] != null) {
-          query = query.where('tournamentType', isEqualTo: filters['tournamentType']);
-        }
-        
-        // 이전 버전 호환성을 위한 코드
-        // isPaid 필터가 있으면 그에 따라 tournamentType 필터 적용
-        if (filters['isPaid'] != null) {
-          final tournamentType = filters['isPaid'] 
-              ? TournamentType.competitive.index
-              : TournamentType.casual.index;
-          query = query.where('tournamentType', isEqualTo: tournamentType);
-        }
-        
-        // 날짜 범위 필터
-        if (filters['startDate'] != null && filters['endDate'] != null) {
-          query = query.where('startsAt', 
-            isGreaterThanOrEqualTo: Timestamp.fromDate(filters['startDate']),
-            isLessThanOrEqualTo: Timestamp.fromDate(filters['endDate'])
-          );
-        }
-        
-        // 프리미엄 필터
-        if (filters['premiumBadge'] != null) {
-          query = query.where('premiumBadge', isEqualTo: filters['premiumBadge']);
-        }
-      }
+      // 인덱스 오류를 방지하기 위해 단순화된 쿼리 사용
+      // 먼저 기본 쿼리로 데이터를 가져옴
+      QuerySnapshot snapshot;
       
-      // 페이지네이션
       if (startAfter != null) {
-        query = query.startAfterDocument(startAfter);
-      }
-      
-      if (limit != null) {
+        query = query.startAfterDocument(startAfter).limit(limit);
+      } else {
         query = query.limit(limit);
       }
       
       try {
-        final snapshot = await query.get();
+        // 1. 기본 필터가 적용된 쿼리 실행
+        snapshot = await query.get();
         
-        return snapshot.docs
+        // 2. 메모리에서 추가 필터 적용
+        List<TournamentModel> tournaments = snapshot.docs
             .map((doc) => TournamentModel.fromFirestore(doc))
             .toList();
-      } catch (e) {
-        // 인덱스 오류 발생 시 fallback 시도
-        if (e.toString().contains('failed-precondition') && e.toString().contains('index')) {
-          debugPrint('인덱스 오류 발생: $e');
-          debugPrint('단순 쿼리로 fallback합니다.');
-          
-          // 단순 쿼리로 fallback (정렬만 적용)
-          Query fallbackQuery = _tournamentsRef.orderBy('createdAt', descending: true);
-          
-          if (limit != null) {
-            fallbackQuery = fallbackQuery.limit(limit);
+        
+        // 추가 필터가 있으면 메모리에서 필터링
+        if (filters != null) {
+          // 토너먼트 타입 필터 적용 (일반전/경쟁전)
+          if (filters['tournamentType'] != null) {
+            tournaments = tournaments.where((t) => 
+              t.tournamentType.index == filters['tournamentType']).toList();
           }
           
-          final fallbackSnapshot = await fallbackQuery.get();
-          
-          // 클라이언트 측 필터링
-          List<TournamentModel> tournaments = fallbackSnapshot.docs
-              .map((doc) => TournamentModel.fromFirestore(doc))
-              .toList();
-          
-          // 필터가 있으면 클라이언트 측에서 필터링
-          if (filters != null) {
-            if (filters['tournamentType'] != null) {
-              tournaments = tournaments.where((t) => 
-                  t.tournamentType.index == filters['tournamentType']).toList();
-            } else if (filters['isPaid'] != null) {
-              final tournamentType = filters['isPaid'] 
-                  ? TournamentType.competitive
-                  : TournamentType.casual;
-              tournaments = tournaments.where((t) => 
-                  t.tournamentType == tournamentType).toList();
-            }
+          // 날짜 범위 필터 적용
+          if (filters['startDate'] != null && filters['endDate'] != null) {
+            final startDate = (filters['startDate'] as DateTime);
+            final endDate = (filters['endDate'] as DateTime);
             
-            if (filters['premiumBadge'] != null) {
-              tournaments = tournaments.where((t) => t.premiumBadge == filters['premiumBadge']).toList();
-            }
-            
-            if (filters['startDate'] != null && filters['endDate'] != null) {
-              final startDate = filters['startDate'] as DateTime;
-              final endDate = filters['endDate'] as DateTime;
-              tournaments = tournaments.where((t) {
-                final tournamentDate = t.startsAt.toDate();
-                return tournamentDate.isAfter(startDate.subtract(const Duration(minutes: 1))) && 
-                       tournamentDate.isBefore(endDate.add(const Duration(minutes: 1)));
-              }).toList();
-            }
+            tournaments = tournaments.where((t) {
+              final tournamentDate = t.startsAt.toDate();
+              return tournamentDate.isAfter(startDate) && 
+                     tournamentDate.isBefore(endDate.add(const Duration(days: 1)));
+            }).toList();
           }
           
-          // 정렬 적용
-          if (orderBy == 'startsAt') {
-            tournaments.sort((a, b) {
-              final comparison = a.startsAt.toDate().compareTo(b.startsAt.toDate());
-              return descending ? -comparison : comparison;
-            });
-          } else if (orderBy == 'createdAt') {
-            tournaments.sort((a, b) {
-              final comparison = a.createdAt.compareTo(b.createdAt);
-              return descending ? -comparison : comparison;
-            });
-          } else if (orderBy == 'title') {
-            tournaments.sort((a, b) {
-              final comparison = a.title.compareTo(b.title);
-              return descending ? -comparison : comparison;
-            });
+          // OVR 제한 필터 적용
+          if (filters['ovrLimit'] != null) {
+            tournaments = tournaments.where((t) => 
+              t.ovrLimit == null || t.ovrLimit! <= filters['ovrLimit']).toList();
           }
-          
-          return tournaments;
         }
         
-        // 다른 오류는 그대로 던지기
-        rethrow;
+        return tournaments;
+      } catch (e) {
+        debugPrint('인덱스 오류 발생: $e');
+        debugPrint('단순 쿼리로 fallback합니다.');
+        
+        // 인덱스 오류 발생 시 더 간단한 쿼리로 fallback
+        query = _firestore
+            .collection('tournaments')
+            .where('status', isEqualTo: TournamentStatus.open.index)
+            .limit(limit);
+            
+        snapshot = await query.get();
+        
+        List<TournamentModel> tournaments = snapshot.docs
+            .map((doc) => TournamentModel.fromFirestore(doc))
+            .toList();
+        
+        // 메모리에서 필터 적용
+        if (filters != null) {
+          // 토너먼트 타입 필터 적용
+          if (filters['tournamentType'] != null) {
+            tournaments = tournaments.where((t) => 
+              t.tournamentType.index == filters['tournamentType']).toList();
+          }
+        }
+        
+        // 시작 시간으로 정렬
+        tournaments.sort((a, b) => a.startsAt.compareTo(b.startsAt));
+        
+        return tournaments;
       }
     } catch (e) {
-      debugPrint('토너먼트 목록 조회 오류: $e');
-      // 사용자 친화적인 오류 메시지로 변환
-      if (e.toString().contains('failed-precondition') && e.toString().contains('index')) {
-        throw Exception('필터링에 필요한 인덱스가 아직 생성되지 않았습니다. 잠시 후 다시 시도해주세요.');
-      }
-      rethrow;
+      debugPrint('Error getting tournaments: $e');
+      return [];
     }
   }
   

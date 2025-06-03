@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:intl/intl.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/models/models.dart';
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
@@ -194,6 +195,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
+  void _viewTournament(String tournamentId) {
+    context.push('/tournaments/$tournamentId');
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = Provider.of<AppStateProvider>(context).currentUser;
@@ -213,6 +218,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               ? Center(child: Text(_errorMessage!))
               : Column(
                   children: [
+                    if (_chatRoom != null && _chatRoom!.type == ChatRoomType.tournamentRecruitment && _chatRoom!.tournamentId != null)
+                      _buildTournamentBanner(_chatRoom!.tournamentId!),
                     Expanded(
                       child: _buildMessagesList(currentUser.uid),
                     ),
@@ -444,6 +451,49 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 : const Icon(Icons.send),
             color: AppColors.primary,
             onPressed: _isSending ? null : _sendMessage,
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTournamentBanner(String tournamentId) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        border: Border(
+          bottom: BorderSide(
+            color: AppColors.primary.withOpacity(0.2),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          const Icon(
+            Icons.sports_esports,
+            color: AppColors.primary,
+            size: 20,
+          ),
+          const SizedBox(width: 8),
+          const Expanded(
+            child: Text(
+              '이 채팅방은 내전과 연결되어 있습니다',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.primary,
+              ),
+            ),
+          ),
+          TextButton(
+            onPressed: () => _viewTournament(tournamentId),
+            style: TextButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              visualDensity: VisualDensity.compact,
+            ),
+            child: const Text('내전 살펴보기'),
           ),
         ],
       ),

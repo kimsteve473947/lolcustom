@@ -34,12 +34,19 @@ class ApplicationModel {
 
   factory ApplicationModel.fromFirestore(DocumentSnapshot doc) {
     Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+    
+    // userProfileImageUrl 처리 - 빈 문자열이나 유효하지 않은 URL 처리
+    String? userProfileImageUrl = data['userProfileImageUrl'];
+    if (userProfileImageUrl != null && (userProfileImageUrl.isEmpty || !userProfileImageUrl.startsWith('http'))) {
+      userProfileImageUrl = null;
+    }
+    
     return ApplicationModel(
       id: doc.id,
       tournamentId: data['tournamentId'] ?? '',
       userUid: data['userUid'] ?? '',
       userName: data['userName'] ?? 'Unknown',
-      userProfileImageUrl: data['userProfileImageUrl'],
+      userProfileImageUrl: userProfileImageUrl,
       role: data['role'] ?? 'mid',
       userOvr: data['userOvr'],
       status: ApplicationStatus.values[data['status'] ?? 0],

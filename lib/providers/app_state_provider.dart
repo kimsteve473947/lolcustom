@@ -364,7 +364,23 @@ class AppStateProvider extends ChangeNotifier {
     _clearError();
     
     try {
+      // 토너먼트 정보 조회
+      final tournament = await _firebaseService.getTournament(tournamentId);
+      if (tournament == null) {
+        _setError('토너먼트를 찾을 수 없습니다');
+        return false;
+      }
+      
+      // 참가 취소 처리
       await _firebaseService.leaveTournamentByRole(tournamentId, role);
+      
+      // 경쟁전인 경우 크레딧 환불 알림 (UI 업데이트)
+      if (tournament.tournamentType == TournamentType.competitive) {
+        const refundCredits = 20; // 항상 고정 20 크레딧
+        _currentUser = _currentUser!.withUpdatedCredits(_currentUser!.credits + refundCredits);
+        notifyListeners();
+      }
+      
       return true;
     } catch (e) {
       _setError('토너먼트 참가 취소 중 오류가 발생했습니다: $e');

@@ -60,11 +60,18 @@ class UserModel extends Equatable {
   // 파이어스토어에서 데이터 불러오기
   factory UserModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    
+    // profileImageUrl 처리 - 빈 문자열이나 유효하지 않은 URL 처리
+    String profileImageUrl = data['profileImageUrl'] ?? '';
+    if (profileImageUrl.isEmpty || !profileImageUrl.startsWith('http')) {
+      profileImageUrl = '';
+    }
+    
     return UserModel(
       uid: doc.id,
       email: data['email'] ?? '',
       nickname: data['nickname'] ?? '',
-      profileImageUrl: data['profileImageUrl'] ?? '',
+      profileImageUrl: profileImageUrl,
       joinedAt: data['joinedAt'] ?? Timestamp.now(),
       role: roleFromString(data['role']),
       additionalInfo: data['additionalInfo'] as Map<String, dynamic>?,

@@ -81,12 +81,18 @@ class RatingModel extends Equatable {
   }
   
   factory RatingModel.fromMap(Map<String, dynamic> map) {
+    // raterProfileImageUrl 처리 - 빈 문자열이나 유효하지 않은 URL 처리
+    String? raterProfileImageUrl = map['raterProfileImageUrl'];
+    if (raterProfileImageUrl != null && (raterProfileImageUrl.isEmpty || !raterProfileImageUrl.startsWith('http'))) {
+      raterProfileImageUrl = null;
+    }
+    
     return RatingModel(
       id: map['id'] ?? '',
       ratedUserId: map['ratedUserId'] ?? '',
       raterId: map['raterId'] ?? '',
       raterName: map['raterName'] ?? 'Unknown',
-      raterProfileImageUrl: map['raterProfileImageUrl'],
+      raterProfileImageUrl: raterProfileImageUrl,
       score: (map['score'] as num?)?.toDouble() ?? 0.0,
       role: map['role'],
       comment: map['comment'],

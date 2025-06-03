@@ -99,7 +99,9 @@ class AppRouter {
         path: '/tournaments/:id',
         builder: (context, state) {
           final tournamentId = state.pathParameters['id']!;
-          return TournamentDetailScreen(tournamentId: tournamentId);
+          return TournamentDetailScreen(
+            tournamentId: tournamentId,
+          );
         },
       ),
       GoRoute(

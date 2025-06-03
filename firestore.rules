@@ -20,6 +20,12 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
     
+    // 토너먼트 호스트인지 확인하는 함수
+    function isTournamentHost(tournamentId) {
+      let tournament = get(/databases/$(database)/documents/tournaments/$(tournamentId));
+      return isAuthenticated() && request.auth.uid == tournament.data.hostId;
+    }
+    
     // 모든 문서에 대한 기본 규칙
     match /{document=**} {
       // 기본적으로 모든 접근 거부
@@ -31,28 +37,58 @@ service cloud.firestore {
       // 인증된 사용자는 모든 사용자 프로필을 읽을 수 있음
       allow read: if isAuthenticated();
       // 자신의 프로필만 수정 가능
-      allow write: if isOwner(userId);
+      allow write: if isOwner(userId) || isAdmin();
     }
     
     // 토너먼트 컬렉션 규칙
     match /tournaments/{tournamentId} {
       // 인증된 사용자는 모든 토너먼트 정보를 읽을 수 있음
       allow read: if isAuthenticated();
-      // 관리자만 토너먼트 생성/수정/삭제 가능
+      
+      // 인증된 사용자는 토너먼트 생성 가능
       allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && (
+      
+      // 토너먼트 업데이트 권한
+      // 1. 호스트는 모든 필드 업데이트 가능
+      // 2. 일반 사용자는 참가 관련 필드만 업데이트 가능
+      // 3. 관리자는 모든 필드 업데이트 가능
+      allow update: if isAuthenticated() && (
+        resource.data.hostId == request.auth.uid || 
+        isAdmin() ||
+        (
+          // 참가자가 변경할 수 있는 필드 목록
+          request.resource.data.diff(resource.data).affectedKeys()
+            .hasOnly(['participants', 'participantsByRole', 'filledSlots', 'filledSlotsByRole', 'status', 'updatedAt'])
+        )
+      );
+      
+      // 삭제는 호스트 또는 관리자만 가능
+      allow delete: if isAuthenticated() && (
         resource.data.hostId == request.auth.uid || isAdmin()
       );
     }
     
-    // 신청서 컬렉션 규칙
+    // 신청 컬렉션 규칙
     match /applications/{applicationId} {
       // 인증된 사용자는 모든 신청서를 읽을 수 있음
       allow read: if isAuthenticated();
-      // 인증된 사용자는 신청서 생성 가능, 자신의 신청서만 수정 가능
-      allow create: if isAuthenticated();
-      allow update, delete: if isAuthenticated() && (
-        resource.data.userId == request.auth.uid || isAdmin()
+      
+      // 인증된 사용자는 자신의 신청서만 생성 가능
+      allow create: if isAuthenticated() && 
+                   request.resource.data.userUid == request.auth.uid;
+      
+      // 업데이트는 신청자 본인, 토너먼트 호스트, 또는 관리자만 가능
+      allow update: if isAuthenticated() && (
+        resource.data.userUid == request.auth.uid || 
+        isTournamentHost(resource.data.tournamentId) ||
+        isAdmin()
+      );
+      
+      // 삭제는 신청자 본인, 토너먼트 호스트, 또는 관리자만 가능
+      allow delete: if isAuthenticated() && (
+        resource.data.userUid == request.auth.uid || 
+        isTournamentHost(resource.data.tournamentId) ||
+        isAdmin()
       );
     }
     
@@ -60,9 +96,62 @@ service cloud.firestore {
     match /mercenaries/{mercenaryId} {
       // 인증된 사용자는 모든 용병 정보를 읽을 수 있음
       allow read: if isAuthenticated();
-      // 자신의 용병 프로필만 생성/수정/삭제 가능
-      allow create, update, delete: if isAuthenticated() && (
-        request.resource.data.userId == request.auth.uid || isAdmin()
+      
+      // 인증된 사용자는 자신의 용병 프로필만 생성/수정/삭제 가능
+      allow create: if isAuthenticated() && 
+                   request.resource.data.userUid == request.auth.uid;
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userUid == request.auth.uid || isAdmin()
+      );
+    }
+    
+    // 평가 컬렉션 규칙
+    match /ratings/{ratingId} {
+      // 인증된 사용자는 모든 평가를 읽을 수 있음
+      allow read: if isAuthenticated();
+      
+      // 인증된 사용자는 평가 생성 가능
+      allow create: if isAuthenticated() && 
+                   request.resource.data.raterId == request.auth.uid;
+      
+      // 평가 수정/삭제는 평가자 본인 또는 관리자만 가능
+      allow update, delete: if isAuthenticated() && (
+        resource.data.raterId == request.auth.uid || isAdmin()
+      );
+    }
+    
+    // 채팅방 컬렉션 규칙
+    match /chatRooms/{chatRoomId} {
+      // 채팅방 참가자만 읽기 가능
+      allow read: if isAuthenticated() && 
+                request.auth.uid in resource.data.participantUids;
+      
+      // 인증된 사용자는 채팅방 생성 가능
+      allow create: if isAuthenticated();
+      
+      // 채팅방 업데이트는 참가자 또는 관리자만 가능
+      allow update: if isAuthenticated() && (
+        request.auth.uid in resource.data.participantUids || isAdmin()
+      );
+      
+      // 삭제는 관리자만 가능
+      allow delete: if isAdmin();
+    }
+    
+    // 메시지 컬렉션 규칙
+    match /messages/{messageId} {
+      // 채팅방 참가자만 메시지 읽기 가능
+      allow read: if isAuthenticated() && 
+                exists(/databases/$(database)/documents/chatRooms/$(resource.data.chatRoomId)) &&
+                request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(resource.data.chatRoomId)).data.participantUids;
+      
+      // 인증된 사용자는 자신의 메시지만 생성 가능
+      allow create: if isAuthenticated() && 
+                  request.resource.data.senderId == request.auth.uid;
+      
+      // 메시지 수정/삭제는 작성자 또는 관리자만 가능
+      allow update, delete: if isAuthenticated() && (
+        resource.data.senderId == request.auth.uid || isAdmin()
       );
     }
   }

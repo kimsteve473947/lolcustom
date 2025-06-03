@@ -54,6 +54,12 @@ class MercenaryModel extends Equatable {
       averageRoleStat = sum / roleStats.length;
     }
     
+    // profileImageUrl 처리 - 빈 문자열이나 유효하지 않은 URL 처리
+    String? profileImageUrl = data['profileImageUrl'];
+    if (profileImageUrl != null && (profileImageUrl.isEmpty || !profileImageUrl.startsWith('http'))) {
+      profileImageUrl = null;
+    }
+    
     return MercenaryModel(
       id: doc.id,
       userUid: data['userUid'] ?? '',
@@ -66,7 +72,7 @@ class MercenaryModel extends Equatable {
       totalRatings: data['totalRatings'] ?? 0,
       averageRoleStat: averageRoleStat,
       nickname: data['nickname'] ?? '',
-      profileImageUrl: data['profileImageUrl'],
+      profileImageUrl: profileImageUrl,
       tier: UserModel.tierFromString(data['tier']),
       isAvailable: data['isAvailable'] ?? true,
       lastActiveAt: data['lastActiveAt'] ?? Timestamp.now(),
