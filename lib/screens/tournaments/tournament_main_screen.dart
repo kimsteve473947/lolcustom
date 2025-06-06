@@ -95,6 +95,20 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
     _mainTabController.addListener(_handleTabChange);
     _setupDates();
     _startAutoSlide();
+    
+    // 앱 시작 시 오늘 날짜 선택
+    final now = DateTime.now();
+    _selectedDate = DateTime(now.year, now.month, now.day);
+    
+    // 오늘 날짜 인덱스 찾기
+    for (int i = 0; i < _dates.length; i++) {
+      if (_dates[i].day == _selectedDate!.day && 
+          _dates[i].month == _selectedDate!.month && 
+          _dates[i].year == _selectedDate!.year) {
+        _selectedDateIndex = i;
+        break;
+      }
+    }
   }
   
   @override
@@ -115,21 +129,21 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
     }
   }
   
-  // 날짜 리스트 초기화 - 오늘부터 14일까지만 표시
+  // 날짜 리스트 초기화
   void _setupDates() {
     _dates.clear();
     
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
     
-    // 오늘부터 14일 후까지만 날짜 생성
+    // 오늘부터 14일 후까지 날짜 생성
     for (int i = 0; i <= 14; i++) {
       _dates.add(today.add(Duration(days: i)));
     }
     
     // 기본적으로 오늘 날짜 선택
     _selectedDateIndex = 0;
-    _selectedDate = _dates[_selectedDateIndex];
+    _selectedDate = today;
   }
   
   // 자동 슬라이드 타이머 설정
@@ -173,7 +187,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
     return Scaffold(
       appBar: AppBar(
         title: const Text(
-          '딜라',
+          '스크림져드',
           style: TextStyle(
             color: Color(0xFF1F1F1F),
             fontWeight: FontWeight.bold,
@@ -270,7 +284,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
     return Column(
       children: [
         SizedBox(
-          height: 180,
+          height: 150,
           child: PageView.builder(
             controller: _pageController,
             itemCount: _promotionCards.length,
@@ -296,18 +310,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
                     ],
                   ),
                 ),
-                child: Container(
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(16),
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        Colors.black.withOpacity(0.3),
-                      ],
-                    ),
-                  ),
+                child: Padding(
                   padding: const EdgeInsets.all(16.0),
                   child: Column(
                     mainAxisAlignment: MainAxisAlignment.end,
@@ -343,13 +346,13 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
           activeIndex: _currentCarouselIndex,
           count: _promotionCards.length,
           effect: const ExpandingDotsEffect(
-            dotHeight: 8,
-            dotWidth: 8,
+            dotHeight: 6,
+            dotWidth: 6,
             activeDotColor: AppColors.primary,
             dotColor: Colors.grey,
           ),
         ),
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
       ],
     );
   }
@@ -357,7 +360,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
   // 날짜 선택기
   Widget _buildDateSelector() {
     return Container(
-      height: 95,
+      height: 80, // 높이 줄임
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(
@@ -368,7 +371,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
         itemCount: _dates.length,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 12),
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
         itemBuilder: (context, index) {
           final date = _dates[index];
           final isToday = _isToday(date);
@@ -383,63 +386,59 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
               _onDateSelected(index);
             },
             child: Container(
-              width: 65,
-              margin: const EdgeInsets.symmetric(horizontal: 4),
+              width: 58, // 너비 줄임
+              margin: const EdgeInsets.symmetric(horizontal: 3), // 마진 줄임
               decoration: BoxDecoration(
                 color: isSelected ? AppColors.primary : Colors.white,
-                borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(10), // 라운딩 줄임
                 border: Border.all(
                   color: isToday && !isSelected 
                       ? AppColors.primary 
                       : isSelected 
                           ? AppColors.primary 
                           : Colors.grey.shade300,
-                  width: 1.5,
+                  width: 1, // 테두리 두께 줄임
                 ),
               ),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(vertical: 4.0),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Text(
-                      dayFormat.format(date),
-                      style: TextStyle(
-                        fontSize: 17,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected 
-                            ? Colors.white 
-                            : isToday 
-                                ? AppColors.primary 
-                                : Colors.black,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Text(
+                    dayFormat.format(date),
+                    style: TextStyle(
+                      fontSize: 16, // 폰트 사이즈 줄임
+                      fontWeight: FontWeight.bold,
+                      color: isSelected 
+                          ? Colors.white 
+                          : isToday 
+                              ? AppColors.primary 
+                              : Colors.black,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    weekdayFormat.format(date),
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: isSelected 
+                          ? Colors.white 
+                          : isToday 
+                              ? AppColors.primary 
+                              : Colors.grey,
+                    ),
+                  ),
+                  if (isToday && !isSelected)
+                    Container(
+                      width: 3,
+                      height: 3,
+                      margin: const EdgeInsets.only(top: 2),
+                      decoration: const BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.primary,
                       ),
                     ),
-                    const SizedBox(height: 2),
-                    Text(
-                      weekdayFormat.format(date),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: isSelected 
-                            ? Colors.white 
-                            : isToday 
-                                ? AppColors.primary 
-                                : Colors.grey,
-                      ),
-                    ),
-                    if (isToday && !isSelected)
-                      const SizedBox(height: 2),
-                    if (isToday && !isSelected)
-                      Container(
-                        width: 3,
-                        height: 3,
-                        decoration: const BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: AppColors.primary,
-                        ),
-                      ),
-                  ],
-                ),
+                ],
               ),
             ),
           );

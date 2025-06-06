@@ -60,7 +60,7 @@ class _SplashScreenState extends State<SplashScreen> {
             ),
             const SizedBox(height: 24),
             const Text(
-              'LoL 내전 매니저',
+              '스크림져드',
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.bold,

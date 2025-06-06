@@ -79,6 +79,28 @@ class TournamentModel extends Equatable {
   
   int? get price => tournamentType == TournamentType.competitive ? 20 : null;
   
+  // 호스트 포지션 게터 추가
+  String? get hostPosition {
+    // 실제 호스트 포지션 값 반환
+    if (_hostPosition != null) {
+      return _hostPosition;
+    }
+    
+    // participantsByRole에서 hostId를 가진 참가자의 역할 찾기
+    for (final entry in participantsByRole.entries) {
+      final role = entry.key;
+      final participants = entry.value;
+      if (participants.contains(hostId)) {
+        return role;
+      }
+    }
+    
+    return null;
+  }
+  
+  // 호스트 포지션 저장용 내부 필드
+  final String? _hostPosition;
+  
   const TournamentModel({
     required this.id,
     required this.title,
@@ -112,7 +134,8 @@ class TournamentModel extends Equatable {
     this.customRoomPassword,
     this.referees = const [],
     this.isRefereed = false,
-  });
+    String? hostPosition,
+  }) : _hostPosition = hostPosition;
   
   // 기본 값으로 역할별 슬롯을 생성하는 팩토리 메서드
   factory TournamentModel.withDefaultRoleSlots({
@@ -128,6 +151,7 @@ class TournamentModel extends Equatable {
     required TournamentType tournamentType,
     int? creditCost,
     int? ovrLimit,
+    PlayerTier? tierLimit,
     bool premiumBadge = false,
     required TournamentStatus status,
     required DateTime createdAt,
@@ -144,6 +168,7 @@ class TournamentModel extends Equatable {
     String? customRoomPassword,
     List<String> referees = const [],
     bool isRefereed = false,
+    String? hostPosition,
   }) {
     // 리그 오브 레전드 내전을 위한 기본 슬롯 - 각 라인 2명씩
     final defaultSlotsByRole = <String, int>{
@@ -183,6 +208,7 @@ class TournamentModel extends Equatable {
       tournamentType: tournamentType,
       creditCost: creditCost,
       ovrLimit: ovrLimit,
+      tierLimit: tierLimit,
       premiumBadge: premiumBadge,
       status: status,
       createdAt: createdAt,
@@ -202,6 +228,7 @@ class TournamentModel extends Equatable {
       customRoomPassword: customRoomPassword,
       referees: referees,
       isRefereed: isRefereed || tournamentType == TournamentType.competitive,
+      hostPosition: hostPosition,
     );
   }
   
@@ -209,7 +236,125 @@ class TournamentModel extends Equatable {
   factory TournamentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
     
-    // 롤 내전을 위한 기본 슬롯 - 각 라인 2명씩
+    // 필수 타임스탬프 필드 안전하게 변환
+    Timestamp startsAt;
+    try {
+      if (data['startsAt'] is Timestamp) {
+        startsAt = data['startsAt'] as Timestamp;
+      } else {
+        startsAt = Timestamp.now();
+        print('Warning: Invalid startsAt format for tournament ${doc.id}');
+      }
+    } catch (e) {
+      print('Error parsing startsAt: $e');
+      startsAt = Timestamp.now();
+    }
+    
+    DateTime createdAt;
+    try {
+      if (data['createdAt'] is Timestamp) {
+        createdAt = (data['createdAt'] as Timestamp).toDate();
+      } else {
+        createdAt = DateTime.now();
+        print('Warning: Invalid createdAt format for tournament ${doc.id}');
+      }
+    } catch (e) {
+      print('Error parsing createdAt: $e');
+      createdAt = DateTime.now();
+    }
+    
+    DateTime? updatedAt;
+    if (data['updatedAt'] != null) {
+      try {
+        if (data['updatedAt'] is Timestamp) {
+          updatedAt = (data['updatedAt'] as Timestamp).toDate();
+        }
+      } catch (e) {
+        print('Error parsing updatedAt: $e');
+      }
+    }
+    
+    // Status 안전하게 변환
+    TournamentStatus status;
+    try {
+      if (data['status'] is int) {
+        final statusIndex = data['status'] as int;
+        if (statusIndex >= 0 && statusIndex < TournamentStatus.values.length) {
+          status = TournamentStatus.values[statusIndex];
+        } else {
+          status = TournamentStatus.open;
+        }
+      } else {
+        status = TournamentStatus.open;
+      }
+    } catch (e) {
+      print('Error parsing status: $e');
+      status = TournamentStatus.open;
+    }
+    
+    // GameFormat 안전하게 변환
+    GameFormat gameFormat;
+    try {
+      if (data['gameFormat'] is int) {
+        final formatIndex = data['gameFormat'] as int;
+        if (formatIndex >= 0 && formatIndex < GameFormat.values.length) {
+          gameFormat = GameFormat.values[formatIndex];
+        } else {
+          gameFormat = GameFormat.single;
+        }
+      } else {
+        gameFormat = GameFormat.single;
+      }
+    } catch (e) {
+      print('Error parsing gameFormat: $e');
+      gameFormat = GameFormat.single;
+    }
+    
+    // GameServer 안전하게 변환
+    GameServer gameServer;
+    try {
+      if (data['gameServer'] is int) {
+        final serverIndex = data['gameServer'] as int;
+        if (serverIndex >= 0 && serverIndex < GameServer.values.length) {
+          gameServer = GameServer.values[serverIndex];
+        } else {
+          gameServer = GameServer.kr;
+        }
+      } else {
+        gameServer = GameServer.kr;
+      }
+    } catch (e) {
+      print('Error parsing gameServer: $e');
+      gameServer = GameServer.kr;
+    }
+    
+    // 안전한 Map 변환 함수
+    Map<String, int> getSafeIntMap(String key, Map<String, int> defaultValue) {
+      if (data[key] == null) return defaultValue;
+      try {
+        if (data[key] is Map) {
+          final rawMap = data[key] as Map;
+          final result = <String, int>{};
+          
+          for (final entry in rawMap.entries) {
+            if (entry.value is int) {
+              result[entry.key.toString()] = entry.value as int;
+            } else if (entry.value is num) {
+              result[entry.key.toString()] = (entry.value as num).toInt();
+            } else {
+              result[entry.key.toString()] = 0; // 기본값
+            }
+          }
+          return result;
+        }
+        return defaultValue;
+      } catch (e) {
+        print('Error parsing $key: $e');
+        return defaultValue;
+      }
+    }
+    
+    // 리그 오브 레전드 내전을 위한 기본 슬롯 - 각 라인 2명씩
     final defaultSlotsByRole = <String, int>{
       'top': 2,
       'jungle': 2,
@@ -320,19 +465,27 @@ class TournamentModel extends Equatable {
     
     // 심판 관련 데이터 추출
     List<String> referees = [];
-    if (data['rules'] != null && data['rules']['referees'] is List) {
-      try {
-        referees = (data['rules']['referees'] as List)
-            .map((item) => item.toString())
-            .toList();
-      } catch (e) {
-        print('Error parsing referees: $e');
+    if (data['rules'] != null && data['rules'] is Map<String, dynamic>) {
+      final rulesMap = data['rules'] as Map<String, dynamic>;
+      if (rulesMap.containsKey('referees') && rulesMap['referees'] is List) {
+        try {
+          referees = (rulesMap['referees'] as List)
+              .map((item) => item.toString())
+              .toList();
+        } catch (e) {
+          print('Error parsing referees: $e');
+        }
       }
     }
     
     bool isRefereed = false;
-    if (data['rules'] != null && data['rules']['isRefereed'] is bool) {
-      isRefereed = data['rules']['isRefereed'];
+    if (data['rules'] != null && data['rules'] is Map<String, dynamic>) {
+      final rulesMap = data['rules'] as Map<String, dynamic>;
+      if (rulesMap.containsKey('isRefereed') && rulesMap['isRefereed'] is bool) {
+        isRefereed = rulesMap['isRefereed'];
+      } else {
+        isRefereed = tournamentType == TournamentType.competitive;
+      }
     } else {
       isRefereed = tournamentType == TournamentType.competitive;
     }
@@ -351,58 +504,62 @@ class TournamentModel extends Equatable {
       hostName: data['hostName'] ?? '',
       hostProfileImageUrl: hostProfileImageUrl,
       hostNickname: data['hostNickname'] ?? data['hostName'] ?? '',
-      startsAt: data['startsAt'] as Timestamp,
+      startsAt: startsAt,
       location: data['location'] ?? '',
       tournamentType: tournamentType,
       creditCost: creditCost,
       ovrLimit: data['ovrLimit'],
       tierLimit: tierLimit,
       premiumBadge: data['premiumBadge'] ?? false,
-      status: TournamentStatus.values[data['status'] ?? 0],
-      createdAt: (data['createdAt'] as Timestamp).toDate(),
-      updatedAt: data['updatedAt'] != null ? (data['updatedAt'] as Timestamp).toDate() : null,
-      slots: Map<String, int>.from(data['slots'] ?? {}),
-      filledSlots: Map<String, int>.from(data['filledSlots'] ?? {}),
-      slotsByRole: Map<String, int>.from(data['slotsByRole'] ?? defaultSlotsByRole),
-      filledSlotsByRole: Map<String, int>.from(data['filledSlotsByRole'] ?? defaultFilledSlotsByRole),
+      status: status,
+      createdAt: createdAt,
+      updatedAt: updatedAt,
+      slots: getSafeIntMap('slots', {}),
+      filledSlots: getSafeIntMap('filledSlots', {}),
+      slotsByRole: getSafeIntMap('slotsByRole', defaultSlotsByRole),
+      filledSlotsByRole: getSafeIntMap('filledSlotsByRole', defaultFilledSlotsByRole),
       participants: participants,
       participantsByRole: participantsByRole,
       rules: data['rules'],
       results: data['results'],
       distance: data['distance']?.toDouble(),
-      gameFormat: GameFormat.values[data['gameFormat'] ?? 0],
-      gameServer: GameServer.values[data['gameServer'] ?? 0],
+      gameFormat: gameFormat,
+      gameServer: gameServer,
       customRoomName: data['customRoomName'],
       customRoomPassword: data['customRoomPassword'],
       referees: referees,
       isRefereed: isRefereed,
+      hostPosition: data['hostPosition'],
     );
   }
   
   // Firestore에 저장할 데이터 변환
   Map<String, dynamic> toFirestore() {
-    // 현재 rules 맵에 referees와 isRefereed 추가
+    // 필수 필드 검증
+    if (title.isEmpty) {
+      throw Exception('제목이 비어있습니다');
+    }
+    
+    if (hostId.isEmpty) {
+      throw Exception('호스트 ID가 비어있습니다');
+    }
+    
+    // 현재 rules 맵에 referees와 isRefereed 추가 (안전하게)
     final Map<String, dynamic> updatedRules = Map<String, dynamic>.from(rules ?? {});
     updatedRules['referees'] = referees;
     updatedRules['isRefereed'] = isRefereed;
     
-    return {
+    // 결과 데이터 준비 (null 필드 제외)
+    final result = <String, dynamic>{
       'title': title,
       'description': description,
       'hostId': hostId,
       'hostName': hostName,
-      'hostProfileImageUrl': hostProfileImageUrl,
-      'hostNickname': hostNickname,
       'startsAt': startsAt,
       'location': location,
       'tournamentType': tournamentType.index,
-      'creditCost': creditCost,
-      'ovrLimit': ovrLimit,
-      'tierLimit': tierLimit?.index,
-      'premiumBadge': premiumBadge,
       'status': status.index,
       'createdAt': Timestamp.fromDate(createdAt),
-      'updatedAt': updatedAt != null ? Timestamp.fromDate(updatedAt!) : null,
       'slots': slots,
       'filledSlots': filledSlots,
       'slotsByRole': slotsByRole,
@@ -410,13 +567,25 @@ class TournamentModel extends Equatable {
       'participants': participants,
       'participantsByRole': participantsByRole,
       'rules': updatedRules,
-      'results': results,
-      'distance': distance,
       'gameFormat': gameFormat.index,
       'gameServer': gameServer.index,
-      'customRoomName': customRoomName,
-      'customRoomPassword': customRoomPassword,
+      'premiumBadge': premiumBadge,
     };
+    
+    // 선택적 필드 추가 (null이 아닌 경우만)
+    if (hostProfileImageUrl != null) result['hostProfileImageUrl'] = hostProfileImageUrl;
+    if (hostNickname != null) result['hostNickname'] = hostNickname;
+    if (creditCost != null) result['creditCost'] = creditCost;
+    if (ovrLimit != null) result['ovrLimit'] = ovrLimit;
+    if (tierLimit != null) result['tierLimit'] = tierLimit!.index;
+    if (updatedAt != null) result['updatedAt'] = Timestamp.fromDate(updatedAt!);
+    if (results != null) result['results'] = results;
+    if (distance != null) result['distance'] = distance;
+    if (customRoomName != null) result['customRoomName'] = customRoomName;
+    if (customRoomPassword != null) result['customRoomPassword'] = customRoomPassword;
+    if (_hostPosition != null) result['hostPosition'] = _hostPosition;
+    
+    return result;
   }
   
   // 업데이트된 TournamentModel 생성
@@ -451,6 +620,7 @@ class TournamentModel extends Equatable {
     String? customRoomPassword,
     List<String>? referees,
     bool? isRefereed,
+    String? hostPosition,
   }) {
     return TournamentModel(
       id: id,
@@ -485,6 +655,7 @@ class TournamentModel extends Equatable {
       customRoomPassword: customRoomPassword ?? this.customRoomPassword,
       referees: referees ?? this.referees,
       isRefereed: isRefereed ?? this.isRefereed,
+      hostPosition: hostPosition ?? this._hostPosition,
     );
   }
   
@@ -503,6 +674,40 @@ class TournamentModel extends Equatable {
     final totalSlots = slotsByRole[role] ?? 0;
     final filled = filledSlotsByRole[role] ?? 0;
     return filled < totalSlots && status == TournamentStatus.open;
+  }
+  
+  // 사용자의 티어가 참가 가능 범위인지 확인
+  bool isUserTierEligible(PlayerTier userTier) {
+    // 티어 제한이 없거나 랜덤 멸망전인 경우 모든 티어 참가 가능
+    if (tierLimit == null || tierLimit == PlayerTier.unranked) {
+      return true;
+    }
+    
+    // 티어 범위 규칙 확인 (rules에서 tierRules 가져오기)
+    if (rules != null && rules is Map<String, dynamic>) {
+      final rulesMap = rules!;
+      if (rulesMap.containsKey('tierRules')) {
+        final tierRules = rulesMap['tierRules'];
+        if (tierRules is Map<String, dynamic>) {
+          final minTierIndex = tierRules['minTier'] as int?;
+          final maxTierIndex = tierRules['maxTier'] as int?;
+          
+          if (minTierIndex != null && maxTierIndex != null) {
+            // 티어 인덱스가 허용 범위 내에 있는지 확인
+            final userTierIndex = userTier.index;
+            return userTierIndex >= minTierIndex && userTierIndex <= maxTierIndex;
+          }
+        }
+      }
+    }
+    
+    // 기존 로직: tierLimit 이상 (하위 호환성 유지)
+    if (tierLimit != null) {
+      return userTier.index >= tierLimit!.index;
+    }
+    
+    // 모든 조건을 충족하지 않으면 기본적으로 참가 가능
+    return true;
   }
   
   // 특정 역할에 참가자 추가 가능 여부 확인
@@ -528,6 +733,6 @@ class TournamentModel extends Equatable {
     status, createdAt, updatedAt, slots, filledSlots, slotsByRole, filledSlotsByRole,
     participants, participantsByRole, rules, results, distance, 
     gameFormat, gameServer, customRoomName, customRoomPassword,
-    referees, isRefereed
+    referees, isRefereed, _hostPosition
   ];
 } 

@@ -381,4 +381,18 @@ service cloud.firestore {
 
 ## 연락처
 
-문의사항이 있으시면 [이메일 주소]로 연락주세요. 
+문의사항이 있으시면 [이메일 주소]로 연락주세요.
+
+## 앱 에셋 관리
+
+### 롤 라인 로고
+
+각 라인(포지션)별 로고 이미지는 `assets/images/lanes/` 경로에 저장되어 있습니다:
+- 탑: `lane_top.png`
+- 정글: `lane_jungle.png`
+- 미드: `lane_mid.png`
+- 원딜: `lane_adc.png`
+- 서포터: `lane_support.png`
+
+이 이미지들은 `lib/constants/lol_constants.dart` 파일의 `LolLaneIcons` 클래스에서 참조됩니다.
+`TournamentUIUtils.getRoleIconImage()` 함수를 사용하여 각 역할에 맞는 이미지를 가져올 수 있습니다. 

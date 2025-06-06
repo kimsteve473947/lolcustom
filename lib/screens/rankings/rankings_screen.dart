@@ -81,7 +81,7 @@ class _RankingsScreenState extends State<RankingsScreen> with SingleTickerProvid
       ),
       body: _errorMessage != null
           ? ErrorView(
-              message: _errorMessage!,
+              errorMessage: _errorMessage!,
               onRetry: _loadRankings,
             )
           : _isLoading

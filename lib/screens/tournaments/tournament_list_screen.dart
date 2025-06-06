@@ -361,7 +361,7 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
                   // 무료 내전 탭
                   _errorMessage != null
                     ? ErrorView(
-                        message: _errorMessage!,
+                        errorMessage: _errorMessage!,
                         onRetry: _loadFreeTournaments,
                       )
                     : RefreshIndicator(
@@ -379,7 +379,7 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
                   // 유료 내전 탭
                   _errorMessage != null
                     ? ErrorView(
-                        message: _errorMessage!,
+                        errorMessage: _errorMessage!,
                         onRetry: _loadPaidTournaments,
                       )
                     : RefreshIndicator(

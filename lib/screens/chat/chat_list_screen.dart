@@ -95,7 +95,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       ),
       body: _errorMessage != null
           ? ErrorView(
-              message: _errorMessage!,
+              errorMessage: _errorMessage!,
               onRetry: _loadChatRooms,
             )
           : _isLoading

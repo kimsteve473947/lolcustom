@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 class FirebaseMessagingService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
@@ -28,8 +30,15 @@ class FirebaseMessagingService {
     if (Platform.isIOS) {
       try {
         // APNS 토큰을 먼저 확인
-        await _messaging.getAPNSToken();
-        debugPrint('APNS Token retrieved successfully');
+        String? apnsToken = await _messaging.getAPNSToken();
+        debugPrint('APNS Token retrieved successfully: $apnsToken');
+        
+        // APNS 토큰이 없는 경우 지연 후 다시 시도
+        if (apnsToken == null) {
+          await Future.delayed(const Duration(seconds: 2));
+          apnsToken = await _messaging.getAPNSToken();
+          debugPrint('APNS Token after delay: $apnsToken');
+        }
       } catch (e) {
         debugPrint('Failed to retrieve APNS Token: $e');
       }
@@ -39,6 +48,18 @@ class FirebaseMessagingService {
     try {
       String? token = await _messaging.getToken();
       debugPrint('FCM Token: $token');
+      
+      // 토큰이 없는 경우 지연 후 다시 시도
+      if (token == null) {
+        await Future.delayed(const Duration(seconds: 3));
+        token = await _messaging.getToken();
+        debugPrint('FCM Token after delay: $token');
+      }
+      
+      // 토큰을 Firebase에 저장
+      if (token != null) {
+        await _saveFcmTokenToFirestore(token);
+      }
     } catch (e) {
       debugPrint('Failed to get FCM token: $e');
     }
@@ -52,6 +73,12 @@ class FirebaseMessagingService {
     
     // Set up message handlers
     _setupMessageHandlers();
+    
+    // 토큰 갱신 리스너 설정
+    _messaging.onTokenRefresh.listen((newToken) {
+      debugPrint('FCM Token refreshed: $newToken');
+      _saveFcmTokenToFirestore(newToken);
+    });
   }
   
   // Method to setup local notifications for Android
@@ -211,11 +238,65 @@ class FirebaseMessagingService {
   }
   
   // Method to save FCM token to the database
-  Future<void> saveFcmToken(String userId) async {
-    final token = await _messaging.getToken();
-    if (token != null) {
-      // TODO: Save token to Firestore
-      debugPrint('Saving FCM token for user: $userId');
+  Future<void> _saveFcmTokenToFirestore(String token) async {
+    try {
+      final currentUser = FirebaseAuth.instance.currentUser;
+      if (currentUser == null) {
+        debugPrint('Cannot save FCM token: No user logged in');
+        return;
+      }
+      
+      final userId = currentUser.uid;
+      final tokenData = {
+        'token': token,
+        'device': Platform.isIOS ? 'iOS' : 'Android',
+        'createdAt': FieldValue.serverTimestamp(),
+        'updatedAt': FieldValue.serverTimestamp(),
+        'appVersion': '1.0.0', // 앱 버전 정보 (나중에 동적으로 가져올 수 있음)
+      };
+      
+      // 사용자 문서에 토큰 업데이트
+      try {
+        await FirebaseFirestore.instance
+            .collection('users')
+            .doc(userId)
+            .update({
+          'fcmTokens': FieldValue.arrayUnion([token]),
+          'lastActiveAt': FieldValue.serverTimestamp(),
+        });
+      } catch (e) {
+        // 사용자 문서가 없는 경우 새로 생성
+        if (e is FirebaseException && e.code == 'not-found') {
+          await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .set({
+            'uid': userId,
+            'email': currentUser.email ?? '',
+            'nickname': currentUser.displayName ?? 'User${userId.substring(0, 4)}',
+            'fcmTokens': [token],
+            'joinedAt': FieldValue.serverTimestamp(),
+            'lastActiveAt': FieldValue.serverTimestamp(),
+            'isPremium': false,
+          }, SetOptions(merge: true));
+          debugPrint('Created new user document with FCM token');
+        } else {
+          debugPrint('Error updating user with FCM token: $e');
+          return;
+        }
+      }
+      
+      // 토큰 컬렉션에 토큰 정보 저장 (기기별 관리를 위해)
+      await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .collection('tokens')
+          .doc(token)
+          .set(tokenData, SetOptions(merge: true));
+      
+      debugPrint('FCM token saved successfully for user: $userId');
+    } catch (e) {
+      debugPrint('Error saving FCM token: $e');
     }
   }
 } 

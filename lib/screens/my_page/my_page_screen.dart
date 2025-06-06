@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
-import 'package:lol_custom_game_manager/providers/auth_provider.dart';
+import 'package:lol_custom_game_manager/providers/auth_provider.dart' as CustomAuth;
+import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
@@ -13,10 +14,46 @@ class MyPageScreen extends StatefulWidget {
 
 class _MyPageScreenState extends State<MyPageScreen> {
   @override
+  void initState() {
+    super.initState();
+    // 화면이 처음 로드될 때 사용자 정보 동기화
+    _syncUserData();
+  }
+  
+  // 사용자 데이터 동기화 메서드
+  Future<void> _syncUserData() async {
+    final appStateProvider = Provider.of<AppStateProvider>(context, listen: false);
+    try {
+      await appStateProvider.syncCurrentUser();
+      debugPrint('MyPageScreen - 사용자 데이터 동기화 완료');
+    } catch (e) {
+      debugPrint('MyPageScreen - 사용자 데이터 동기화 오류: $e');
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
-    final authProvider = Provider.of<AuthProvider>(context);
+    final authProvider = Provider.of<CustomAuth.AuthProvider>(context);
+    final appStateProvider = Provider.of<AppStateProvider>(context);
     final isLoggedIn = authProvider.isLoggedIn;
     final user = authProvider.user;
+    final currentUser = appStateProvider.currentUser;
+    
+    // 디버깅 정보 출력
+    debugPrint('MyPageScreen - authProvider.user: ${user?.nickname} (${user?.uid})');
+    debugPrint('MyPageScreen - appStateProvider.currentUser: ${currentUser?.nickname} (${currentUser?.uid})');
+    
+    String displayName = 'Unknown User';
+    String userId = 'No ID';
+    
+    // 사용자 정보 소스 결정 (우선순위: authProvider > appStateProvider > 기본값)
+    if (user != null) {
+      displayName = '${user.nickname} (Auth)';
+      userId = user.uid;
+    } else if (currentUser != null) {
+      displayName = '${currentUser.nickname} (State)';
+      userId = currentUser.uid;
+    }
 
     return Scaffold(
       appBar: AppBar(
@@ -32,199 +69,243 @@ class _MyPageScreenState extends State<MyPageScreen> {
           ),
         ],
       ),
-      body: isLoggedIn && user != null
+      body: isLoggedIn
           ? ListView(
+              padding: const EdgeInsets.all(16),
               children: [
-                // 프로필 정보
-                Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                  ),
-                  child: Column(
-                    children: [
-                      CircleAvatar(
-                        radius: 40,
-                        backgroundColor: AppColors.primary,
-                        child: Text(
-                          user.nickname.isNotEmpty
-                              ? user.nickname.substring(0, 1).toUpperCase()
-                              : '?',
-                          style: const TextStyle(
-                            fontSize: 32,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        user.nickname,
-                        style: const TextStyle(
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        user.email,
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey.shade700,
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-                      OutlinedButton(
-                        onPressed: () {
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            const SnackBar(content: Text('프로필 수정 페이지로 이동합니다')),
-                          );
-                        },
-                        child: const Text('프로필 수정'),
-                      ),
-                    ],
+                // 사용자 프로필 정보
+                _buildProfileSection(displayName, userId),
+                
+                const SizedBox(height: 24),
+                const Divider(),
+                
+                // 내 활동 섹션
+                _buildActivitySection(),
+                
+                // 관리자 도구 섹션
+                const SizedBox(height: 24),
+                const Divider(),
+                const SizedBox(height: 16),
+                const Text(
+                  '개발자 도구',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
                   ),
                 ),
-                // 메뉴 항목들
                 const SizedBox(height: 16),
-                _buildMenuSection('활동 내역'),
-                _buildMenuItem(
-                  icon: Icons.calendar_today,
-                  title: '내가 주최한 내전',
-                  onTap: () {},
-                ),
-                _buildMenuItem(
-                  icon: Icons.groups,
-                  title: '내가 참여한 내전',
-                  onTap: () {},
-                ),
-                _buildMenuItem(
-                  icon: Icons.person_search,
-                  title: '용병 활동 내역',
-                  onTap: () {},
-                ),
-                const SizedBox(height: 16),
-                _buildMenuSection('계정 관리'),
-                _buildMenuItem(
-                  icon: Icons.notifications,
-                  title: '알림 설정',
-                  onTap: () {},
-                ),
-                _buildMenuItem(
-                  icon: Icons.logout,
-                  title: '로그아웃',
+                ListTile(
+                  leading: const Icon(Icons.admin_panel_settings),
+                  title: const Text('관리자 도구'),
+                  subtitle: const Text('개발자용 특수 기능'),
                   onTap: () {
-                    _showLogoutDialog(context);
+                    context.push('/admin');
                   },
+                  tileColor: Colors.grey.shade100,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
+                  leading: const Icon(Icons.sync_problem, color: Colors.orange),
+                  title: const Text('사용자 데이터 초기화'),
+                  subtitle: const Text('로그인 문제 해결을 위한 도구'),
+                  onTap: () async {
+                    // 데이터 초기화 확인 다이얼로그
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('사용자 데이터 초기화'),
+                        content: const Text(
+                          '현재 로그인 정보를 초기화합니다. 로그인이 제대로 되지 않는 경우에만 사용하세요. 계속하시겠습니까?'
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('취소'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: const Text('초기화'),
+                            style: TextButton.styleFrom(
+                              foregroundColor: Colors.red,
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                    
+                    if (confirm == true) {
+                      final success = await appStateProvider.resetUserData();
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(success 
+                              ? '사용자 데이터가 초기화되었습니다. 다시 로그인해주세요.'
+                              : '초기화 중 오류가 발생했습니다: ${appStateProvider.errorMessage}'),
+                            backgroundColor: success ? Colors.green : Colors.red,
+                          ),
+                        );
+                        
+                        if (success) {
+                          // 로그아웃 후 로그인 화면으로 이동
+                          await authProvider.signOut();
+                          if (context.mounted) {
+                            context.go('/login');
+                          }
+                        }
+                      }
+                    }
+                  },
+                  tileColor: Colors.orange.shade50,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                
+                // 로그아웃 버튼
+                const SizedBox(height: 32),
+                ElevatedButton.icon(
+                  onPressed: () async {
+                    // 로그아웃 확인 다이얼로그
+                    final confirm = await showDialog<bool>(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('로그아웃'),
+                        content: const Text('정말 로그아웃 하시겠습니까?'),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: const Text('취소'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: const Text('로그아웃'),
+                          ),
+                        ],
+                      ),
+                    );
+                    
+                    if (confirm == true) {
+                      await authProvider.signOut();
+                      if (context.mounted) {
+                        context.go('/login');
+                      }
+                    }
+                  },
+                  icon: const Icon(Icons.exit_to_app, color: Colors.red),
+                  label: const Text('로그아웃', style: TextStyle(color: Colors.red)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: Colors.red,
+                    side: const BorderSide(color: Colors.red),
+                    minimumSize: const Size(double.infinity, 48),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                  ),
                 ),
               ],
             )
-          : _buildLoginView(),
+          : Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text('로그인이 필요합니다'),
+                  const SizedBox(height: 16),
+                  ElevatedButton(
+                    onPressed: () => context.go('/login'),
+                    child: const Text('로그인하기'),
+                  ),
+                ],
+              ),
+            ),
     );
   }
-
-  Widget _buildLoginView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.account_circle,
-            size: 80,
-            color: Colors.grey.shade400,
-          ),
-          const SizedBox(height: 24),
-          const Text(
-            '로그인이 필요합니다',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '로그인하여 내전 관리 및 용병 활동을\n시작해보세요',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              fontSize: 14,
-              color: Colors.grey.shade600,
-            ),
-          ),
-          const SizedBox(height: 32),
-          ElevatedButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('로그인 페이지로 이동합니다')),
-              );
-            },
-            child: const Text('로그인하기'),
-          ),
-          const SizedBox(height: 16),
-          TextButton(
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('회원가입 페이지로 이동합니다')),
-              );
-            },
-            child: const Text('아직 계정이 없으신가요? 회원가입'),
-          ),
-        ],
+  
+  Widget _buildProfileSection(String username, String userId) {
+    return Card(
+      elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
       ),
-    );
-  }
-
-  Widget _buildMenuSection(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      child: Text(
-        title,
-        style: const TextStyle(
-          fontSize: 18,
-          fontWeight: FontWeight.bold,
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          children: [
+            const CircleAvatar(
+              radius: 40,
+              backgroundImage: AssetImage('assets/images/profile_placeholder.png'),
+            ),
+            const SizedBox(height: 16),
+            Text(
+              username,
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              userId,
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.normal,
+              ),
+            ),
+            const SizedBox(height: 8),
+            ElevatedButton(
+              onPressed: () {
+                // 프로필 편집
+              },
+              child: const Text('프로필 편집'),
+            ),
+          ],
         ),
       ),
     );
   }
-
-  Widget _buildMenuItem({
-    required IconData icon,
-    required String title,
-    required VoidCallback onTap,
-    String? subtitle,
-  }) {
-    return ListTile(
-      leading: Icon(icon, color: AppColors.primary),
-      title: Text(title),
-      subtitle: subtitle != null ? Text(subtitle) : null,
-      trailing: const Icon(Icons.arrow_forward_ios, size: 16),
-      onTap: onTap,
-    );
-  }
-
-  void _showLogoutDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('로그아웃'),
-        content: const Text('정말 로그아웃 하시겠습니까?'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('취소'),
+  
+  Widget _buildActivitySection() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const SizedBox(height: 16),
+        const Text(
+          '내 활동',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.bold,
+            color: AppColors.primary,
           ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await Provider.of<AuthProvider>(context, listen: false).signOut();
-              // 로그아웃 후 로그인 페이지로 이동
-              if (context.mounted) {
-                context.go('/login');
-              }
-            },
-            child: const Text('로그아웃'),
+        ),
+        const SizedBox(height: 16),
+        ListTile(
+          leading: const Icon(Icons.history),
+          title: const Text('참여한 내전'),
+          onTap: () {
+            // 참여한 내전 목록으로 이동
+          },
+          tileColor: Colors.grey.shade100,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(height: 8),
+        ListTile(
+          leading: const Icon(Icons.event),
+          title: const Text('내가 생성한 내전'),
+          onTap: () {
+            // 내가 생성한 내전 목록으로 이동
+          },
+          tileColor: Colors.grey.shade100,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+          ),
+        ),
+      ],
     );
   }
 } 

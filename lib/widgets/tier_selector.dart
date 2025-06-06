@@ -1,12 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/models/user_model.dart';
+import 'package:lol_custom_game_manager/utils/image_utils.dart';
 
 class TierSelector extends StatefulWidget {
   final PlayerTier? initialTier;
   final ValueChanged<PlayerTier> onTierChanged;
   final String title;
   final String subtitle;
+  final ValueChanged<String>? onTitleGenerated;
 
   const TierSelector({
     Key? key,
@@ -14,6 +16,7 @@ class TierSelector extends StatefulWidget {
     required this.onTierChanged,
     this.title = '티어 선택',
     this.subtitle = '참가자 제한 티어를 선택하세요',
+    this.onTitleGenerated,
   }) : super(key: key);
 
   @override
@@ -27,6 +30,15 @@ class _TierSelectorState extends State<TierSelector> {
   void initState() {
     super.initState();
     _selectedTier = widget.initialTier ?? PlayerTier.unranked;
+    
+    // 초기값에 대한 제목 생성 및 콜백 호출
+    // initState에서 직접 콜백 호출 대신 마이크로태스크 큐에 추가
+    if (widget.onTitleGenerated != null) {
+      // 다음 프레임에서 실행되도록 스케줄링
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        _generateTitle(_selectedTier);
+      });
+    }
   }
   
   final Map<PlayerTier, Color> _tierColors = {
@@ -35,6 +47,7 @@ class _TierSelectorState extends State<TierSelector> {
     PlayerTier.silver: const Color(0xFFC0C0C0),
     PlayerTier.gold: const Color(0xFFFFD700),
     PlayerTier.platinum: const Color(0xFF89CFF0),
+    PlayerTier.emerald: const Color(0xFF50C878),
     PlayerTier.diamond: const Color(0xFFB9F2FF),
     PlayerTier.master: const Color(0xFF9370DB),
     PlayerTier.grandmaster: const Color(0xFFFF4500),
@@ -48,11 +61,12 @@ class _TierSelectorState extends State<TierSelector> {
     PlayerTier.silver: '실버',
     PlayerTier.gold: '골드',
     PlayerTier.platinum: '플래티넘',
+    PlayerTier.emerald: '에메랄드',
     PlayerTier.diamond: '다이아몬드',
     PlayerTier.master: '마스터',
     PlayerTier.grandmaster: '그랜드마스터',
     PlayerTier.challenger: '챌린저',
-    PlayerTier.unranked: '제한 없음',
+    PlayerTier.unranked: '랜덤 멸망전',
   };
   
   final Map<PlayerTier, IconData> _tierIcons = {
@@ -61,18 +75,73 @@ class _TierSelectorState extends State<TierSelector> {
     PlayerTier.silver: Icons.filter_tilt_shift,
     PlayerTier.gold: Icons.star,
     PlayerTier.platinum: Icons.auto_awesome,
+    PlayerTier.emerald: Icons.spa,
     PlayerTier.diamond: Icons.diamond,
     PlayerTier.master: Icons.workspace_premium,
     PlayerTier.grandmaster: Icons.military_tech,
     PlayerTier.challenger: Icons.emoji_events,
-    PlayerTier.unranked: Icons.remove_circle_outline,
+    PlayerTier.unranked: Icons.shuffle,
   };
   
+  // 선택한 티어에 따라 제목을 생성하는 메서드
+  void _generateTitle(PlayerTier tier) {
+    if (tier == PlayerTier.unranked) {
+      widget.onTitleGenerated?.call('랜덤 멸망전');
+    } else {
+      final tierName = _tierNames[tier] ?? '알 수 없음';
+      
+      // 마스터인 경우 "마스터~챌린저 내전"으로 표시
+      if (tier == PlayerTier.master) {
+        widget.onTitleGenerated?.call('$tierName~챌린저 내전');
+        return;
+      }
+      
+      // 다음 티어 찾기
+      final nextTierIndex = tier.index + 1;
+      if (nextTierIndex < PlayerTier.values.length) {
+        final nextTier = PlayerTier.values[nextTierIndex];
+        final nextTierName = _tierNames[nextTier] ?? '알 수 없음';
+        widget.onTitleGenerated?.call('$tierName~$nextTierName 내전');
+      } else {
+        widget.onTitleGenerated?.call('$tierName 내전');
+      }
+    }
+  }
+  
   void _selectTier(PlayerTier tier) {
+    if (_selectedTier == tier) return; // 같은 티어 재선택 방지
+    
     setState(() {
       _selectedTier = tier;
     });
     widget.onTierChanged(tier);
+    
+    // 티어 선택 시 제목 생성 및 콜백 호출
+    if (widget.onTitleGenerated != null) {
+      _generateTitle(tier);
+    }
+  }
+  
+  // 티어 이름에 따라 참가 가능 범위 반환
+  String _getTierRangeText(PlayerTier tier) {
+    if (tier == PlayerTier.unranked) {
+      return '모든 티어 참가 가능';
+    }
+    
+    // 마스터인 경우 마스터~챌린저 참가 가능으로 표시
+    if (tier == PlayerTier.master) {
+      return '${_tierNames[tier]} ~ 챌린저 참가 가능';
+    }
+    
+    // 티어 순서를 기준으로 다음 티어 찾기
+    final tierIndex = tier.index;
+    if (tierIndex >= PlayerTier.values.length - 1) {
+      // 최상위 티어인 경우 해당 티어만 참가 가능
+      return '${_tierNames[tier]} 참가 가능';
+    } else {
+      final nextTier = PlayerTier.values[tierIndex + 1];
+      return '${_tierNames[tier]} ~ ${_tierNames[nextTier]} 참가 가능';
+    }
   }
   
   @override
@@ -112,10 +181,9 @@ class _TierSelectorState extends State<TierSelector> {
               _buildTierItem(PlayerTier.silver),
               _buildTierItem(PlayerTier.gold),
               _buildTierItem(PlayerTier.platinum),
+              _buildTierItem(PlayerTier.emerald),
               _buildTierItem(PlayerTier.diamond),
               _buildTierItem(PlayerTier.master),
-              _buildTierItem(PlayerTier.grandmaster),
-              _buildTierItem(PlayerTier.challenger),
             ],
           ),
         ),
@@ -128,7 +196,7 @@ class _TierSelectorState extends State<TierSelector> {
             borderRadius: BorderRadius.circular(8),
           ),
           child: Text(
-            '${_tierNames[_selectedTier]} 이상 참가 가능',
+            _getTierRangeText(_selectedTier),
             style: const TextStyle(
               fontWeight: FontWeight.bold,
               color: AppColors.primary,
@@ -144,7 +212,6 @@ class _TierSelectorState extends State<TierSelector> {
     final isSelected = _selectedTier == tier;
     final color = _tierColors[tier] ?? Colors.grey;
     final name = _tierNames[tier] ?? '알 수 없음';
-    final icon = _tierIcons[tier] ?? Icons.question_mark;
     
     return GestureDetector(
       onTap: () => _selectTier(tier),
@@ -162,11 +229,37 @@ class _TierSelectorState extends State<TierSelector> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              icon,
-              color: color,
-              size: 32,
-            ),
+            if (tier == PlayerTier.unranked)
+              Icon(
+                Icons.shuffle,
+                color: color,
+                size: 32,
+              )
+            else
+              Container(
+                height: 40,
+                width: 40,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  boxShadow: isSelected
+                      ? [
+                          BoxShadow(
+                            color: color.withOpacity(0.3),
+                            blurRadius: 8,
+                            spreadRadius: 2,
+                          )
+                        ]
+                      : [],
+                ),
+                child: ClipOval(
+                  child: Image.asset(
+                    ImageUtils.getTierLogoPath(tier),
+                    height: 40,
+                    width: 40,
+                    fit: BoxFit.cover,
+                  ),
+                ),
+              ),
             const SizedBox(height: 8),
             Text(
               name,

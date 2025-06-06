@@ -9,9 +9,12 @@ import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:lol_custom_game_manager/widgets/error_view.dart';
 import 'package:lol_custom_game_manager/utils/image_utils.dart';
+import 'package:lol_custom_game_manager/utils/tournament_ui_utils.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lol_custom_game_manager/screens/main_screen.dart';
+import 'package:lol_custom_game_manager/constants/lol_constants.dart';
+import 'package:lol_custom_game_manager/widgets/lane_icon_widget.dart';
 
 class TournamentDetailScreen extends StatefulWidget {
   final String tournamentId;
@@ -356,159 +359,42 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                 },
               ),
             ),
+          if (_isUserHost() && _tournament != null)
+            IconButton(
+              icon: const Icon(Icons.delete),
+              tooltip: '내전 취소',
+              onPressed: _deleteTournament,
+            ),
         ],
       ),
       body: SafeArea(
         child: _errorMessage != null
           ? ErrorView(
-              message: _errorMessage!,
+              errorMessage: _errorMessage!,
               onRetry: _loadTournament,
             )
           : _isLoading && _tournament == null
               ? const LoadingIndicator()
               : _tournament == null
                   ? const Center(child: Text('내전 정보를 불러올 수 없습니다'))
-                  : _buildTournamentDetails(),
+                  : _buildContent(),
       ),
       bottomNavigationBar: _tournament != null && !_isUserHost() && _tournament!.status == TournamentStatus.open
-          ? Container(
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(24),
-                  topRight: Radius.circular(24),
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.1),
-                    blurRadius: 10,
-                    offset: const Offset(0, -5),
-                  ),
-                ],
-              ),
-              padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: _getRoleColor(_selectedRole).withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: _getRoleColor(_selectedRole).withOpacity(0.3),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.grey.shade100,
-                          offset: const Offset(0, 2),
-                          blurRadius: 4,
-                        ),
-                      ],
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(
-                          _getRoleIcon(_selectedRole),
-                          color: _getRoleColor(_selectedRole),
-                          size: 24,
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          hasApplied 
-                              ? '${_getRoleName(_selectedRole)} 역할로 참가 중'
-                              : '선택한 포지션: ${_getRoleName(_selectedRole)}',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: _getRoleColor(_selectedRole),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  ElevatedButton(
-                    onPressed: _isLoading 
-                        ? null 
-                        : hasApplied
-                            ? () {
-                                final application = _applications.firstWhere(
-                                  (app) => app.userUid == appState.currentUser!.uid && 
-                                    app.status != ApplicationStatus.cancelled && 
-                                    app.status != ApplicationStatus.rejected,
-                                  orElse: () => ApplicationModel(
-                                    id: '',
-                                    tournamentId: _tournament!.id,
-                                    userUid: appState.currentUser!.uid,
-                                    userName: appState.currentUser!.nickname ?? '알 수 없음',
-                                    role: _selectedRole,
-                                    message: '',
-                                    status: ApplicationStatus.pending,
-                                    appliedAt: Timestamp.now(),
-                                  ),
-                                );
-                                _cancelRegistration(application.role);
-                              }
-                            : _applyToTournament,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: hasApplied ? AppColors.error : _getRoleColor(_selectedRole),
-                      foregroundColor: Colors.white,
-                      minimumSize: const Size(double.infinity, 56),
-                      disabledBackgroundColor: Colors.grey.shade400,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      elevation: 0,
-                    ),
-                    child: _isLoading
-                        ? const SizedBox(
-                            height: 24,
-                            width: 24,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                            ),
-                          )
-                        : Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                hasApplied ? Icons.cancel_outlined : _getRoleIcon(_selectedRole),
-                                size: 20,
-                              ),
-                              const SizedBox(width: 8),
-                              Text(
-                                hasApplied
-                                    ? '참가 취소하기'
-                                    : '${_getRoleName(_selectedRole)} 역할로 신청하기', 
-                                style: const TextStyle(
-                                  fontSize: 18, 
-                                  fontWeight: FontWeight.bold
-                                ),
-                              ),
-                            ],
-                          ),
-                  ),
-                ],
-              ),
-            )
+          ? _buildParticipationButtons()  // 참가 버튼 표시 위젯을 호출
           : null,
     );
   }
   
   bool _isUserHost() {
     final appState = Provider.of<AppStateProvider>(context, listen: false);
-    return appState.currentUser != null && 
-           _tournament != null && 
-           appState.currentUser!.uid == _tournament!.hostUid;
+    final currentUserId = appState.currentUser?.uid;
+    
+    return _tournament != null && 
+           currentUserId != null &&
+           _tournament!.hostId == currentUserId;
   }
   
-  Widget _buildTournamentDetails() {
-    if (_tournament == null) return const SizedBox.shrink();
-    
+  Widget _buildContent() {
     return FadeTransition(
       opacity: _fadeAnimation,
       child: CustomScrollView(
@@ -606,139 +492,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   // Time and date card
-                  Card(
-                    elevation: 0,
-                    margin: const EdgeInsets.only(bottom: 20),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: Colors.grey.shade200),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.calendar_today,
-                                  size: 20,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                DateFormat('yyyy년 M월 d일 (E)', 'ko_KR').format(_tournament!.startsAt.toDate()),
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.access_time,
-                                  size: 20,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                DateFormat('HH:mm').format(_tournament!.startsAt.toDate()),
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 12),
-                          Row(
-                            children: [
-                              Container(
-                                padding: const EdgeInsets.all(10),
-                                decoration: BoxDecoration(
-                                  color: AppColors.primary.withOpacity(0.1),
-                                  shape: BoxShape.circle,
-                                ),
-                                child: const Icon(
-                                  Icons.people,
-                                  size: 20,
-                                  color: AppColors.primary,
-                                ),
-                              ),
-                              const SizedBox(width: 12),
-                              Text(
-                                '총 참가 인원: ${_tournament!.participants.length}/${_calculateTotalSlots()}명',
-                                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                              ),
-                            ],
-                          ),
-                          if (_tournament!.tournamentType == TournamentType.competitive) ...[
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.warning.withOpacity(0.1),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.monetization_on,
-                                    size: 20,
-                                    color: AppColors.warning,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                const Text(
-                                  '참가 비용: 20 크레딧',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                    color: AppColors.warning,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                          if (_tournament!.ovrLimit != null) ...[
-                            const SizedBox(height: 12),
-                            Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(10),
-                                  decoration: BoxDecoration(
-                                    color: AppColors.primary.withOpacity(0.1),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: const Icon(
-                                    Icons.fitness_center,
-                                    size: 20,
-                                    color: AppColors.primary,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Text(
-                                  '제한 OVR: ${_tournament!.ovrLimit}+',
-                                  style: const TextStyle(fontSize: 16),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
-                      ),
-                    ),
-                  ),
+                  _buildDateTimeCard(),
                   
                   // Description
                   if (_tournament!.description != null && _tournament!.description!.isNotEmpty) ...[
@@ -775,12 +529,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                     const SizedBox(height: 24),
                   ],
                   
-                  // Roles list
+                  // 포지션별 참가 현황 및 참가자 목록 (통합된 UI)
                   _buildRolesList(),
-                  const SizedBox(height: 24),
-                  
-                  // Players list
-                  _buildPlayersList(),
                   const SizedBox(height: 24),
                   
                   // Host info
@@ -1004,17 +754,17 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
   }
   
   Widget _buildRolesList() {
-    // Define role data
+    // Define role data in the correct order
     final roles = [
-      {'name': 'Top', 'icon': Icons.arrow_upward, 'color': AppColors.roleTop, 'key': 'top'},
-      {'name': 'Jungle', 'icon': Icons.nature_people, 'color': AppColors.roleJungle, 'key': 'jungle'},
-      {'name': 'Mid', 'icon': Icons.adjust, 'color': AppColors.roleMid, 'key': 'mid'},
-      {'name': 'ADC', 'icon': Icons.gps_fixed, 'color': AppColors.roleAdc, 'key': 'adc'},
-      {'name': 'Support', 'icon': Icons.shield, 'color': AppColors.roleSupport, 'key': 'support'},
+      {'name': '탑', 'key': 'top'},
+      {'name': '정글', 'key': 'jungle'},
+      {'name': '미드', 'key': 'mid'},
+      {'name': '원딜', 'key': 'adc'},
+      {'name': '서폿', 'key': 'support'},
     ];
     
     return Card(
-      elevation: 0,
+      elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: Colors.grey.shade200),
@@ -1027,7 +777,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
             Row(
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildSectionTitle('포지션별 참가 현황'),
+                _buildSectionTitle('포지션별 참가 현황', useOrange: true),
                 const SizedBox(width: 8),
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
@@ -1041,7 +791,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                   ),
                   child: Text(
                     '${_tournament!.participants.length}/${_calculateTotalSlots()}명',
-                    style: const TextStyle(
+                    style: TextStyle(
                       fontSize: 14,
                       fontWeight: FontWeight.bold,
                       color: AppColors.primary,
@@ -1050,158 +800,212 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                 ),
               ],
             ),
-            const SizedBox(height: 20),
+            const SizedBox(height: 16),
             
-            // 역할별 상태 표시 막대그래프
-            ...roles.map((role) {
-              final key = role['key'] as String;
-              final filled = _tournament!.filledSlotsByRole[key] ?? 0;
-              final total = _tournament!.slotsByRole[key] ?? 2;
-              final progress = total > 0 ? filled / total : 0.0;
-              
-              return Padding(
-                padding: const EdgeInsets.only(bottom: 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Container(
-                          width: 36,
-                          height: 36,
-                          decoration: BoxDecoration(
-                            color: (role['color'] as Color).withOpacity(0.1),
-                            shape: BoxShape.circle,
-                            border: Border.all(
-                              color: (role['color'] as Color).withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Icon(
-                            role['icon'] as IconData,
-                            color: role['color'] as Color,
-                            size: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          '${role['name']}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 16,
-                          ),
-                        ),
-                        const Spacer(),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: filled == total 
-                                ? AppColors.success.withOpacity(0.1)
-                                : (role['color'] as Color).withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(12),
-                            border: Border.all(
-                              color: filled == total 
-                                  ? AppColors.success.withOpacity(0.3)
-                                  : (role['color'] as Color).withOpacity(0.3),
-                              width: 1,
-                            ),
-                          ),
-                          child: Text(
-                            '$filled/$total',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: filled == total ? AppColors.success : (role['color'] as Color),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 8),
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(6),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        backgroundColor: Colors.grey.shade200,
-                        color: role['color'] as Color,
-                        minHeight: 10,
-                      ),
-                    ),
-                    if (_tournament!.participantsByRole[key]?.isNotEmpty == true) ...[
-                      const SizedBox(height: 8),
-                      Wrap(
-                        spacing: 6,
-                        runSpacing: 6,
-                        children: _tournament!.participantsByRole[key]!.map((userId) {
-                          // 참가자 닉네임 찾기
-                          final app = _applications.firstWhere(
-                            (app) => app.userUid == userId && app.role == key,
-                            orElse: () => ApplicationModel(
-                              id: '',
-                              tournamentId: _tournament!.id,
-                              userUid: userId,
-                              userName: '참가자',
-                              role: key,
-                              message: '',
-                              status: ApplicationStatus.accepted,
-                              appliedAt: Timestamp.now(),
-                            ),
-                          );
-                          
-                          return Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(
-                              color: (role['color'] as Color).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(
-                                color: (role['color'] as Color).withOpacity(0.3),
-                                width: 1,
-                              ),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.grey.shade100,
-                                  offset: const Offset(0, 1),
-                                  blurRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                if (app.userProfileImageUrl != null) ...[
-                                  ImageUtils.safeCircleAvatar(
-                                    imageUrl: app.userProfileImageUrl,
-                                    radius: 12,
-                                  ),
-                                  const SizedBox(width: 6),
-                                ],
-                                Text(
-                                  app.userName,
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    fontWeight: FontWeight.w500,
-                                    color: role['color'] as Color,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          );
-                        }).toList(),
+            // 포지션별 참가 현황을 세로로 배치 - 새로운 디자인
+            Column(
+              children: roles.map((role) {
+                final key = role['key'] as String;
+                final filled = _tournament!.filledSlotsByRole[key] ?? 0;
+                final total = _tournament!.slotsByRole[key] ?? 2;
+                final progress = total > 0 ? filled / total : 0.0;
+                final isFull = filled >= total;
+                
+                // 해당 포지션의 참가자 목록 가져오기
+                final participants = _tournament!.participantsByRole[key] ?? [];
+                final applications = _applications.where((app) => 
+                  app.role == key && app.status == ApplicationStatus.accepted).toList();
+                
+                // 역할별 색상 가져오기
+                Color getRoleColor() {
+                  switch (key) {
+                    case 'top': return const Color(0xFFE74C3C);
+                    case 'jungle': return const Color(0xFF27AE60);
+                    case 'mid': return const Color(0xFF3498DB);
+                    case 'adc': return const Color(0xFFF39C12);
+                    case 'support': return const Color(0xFF9B59B6);
+                    default: return AppColors.primary;
+                  }
+                }
+                
+                final roleColor = getRoleColor();
+                
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 12),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: roleColor.withOpacity(0.3)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.grey.shade100,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
                       ),
                     ],
-                  ],
-                ),
-              );
-            }).toList(),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // 헤더 - 포지션 정보와 참가 현황
+                      Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        decoration: BoxDecoration(
+                          color: roleColor.withOpacity(0.1),
+                          borderRadius: const BorderRadius.only(
+                            topLeft: Radius.circular(12),
+                            topRight: Radius.circular(12),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            // 포지션 아이콘
+                            Container(
+                              width: 36,
+                              height: 36,
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                shape: BoxShape.circle,
+                                border: Border.all(
+                                  color: roleColor,
+                                  width: 1,
+                                ),
+                              ),
+                              child: Center(
+                                child: LaneIconWidget(
+                                  lane: key,
+                                  size: 24,
+                                ),
+                              ),
+                            ),
+                            const SizedBox(width: 12),
+                            // 포지션 이름
+                            Text(
+                              role['name'] as String,
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: roleColor,
+                              ),
+                            ),
+                            const Spacer(),
+                            // 참가 인원
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(12),
+                                border: Border.all(color: roleColor),
+                              ),
+                              child: Text(
+                                '$filled/$total',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                  color: roleColor,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      
+                      // 참가자 목록
+                      if (participants.isNotEmpty)
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              // 참가자 목록 헤더
+                              Row(
+                                children: [
+                                  Icon(Icons.people, size: 16, color: Colors.grey.shade600),
+                                  const SizedBox(width: 6),
+                                  Text(
+                                    '참가자',
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.w500,
+                                      color: Colors.grey.shade600,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              const SizedBox(height: 8),
+                              // 참가자 목록
+                              Wrap(
+                                spacing: 8,
+                                runSpacing: 8,
+                                children: applications.map((app) {
+                                  return Container(
+                                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                                    decoration: BoxDecoration(
+                                      color: roleColor.withOpacity(0.1),
+                                      borderRadius: BorderRadius.circular(16),
+                                      border: Border.all(
+                                        color: roleColor.withOpacity(0.3),
+                                        width: 1,
+                                      ),
+                                    ),
+                                    child: Row(
+                                      mainAxisSize: MainAxisSize.min,
+                                      children: [
+                                        ImageUtils.safeCircleAvatar(
+                                          imageUrl: app.userProfileImageUrl,
+                                          radius: 14,
+                                          backgroundColor: roleColor.withOpacity(0.1),
+                                        ),
+                                        const SizedBox(width: 6),
+                                        Text(
+                                          app.userName,
+                                          style: TextStyle(
+                                            fontSize: 13,
+                                            fontWeight: FontWeight.w500,
+                                            color: Colors.black87,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              ),
+                            ],
+                          ),
+                        )
+                      else if (filled == 0)
+                        Padding(
+                          padding: const EdgeInsets.all(12),
+                          child: Row(
+                            children: [
+                              Icon(Icons.person_off, size: 16, color: Colors.grey.shade500),
+                              const SizedBox(width: 8),
+                              Text(
+                                '아직 참가자가 없습니다',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey.shade500,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
             
             // 역할 선택 안내 (신청 화면일 때만)
-            if (!_isUserHost() && _tournament!.status == TournamentStatus.open)
+            if (!_isUserHost() && _tournament!.status == TournamentStatus.open) ...[
+              const SizedBox(height: 16),
               Container(
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: Colors.grey.shade50,
+                  color: AppColors.primary.withOpacity(0.05),
                   borderRadius: BorderRadius.circular(12),
-                  border: Border.all(color: Colors.grey.shade200),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.2)),
                 ),
                 child: Row(
                   children: [
@@ -1216,7 +1020,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                           width: 1,
                         ),
                       ),
-                      child: const Icon(Icons.info_outline, color: AppColors.primary),
+                      child: Icon(Icons.info_outline, color: AppColors.primary),
                     ),
                     const SizedBox(width: 16),
                     const Expanded(
@@ -1228,6 +1032,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                   ],
                 ),
               ),
+            ],
             
             const SizedBox(height: 20),
             
@@ -1237,8 +1042,10 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                child: Wrap(
+                  alignment: WrapAlignment.spaceEvenly,
+                  spacing: 4.0,
+                  runSpacing: 12.0,
                   children: roles.map((role) {
                     final key = role['key'] as String;
                     final filled = _tournament!.filledSlotsByRole[key] ?? 0;
@@ -1246,68 +1053,109 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                     final isFull = filled >= total;
                     final isSelected = _selectedRole == key;
                     
-                    return GestureDetector(
-                      onTap: isFull ? null : () {
-                        setState(() {
-                          _selectedRole = key;
-                        });
-                      },
-                      child: AnimatedContainer(
-                        duration: const Duration(milliseconds: 300),
-                        curve: Curves.easeInOut,
-                        child: Opacity(
-                          opacity: isFull ? 0.5 : 1.0,
-                          child: Column(
-                            children: [
-                              AnimatedContainer(
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeInOut,
-                                width: 60,
-                                height: 60,
-                                decoration: BoxDecoration(
-                                  color: isSelected
-                                      ? role['color'] as Color
-                                      : (role['color'] as Color).withOpacity(0.7),
-                                  shape: BoxShape.circle,
-                                  border: Border.all(
-                                    color: isSelected ? Colors.white : (role['color'] as Color).withOpacity(0.3),
-                                    width: isSelected ? 2 : 1,
+                    // Get role-specific color
+                    Color getRoleColor() {
+                      switch (key) {
+                        case 'top': return const Color(0xFFE74C3C);
+                        case 'jungle': return const Color(0xFF27AE60);
+                        case 'mid': return const Color(0xFF3498DB);
+                        case 'adc': return const Color(0xFFF39C12);
+                        case 'support': return const Color(0xFF9B59B6);
+                        default: return AppColors.primary;
+                      }
+                    }
+                    
+                    final roleColor = getRoleColor();
+                    
+                    return SizedBox(
+                      width: 60, // 모든 아이콘을 한 줄에 표시하기 위한 너비
+                      child: GestureDetector(
+                        onTap: isFull ? null : () {
+                          setState(() {
+                            _selectedRole = key;
+                          });
+                        },
+                        child: AnimatedContainer(
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeInOut,
+                          child: Opacity(
+                            opacity: isFull ? 0.5 : 1.0,
+                            child: Column(
+                              children: [
+                                Stack(
+                                  alignment: Alignment.center,
+                                  children: [
+                                    // 선택 표시 배경
+                                    if (isSelected)
+                                      AnimatedContainer(
+                                        duration: const Duration(milliseconds: 300),
+                                        width: 58,
+                                        height: 58,
+                                        decoration: BoxDecoration(
+                                          color: roleColor.withOpacity(0.1),
+                                          shape: BoxShape.circle,
+                                          border: Border.all(
+                                            color: roleColor,
+                                            width: 2,
+                                          ),
+                                        ),
+                                      ),
+                                    
+                                    // 실제 아이콘 컨테이너
+                                    AnimatedContainer(
+                                      duration: const Duration(milliseconds: 300),
+                                      curve: Curves.easeInOut,
+                                      width: isSelected ? 52 : 50,
+                                      height: isSelected ? 52 : 50,
+                                      decoration: BoxDecoration(
+                                        color: Colors.white,
+                                        shape: BoxShape.circle,
+                                        border: Border.all(
+                                          color: isSelected ? roleColor : Colors.grey.shade300,
+                                          width: isSelected ? 2 : 1,
+                                        ),
+                                        boxShadow: [
+                                          BoxShadow(
+                                            color: isSelected 
+                                              ? roleColor.withOpacity(0.3)
+                                              : Colors.grey.withOpacity(0.2),
+                                            spreadRadius: 1,
+                                            blurRadius: isSelected ? 6 : 3,
+                                            offset: const Offset(0, 2),
+                                          )
+                                        ],
+                                      ),
+                                      child: Center(
+                                        child: LaneIconWidget(
+                                          lane: key,
+                                          size: 35,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  '${role['name']}',
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: isSelected ? FontWeight.bold : FontWeight.w500,
+                                    color: isSelected ? roleColor : Colors.black87,
                                   ),
-                                  boxShadow: isSelected
-                                      ? [BoxShadow(
-                                          color: (role['color'] as Color).withOpacity(0.5),
-                                          spreadRadius: 1,
-                                          blurRadius: 6,
-                                          offset: const Offset(0, 3),
-                                        )]
-                                      : null,
                                 ),
-                                child: Icon(
-                                  role['icon'] as IconData,
-                                  color: Colors.white,
-                                  size: 30,
-                                ),
-                              ),
-                              const SizedBox(height: 8),
-                              Text(
-                                '${role['name']}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                                  color: isFull ? Colors.grey : Colors.black,
-                                ),
-                              ),
-                              if (isSelected)
-                                Container(
-                                  margin: const EdgeInsets.only(top: 4),
-                                  width: 8,
-                                  height: 8,
-                                  decoration: BoxDecoration(
-                                    color: role['color'] as Color,
-                                    shape: BoxShape.circle,
+                                const SizedBox(height: 2),
+                                Text(
+                                  '$filled/$total',
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: isFull 
+                                      ? Colors.red.shade400 
+                                      : (filled > 0 ? Colors.green.shade600 : Colors.grey.shade600),
+                                    fontWeight: FontWeight.w500,
                                   ),
                                 ),
-                            ],
+                              ],
+                            ),
                           ),
                         ),
                       ),
@@ -1320,6 +1168,335 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
       ),
     );
   }
+  
+  Widget _buildPositionItemHorizontal(String key, String name) {
+    final filled = _tournament!.filledSlotsByRole[key] ?? 0;
+    final total = _tournament!.slotsByRole[key] ?? 2;
+    final progress = total > 0 ? filled / total : 0.0;
+    
+    return Container(
+      width: 200,
+      margin: const EdgeInsets.only(right: 12),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: AppColors.primary,
+                      width: 1,
+                    ),
+                  ),
+                  child: Center(
+                    child: SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: _buildLaneIcon(key, size: 24),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    name,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: AppColors.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          if (_tournament!.participantsByRole[key] != null && _tournament!.participantsByRole[key]!.isNotEmpty)
+            ..._tournament!.participantsByRole[key]!.map((userId) {
+              // 참가자 정보 찾기
+              final app = _applications.firstWhere(
+                (app) => app.userUid == userId && app.role == key,
+                orElse: () => ApplicationModel(
+                  id: '',
+                  tournamentId: _tournament!.id,
+                  userUid: userId,
+                  userName: '참가자',
+                  role: key,
+                  message: '',
+                  status: ApplicationStatus.accepted,
+                  appliedAt: Timestamp.now(),
+                ),
+              );
+              
+              return Container(
+                margin: const EdgeInsets.only(bottom: 8),
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.grey.shade100,
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  children: [
+                    ImageUtils.safeCircleAvatar(
+                      imageUrl: app.userProfileImageUrl,
+                      radius: 18,
+                      backgroundColor: AppColors.primary.withOpacity(0.1),
+                    ),
+                    const SizedBox(width: 10),
+                    Expanded(
+                      child: Text(
+                        app.userName,
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildPositionItem(String key, {required List<Map<String, dynamic>> roles}) {
+    final role = roles.firstWhere((r) => r['key'] == key);
+    final filled = _tournament!.filledSlotsByRole[key] ?? 0;
+    final total = _tournament!.slotsByRole[key] ?? 2;
+    final progress = total > 0 ? filled / total : 0.0;
+    
+    // Get role-specific color for better visual distinction
+    Color getRoleColor() {
+      switch (key) {
+        case 'top': return const Color(0xFFE74C3C);
+        case 'jungle': return const Color(0xFF27AE60);
+        case 'mid': return const Color(0xFF3498DB);
+        case 'adc': return const Color(0xFFF39C12);
+        case 'support': return const Color(0xFF9B59B6);
+        default: return AppColors.primary;
+      }
+    }
+
+    final roleColor = getRoleColor();
+    
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16.0),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: roleColor.withOpacity(0.3)),
+        boxShadow: [
+          BoxShadow(
+            color: roleColor.withOpacity(0.1),
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 52,
+                height: 52,
+                decoration: BoxDecoration(
+                  color: roleColor.withOpacity(0.1),
+                  shape: BoxShape.circle,
+                  border: Border.all(
+                    color: roleColor,
+                    width: 1.5,
+                  ),
+                ),
+                child: Center(
+                  child: LaneIconWidget(
+                    lane: key,
+                    size: 38,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '${role['name']}',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
+                        color: roleColor,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.people,
+                          size: 16,
+                          color: Colors.grey.shade600,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '참가자: $filled/$total명',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey.shade700,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: roleColor.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(
+                    color: roleColor,
+                    width: 1,
+                  ),
+                ),
+                child: Text(
+                  isFull ? '모집 완료' : '모집 중',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                    color: roleColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Stack(
+              children: [
+                LinearProgressIndicator(
+                  value: progress,
+                  backgroundColor: Colors.grey.shade200,
+                  color: roleColor,
+                  minHeight: 14,
+                ),
+                if (filled > 0)
+                  Positioned.fill(
+                    child: Align(
+                      alignment: Alignment.center,
+                      child: Text(
+                        '$filled/$total',
+                        style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          if (_tournament!.participantsByRole[key]?.isNotEmpty == true) ...[
+            const SizedBox(height: 14),
+            Text(
+              '참가자',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: roleColor,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _tournament!.participantsByRole[key]!.map((userId) {
+                // 참가자 닉네임 찾기
+                final app = _applications.firstWhere(
+                  (app) => app.userUid == userId && app.role == key,
+                  orElse: () => ApplicationModel(
+                    id: '',
+                    tournamentId: _tournament!.id,
+                    userUid: userId,
+                    userName: '참가자',
+                    role: key,
+                    message: '',
+                    status: ApplicationStatus.accepted,
+                    appliedAt: Timestamp.now(),
+                  ),
+                );
+                
+                return Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: roleColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: roleColor.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (app.userProfileImageUrl != null) ...[
+                        ImageUtils.safeCircleAvatar(
+                          imageUrl: app.userProfileImageUrl,
+                          radius: 14,
+                          backgroundColor: roleColor.withOpacity(0.2),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
+                      Text(
+                        app.userName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: roleColor,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+  
+  bool get isFull => _tournament != null && 
+    _tournament!.filledSlotsByRole[_selectedRole] != null && 
+    _tournament!.slotsByRole[_selectedRole] != null && 
+    _tournament!.filledSlotsByRole[_selectedRole]! >= _tournament!.slotsByRole[_selectedRole]!;
   
   Widget _buildPlayersList() {
     // Group applications by role
@@ -1335,9 +1512,12 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
     if (applicationsByRole.isEmpty) {
       return const SizedBox.shrink();
     }
+
+    // Define the correct lane order
+    final laneOrder = ['top', 'jungle', 'mid', 'adc', 'support'];
     
     return Card(
-      elevation: 0,
+      elevation: 2,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(16),
         side: BorderSide(color: Colors.grey.shade200),
@@ -1347,179 +1527,130 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text(
-              '참가자 목록',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+            _buildSectionTitle('참가자 목록', useOrange: true),
             const SizedBox(height: 16),
-            ...applicationsByRole.entries.map((entry) {
-              final roleName = _getRoleName(entry.key);
-              final roleColor = _getRoleColor(entry.key);
-              final roleIcon = _getRoleIcon(entry.key);
-              
-              return Column(
+            // 포지션별 참가 현황을 가로로 나열
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: roleColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Row(
+                children: laneOrder.map((lane) {
+                  if (!applicationsByRole.containsKey(lane) || applicationsByRole[lane]!.isEmpty) {
+                    return const SizedBox.shrink();
+                  }
+                  
+                  final roleName = _getRoleName(lane);
+                  
+                  // Get role-specific color
+                  Color getRoleColor() {
+                    switch (lane) {
+                      case 'top': return const Color(0xFFE74C3C);
+                      case 'jungle': return const Color(0xFF27AE60);
+                      case 'mid': return const Color(0xFF3498DB);
+                      case 'adc': return const Color(0xFFF39C12);
+                      case 'support': return const Color(0xFF9B59B6);
+                      default: return AppColors.primary;
+                    }
+                  }
+                  
+                  final roleColor = getRoleColor();
+                  
+                  return Container(
+                    width: 200,
+                    margin: const EdgeInsets.only(right: 12),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Icon(roleIcon, color: roleColor, size: 18),
-                        const SizedBox(width: 8),
-                        Text(
-                          roleName,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                            color: roleColor,
-                          ),
-                        ),
-                        const Spacer(),
                         Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
                           decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(10),
+                            color: roleColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(12),
                             border: Border.all(color: roleColor.withOpacity(0.3)),
                           ),
-                          child: Text(
-                            '${entry.value.length}명',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                              color: roleColor,
-                            ),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: roleColor,
+                                    width: 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: Container(
+                                    width: 24,
+                                    height: 24,
+                                    child: _buildLaneIcon(lane, size: 24),
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  roleName,
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    color: roleColor,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
-                  ),
-                  ...entry.value.asMap().entries.map((playerEntry) {
-                    final index = playerEntry.key;
-                    final app = playerEntry.value;
-                    
-                    // Calculate a small delay for each item to create a staggered animation effect
-                    final delay = Duration(milliseconds: 50 * index);
-                    
-                    return TweenAnimationBuilder<double>(
-                      tween: Tween<double>(begin: 0.0, end: 1.0),
-                      duration: const Duration(milliseconds: 500),
-                      curve: Curves.easeOutQuad,
-                      builder: (context, value, child) {
-                        return Transform.translate(
-                          offset: Offset(0, 20 * (1 - value)),
-                          child: Opacity(
-                            opacity: value,
-                            child: child,
-                          ),
-                        );
-                      },
-                      child: Container(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.grey.shade200),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.grey.shade100,
-                              blurRadius: 4,
-                              offset: const Offset(0, 2),
+                        const SizedBox(height: 8),
+                        ...applicationsByRole[lane]!.asMap().entries.map((playerEntry) {
+                          final index = playerEntry.key;
+                          final app = playerEntry.value;
+                          
+                          return Container(
+                            margin: const EdgeInsets.only(bottom: 8),
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: roleColor.withOpacity(0.3)),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.grey.shade100,
+                                  blurRadius: 4,
+                                  offset: const Offset(0, 2),
+                                ),
+                              ],
                             ),
-                          ],
-                        ),
-                        child: Row(
-                          children: [
-                            ImageUtils.safeCircleAvatar(
-                              imageUrl: app.userProfileImageUrl,
-                              radius: 24,
-                              backgroundColor: roleColor.withOpacity(0.1),
-                            ),
-                            const SizedBox(width: 16),
-                            Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
+                            child: Row(
+                              children: [
+                                ImageUtils.safeCircleAvatar(
+                                  imageUrl: app.userProfileImageUrl,
+                                  radius: 18,
+                                  backgroundColor: roleColor.withOpacity(0.1),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Text(
                                     app.userName,
                                     style: const TextStyle(
                                       fontWeight: FontWeight.bold,
-                                      fontSize: 16,
+                                      fontSize: 14,
                                     ),
+                                    overflow: TextOverflow.ellipsis,
                                   ),
-                                  const SizedBox(height: 4),
-                                  Row(
-                                    children: [
-                                      Icon(
-                                        roleIcon,
-                                        size: 14,
-                                        color: roleColor,
-                                      ),
-                                      const SizedBox(width: 4),
-                                      Text(
-                                        roleName,
-                                        style: TextStyle(
-                                          fontSize: 14,
-                                          color: roleColor,
-                                          fontWeight: FontWeight.w500,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
-                              ),
+                                ),
+                              ],
                             ),
-                            if (app.userOvr != null)
-                              Container(
-                                width: 44,
-                                height: 44,
-                                decoration: BoxDecoration(
-                                  gradient: LinearGradient(
-                                    begin: Alignment.topLeft,
-                                    end: Alignment.bottomRight,
-                                    colors: [
-                                      roleColor.withOpacity(0.8),
-                                      roleColor,
-                                    ],
-                                  ),
-                                  shape: BoxShape.circle,
-                                  boxShadow: [
-                                    BoxShadow(
-                                      color: roleColor.withOpacity(0.3),
-                                      blurRadius: 4,
-                                      offset: const Offset(0, 2),
-                                    ),
-                                  ],
-                                ),
-                                child: Center(
-                                  child: Text(
-                                    '${app.userOvr}',
-                                    style: const TextStyle(
-                                      color: Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 16,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                    );
-                  }).toList(),
-                  const SizedBox(height: 16),
-                ],
-              );
-            }).toList(),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              ),
+            ),
           ],
         ),
       ),
@@ -1527,36 +1658,31 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
   }
   
   String _getRoleName(String role) {
-    switch (role) {
-      case 'top': return '탑';
-      case 'jungle': return '정글';
-      case 'mid': return '미드';
-      case 'adc': return '원딜';
-      case 'support': return '서포터';
-      default: return role;
-    }
+    return TournamentUIUtils.getRoleName(role);
   }
   
   Color _getRoleColor(String role) {
+    // Return a neutral color instead of a role-specific color
+    return Colors.grey.shade700;
+  }
+  
+  String _getRoleImagePath(String role) {
     switch (role) {
-      case 'top': return AppColors.roleTop;
-      case 'jungle': return AppColors.roleJungle;
-      case 'mid': return AppColors.roleMid;
-      case 'adc': return AppColors.roleAdc;
-      case 'support': return AppColors.roleSupport;
-      default: return AppColors.primary;
+      case 'top': return LolLaneIcons.top;
+      case 'jungle': return LolLaneIcons.jungle;
+      case 'mid': return LolLaneIcons.mid;
+      case 'adc': return LolLaneIcons.adc;
+      case 'support': return LolLaneIcons.support;
+      default: return LolLaneIcons.top;
     }
   }
   
-  IconData _getRoleIcon(String role) {
-    switch (role) {
-      case 'top': return Icons.arrow_upward;
-      case 'jungle': return Icons.nature_people;
-      case 'mid': return Icons.adjust;
-      case 'adc': return Icons.gps_fixed;
-      case 'support': return Icons.shield;
-      default: return Icons.sports_esports;
-    }
+  // New method to render a lane icon using our custom widget
+  Widget _buildLaneIcon(String role, {double size = 24}) {
+    return LaneIconWidget(
+      lane: role,
+      size: size,
+    );
   }
   
   Widget _buildHostInfo() {
@@ -1939,6 +2065,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
         return '골드';
       case PlayerTier.platinum:
         return '플래티넘';
+      case PlayerTier.emerald:
+        return '에메랄드';
       case PlayerTier.diamond:
         return '다이아몬드';
       case PlayerTier.master:
@@ -1960,10 +2088,10 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
         app.status != ApplicationStatus.rejected);
     
     if (hasApplied) {
-      final application = _applications.firstWhere((app) => 
-        app.userUid == appState.currentUser!.uid && 
-        app.status != ApplicationStatus.cancelled && 
-        app.status != ApplicationStatus.rejected,
+      final application = _applications.firstWhere(
+        (app) => app.userUid == appState.currentUser!.uid && 
+          app.status != ApplicationStatus.cancelled && 
+          app.status != ApplicationStatus.rejected,
         orElse: () => ApplicationModel(
           id: '',
           tournamentId: _tournament!.id,
@@ -1998,10 +2126,10 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: _getRoleColor(application.role).withOpacity(0.1),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: _getRoleColor(application.role).withOpacity(0.3),
+                  color: Colors.grey.shade300,
                   width: 1,
                 ),
                 boxShadow: [
@@ -2015,18 +2143,31 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(
-                    _getRoleIcon(application.role),
-                    color: _getRoleColor(application.role),
-                    size: 24,
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: _getRoleColor(_selectedRole).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: _getRoleColor(_selectedRole),
+                        width: 1.5,
+                      ),
+                    ),
+                    child: Center(
+                      child: LaneIconWidget(
+                        lane: _selectedRole, 
+                        size: 26,
+                      ),
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Text(
-                    '${_getRoleName(application.role)} 역할로 참가 중',
+                    '선택한 포지션: ${_getRoleName(_selectedRole)}',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: _getRoleColor(application.role),
+                      color: _getRoleColor(_selectedRole),
                     ),
                   ),
                 ],
@@ -2036,8 +2177,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
             ElevatedButton(
               onPressed: _isLoading ? null : () => _cancelRegistration(application.role),
               style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.error,
-                foregroundColor: Colors.white,
+                backgroundColor: Colors.red.shade100,
+                foregroundColor: Colors.red.shade700,
                 minimumSize: const Size(double.infinity, 56),
                 disabledBackgroundColor: Colors.grey.shade400,
                 shape: RoundedRectangleBorder(
@@ -2096,15 +2237,15 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             decoration: BoxDecoration(
-              color: _getRoleColor(_selectedRole).withOpacity(0.1),
+              color: Colors.white,
               borderRadius: BorderRadius.circular(16),
               border: Border.all(
                 color: _getRoleColor(_selectedRole).withOpacity(0.3),
-                width: 1,
+                width: 1.5,
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.grey.shade100,
+                  color: _getRoleColor(_selectedRole).withOpacity(0.1),
                   offset: const Offset(0, 2),
                   blurRadius: 4,
                 ),
@@ -2113,10 +2254,23 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
             child: Row(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                Icon(
-                  _getRoleIcon(_selectedRole),
-                  color: _getRoleColor(_selectedRole),
-                  size: 24,
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: _getRoleColor(_selectedRole).withOpacity(0.1),
+                    shape: BoxShape.circle,
+                    border: Border.all(
+                      color: _getRoleColor(_selectedRole),
+                      width: 1.5,
+                    ),
+                  ),
+                  child: Center(
+                    child: LaneIconWidget(
+                      lane: _selectedRole, 
+                      size: 30,
+                    ),
+                  ),
                 ),
                 const SizedBox(width: 12),
                 Text(
@@ -2135,10 +2289,10 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: AppColors.warning.withOpacity(0.1),
+                color: Colors.white,
                 borderRadius: BorderRadius.circular(16),
                 border: Border.all(
-                  color: AppColors.warning.withOpacity(0.3),
+                  color: Colors.grey.shade300,
                   width: 1,
                 ),
                 boxShadow: [
@@ -2155,7 +2309,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                   const Icon(
                     Icons.monetization_on,
                     size: 24,
-                    color: AppColors.warning,
+                    color: Colors.black87,
                   ),
                   const SizedBox(width: 12),
                   Text(
@@ -2163,7 +2317,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
-                      color: AppColors.warning,
+                      color: Colors.black87,
                     ),
                   ),
                 ],
@@ -2174,14 +2328,24 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
           ElevatedButton(
             onPressed: _isLoading ? null : _applyToTournament,
             style: ElevatedButton.styleFrom(
-              backgroundColor: _getRoleColor(_selectedRole),
+              // 역할별 색상으로 변경
+              backgroundColor: () {
+                switch (_selectedRole.toLowerCase()) {
+                  case 'top': return const Color(0xFFE74C3C);
+                  case 'jungle': return const Color(0xFF27AE60);
+                  case 'mid': return const Color(0xFF3498DB);
+                  case 'adc': return const Color(0xFFF39C12);
+                  case 'support': return const Color(0xFF9B59B6);
+                  default: return AppColors.primary;
+                }
+              }(),
               foregroundColor: Colors.white,
               minimumSize: const Size(double.infinity, 56),
               disabledBackgroundColor: Colors.grey.shade400,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              elevation: 0,
+              elevation: 2,
             ),
             child: _isLoading
                 ? const SizedBox(
@@ -2195,16 +2359,18 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                 : Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      Icon(
-                        _getRoleIcon(_selectedRole),
-                        size: 20,
+                      LaneIconWidget(
+                        lane: _selectedRole, 
+                        size: 28,
+                        useRoleColor: false,
                       ),
-                      const SizedBox(width: 8),
+                      const SizedBox(width: 12),
                       Text(
-                        '${_getRoleName(_selectedRole)} 역할로 신청하기', 
+                        '${_getRoleName(_selectedRole)} 역할로 신청하기',
                         style: const TextStyle(
-                          fontSize: 18, 
-                          fontWeight: FontWeight.bold
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
                         ),
                       ),
                     ],
@@ -2242,6 +2408,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
           ),
           TextButton(
             onPressed: () => Navigator.pop(context, true),
+            style: TextButton.styleFrom(
+              foregroundColor: Colors.red,
+            ),
             child: const Text('예, 취소합니다'),
           ),
         ],
@@ -2420,41 +2589,14 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
   String _getStatusText() {
     if (_tournament == null) return '';
     
-    switch (_tournament!.status) {
-      case TournamentStatus.draft:
-        return '초안';
-      case TournamentStatus.open:
-        return '모집 중';
-      case TournamentStatus.full:
-        return '모집 완료';
-      case TournamentStatus.inProgress:
-      case TournamentStatus.ongoing:
-        return '진행 중';
-      case TournamentStatus.completed:
-        return '완료됨';
-      case TournamentStatus.cancelled:
-        return '취소됨';
-    }
+    return TournamentUIUtils.getStatusText(_tournament!.status);
   }
   
   Color _getStatusColor() {
     if (_tournament == null) return Colors.grey;
     
-    switch (_tournament!.status) {
-      case TournamentStatus.draft:
-        return Colors.grey;
-      case TournamentStatus.open:
-        return AppColors.success;
-      case TournamentStatus.full:
-        return AppColors.primary;
-      case TournamentStatus.inProgress:
-      case TournamentStatus.ongoing:
-        return AppColors.warning;
-      case TournamentStatus.completed:
-        return AppColors.textSecondary;
-      case TournamentStatus.cancelled:
-        return AppColors.error;
-    }
+    // Return a neutral color for all statuses
+    return Colors.grey;
   }
   
   int _calculateTotalSlots() {
@@ -2463,23 +2605,184 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
     return _tournament!.slotsByRole.values.fold(0, (sum, slots) => sum + slots);
   }
   
-  Widget _buildSectionTitle(String title) {
+  Widget _buildSectionTitle(String title, {bool useOrange = false}) {
     return Row(
       children: [
         Container(
           width: 4,
-          height: 20,
+          height: 24,
           decoration: BoxDecoration(
-            color: AppColors.primary,
+            color: useOrange ? AppColors.primary : Colors.grey.shade400,
             borderRadius: BorderRadius.circular(2),
           ),
         ),
         const SizedBox(width: 8),
         Text(
           title,
-          style: const TextStyle(
+          style: TextStyle(
             fontSize: 18,
             fontWeight: FontWeight.bold,
+            color: useOrange ? AppColors.primary : Colors.black87,
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 토너먼트 삭제 메서드
+  Future<void> _deleteTournament() async {
+    final appState = Provider.of<AppStateProvider>(context, listen: false);
+    
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('내전 취소 확인'),
+          content: const Text(
+            '정말로 이 내전을 취소하시겠습니까? 이 작업은 되돌릴 수 없습니다.',
+            style: TextStyle(fontSize: 16),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('아니오'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: TextButton.styleFrom(
+                foregroundColor: Colors.red,
+              ),
+              child: const Text('예, 취소합니다'),
+            ),
+          ],
+        ),
+      );
+      
+      if (confirmed == true) {
+        final success = await appState.deleteTournament(widget.tournamentId);
+        
+        if (success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('내전이 성공적으로 취소되었습니다'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+          
+          // 메인 화면으로 이동
+          if (mounted) {
+            context.go('/tournaments');
+          }
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(appState.errorMessage ?? '내전 취소 중 오류가 발생했습니다'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('내전 취소 중 오류가 발생했습니다: $e'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
+    }
+  }
+
+  // 날짜 및 시간 카드
+  Widget _buildDateTimeCard() {
+    return Card(
+      elevation: 0,
+      margin: const EdgeInsets.only(bottom: 20),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _buildInfoRow(
+              icon: Icons.calendar_today,
+              text: DateFormat('yyyy년 M월 d일 (E)', 'ko_KR').format(_tournament!.startsAt.toDate().toLocal()),
+            ),
+            const SizedBox(height: 12),
+            _buildInfoRow(
+              icon: Icons.access_time,
+              text: DateFormat('HH:mm').format(_tournament!.startsAt.toDate().toLocal()),
+            ),
+            const SizedBox(height: 12),
+            _buildInfoRow(
+              icon: Icons.people,
+              text: '총 참가 인원: ${_tournament!.participants.length}/${_calculateTotalSlots()}명',
+              isBold: true,
+            ),
+            if (_tournament!.tournamentType == TournamentType.competitive) ...[
+              const SizedBox(height: 12),
+              _buildInfoRow(
+                icon: Icons.monetization_on,
+                text: '참가 비용: 20 크레딧',
+                color: AppColors.warning,
+                isBold: true,
+              ),
+            ],
+            if (_tournament!.ovrLimit != null) ...[
+              const SizedBox(height: 12),
+              _buildInfoRow(
+                icon: Icons.fitness_center,
+                text: '제한 OVR: ${_tournament!.ovrLimit}+',
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+  
+  // 정보 행 (아이콘 + 텍스트)
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String text,
+    Color color = AppColors.primary,
+    bool isBold = false,
+  }) {
+    return Row(
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: color.withOpacity(0.1),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            size: 20,
+            color: color,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Text(
+          text,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+            color: color == AppColors.primary ? Colors.black87 : color,
           ),
         ),
       ],

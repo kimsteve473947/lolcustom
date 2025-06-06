@@ -22,13 +22,18 @@ class AuthProvider extends ChangeNotifier {
   // 초기화
   void _init() {
     // 현재 로그인된 사용자 정보 가져오기
+    debugPrint('AuthProvider._init() 시작');
     _fetchCurrentUser();
     
     // 사용자 상태 변경 감지
     authService.authStateChanges().listen((User? user) {
+      debugPrint('AuthProvider - Auth 상태 변경 감지: ${user?.email} (${user?.uid})');
       if (user != null) {
-        _fetchCurrentUser();
+        // 사용자가 로그인하면 정보 새로고침
+        _fetchCurrentUser(forceRefresh: true);
       } else {
+        // 사용자가 로그아웃하면 null로 설정
+        debugPrint('AuthProvider - 사용자 로그아웃 감지: 데이터 초기화');
         _user = null;
         notifyListeners();
       }
@@ -36,14 +41,28 @@ class AuthProvider extends ChangeNotifier {
   }
   
   // 현재 로그인된 사용자 정보 가져오기
-  Future<void> _fetchCurrentUser() async {
-    if (!authService.isLoggedIn) return;
+  Future<void> _fetchCurrentUser({bool forceRefresh = false}) async {
+    if (!authService.isLoggedIn) {
+      debugPrint('AuthProvider._fetchCurrentUser() - 로그인되어 있지 않음');
+      _user = null;
+      notifyListeners();
+      return;
+    }
     
     _setLoading(true);
     try {
+      // 강제로 Firebase Auth 사용자 정보 새로고침
+      if (forceRefresh) {
+        await authService.reloadCurrentUser();
+        debugPrint('AuthProvider - 사용자 정보 강제 새로고침 완료: ${authService.currentUser?.email}');
+      }
+      
+      // Firestore에서 최신 사용자 정보 가져오기
       _user = await authService.getCurrentUserModel();
+      debugPrint('AuthProvider - 사용자 정보 로드 완료: ${_user?.nickname} (${_user?.uid})');
       _clearError();
     } catch (e) {
+      debugPrint('AuthProvider - 사용자 정보 로드 오류: $e');
       _setError(e.toString());
     } finally {
       _setLoading(false);
@@ -108,11 +127,25 @@ class AuthProvider extends ChangeNotifier {
   Future<void> signOut() async {
     _setLoading(true);
     try {
+      // 로그아웃 시도 로깅
+      debugPrint('로그아웃 시작: ${authService.currentUser?.email}');
+      
+      // Firebase 인증에서 로그아웃
       await authService.signOut();
+      
+      // 사용자 데이터 명시적으로 초기화
       _user = null;
+      
+      // 메모리 캐시 클리어
       _clearError();
+      
+      // 데이터 갱신 알림
+      notifyListeners();
+      
+      debugPrint('로그아웃 완료. 현재 사용자 데이터: $_user');
     } catch (e) {
-      _setError(e.toString());
+      _setError('로그아웃 중 오류 발생: $e');
+      debugPrint('로그아웃 오류: $e');
     } finally {
       _setLoading(false);
     }

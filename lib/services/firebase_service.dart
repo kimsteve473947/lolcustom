@@ -744,4 +744,51 @@ class FirebaseService {
       throw Exception('채팅방과 내전을 연결하는 중 오류가 발생했습니다: $e');
     }
   }
+
+  // 단일 토너먼트 삭제
+  Future<void> deleteTournament(String tournamentId) async {
+    try {
+      // 권한 문제 해결을 위해 트랜잭션 대신 일반 삭제 방식 사용
+      // 토너먼트 문서 삭제
+      await _firestore.collection('tournaments').doc(tournamentId).delete();
+      
+      // 관련 신청서 조회
+      final applicationsSnapshot = await _firestore
+          .collection('applications')
+          .where('tournamentId', isEqualTo: tournamentId)
+          .get();
+          
+      // 관련 신청서 삭제
+      for (final doc in applicationsSnapshot.docs) {
+        await _firestore.collection('applications').doc(doc.id).delete();
+      }
+      
+      debugPrint('Tournament $tournamentId successfully deleted');
+    } catch (e) {
+      debugPrint('Error deleting tournament: $e');
+      rethrow;
+    }
+  }
+
+  // 토너먼트 일괄 삭제 기능
+  Future<int> deleteAllTournaments() async {
+    try {
+      // 먼저 삭제할 토너먼트 목록 조회
+      final QuerySnapshot snapshot = await _firestore.collection('tournaments').get();
+      
+      int count = 0;
+      
+      // 각 토너먼트 문서 삭제
+      for (final doc in snapshot.docs) {
+        await _firestore.collection('tournaments').doc(doc.id).delete();
+        count++;
+      }
+      
+      debugPrint('Deleted $count tournaments');
+      return count;
+    } catch (e) {
+      debugPrint('Error deleting all tournaments: $e');
+      rethrow;
+    }
+  }
 }

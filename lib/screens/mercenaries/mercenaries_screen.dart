@@ -88,7 +88,7 @@ class _MercenariesScreenState extends State<MercenariesScreen> {
           Expanded(
             child: _errorMessage != null
                 ? ErrorView(
-                    message: _errorMessage!,
+                    errorMessage: _errorMessage!,
                     onRetry: _loadMercenaries,
                   )
                 : _isLoading

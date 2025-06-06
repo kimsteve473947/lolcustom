@@ -22,18 +22,18 @@ class AppColors {
   static const Color textDisabled = Color(0xFFCCCCCC);
   
   // 롤 포지션 컬러
-  static const Color top = Color(0xFFFF4D4D);
-  static const Color jungle = Color(0xFF4CAF50);
-  static const Color mid = Color(0xFF2196F3);
-  static const Color adc = Color(0xFFFF9800);
-  static const Color support = Color(0xFF9C27B0);
+  static const Color top = Color(0xFFE53935);     // 더 짙은 빨간색
+  static const Color jungle = Color(0xFF4CAF50);  // 기존 녹색 유지
+  static const Color mid = Color(0xFF2196F3);     // 기존 파란색 유지
+  static const Color adc = Color(0xFFFFA000);     // 더 짙은 주황색으로 변경
+  static const Color support = Color(0xFF9C27B0); // 기존 보라색 유지
   
   // 롤 포지션 컬러 (TournamentCard 사용)
-  static const Color roleTop = Color(0xFFFF4D4D);
-  static const Color roleJungle = Color(0xFF4CAF50);
-  static const Color roleMid = Color(0xFF2196F3);
-  static const Color roleAdc = Color(0xFFFF9800);
-  static const Color roleSupport = Color(0xFF9C27B0);
+  static const Color roleTop = Color(0xFFE53935);     // 더 짙은 빨간색
+  static const Color roleJungle = Color(0xFF4CAF50);  // 기존 녹색 유지
+  static const Color roleMid = Color(0xFF2196F3);     // 기존 파란색 유지
+  static const Color roleAdc = Color(0xFFFFA000);     // 더 짙은 주황색으로 변경
+  static const Color roleSupport = Color(0xFF9C27B0); // 기존 보라색 유지
   
   // 텍스트 컬러
   static const Color textPrimary = Color(0xFF333333);

@@ -39,26 +39,100 @@ class AuthService {
   Future<UserModel?> getCurrentUserModel() async {
     try {
       final user = currentUser;
-      if (user == null) return null;
+      if (user == null) {
+        debugPrint('AuthService.getCurrentUserModel() - 로그인된 사용자 없음');
+        return null;
+      }
       
-      final doc = await _firestore.collection('users').doc(user.uid).get();
+      // 현재 Firebase Auth 사용자 정보 새로고침
+      await user.reload();
+      final refreshedUser = _auth.currentUser; // 새로고침 후 다시 가져오기
+      
+      if (refreshedUser == null) {
+        debugPrint('AuthService.getCurrentUserModel() - 새로고침 후 사용자 없음 (세션 만료)');
+        return null;
+      }
+      
+      debugPrint('AuthService.getCurrentUserModel() - Firestore에서 사용자 문서 조회 시작: ${refreshedUser.uid}');
+      
+      // Firestore에서 사용자 문서 가져오기
+      final doc = await _firestore.collection('users').doc(refreshedUser.uid).get();
       
       if (doc.exists) {
-        return UserModel.fromFirestore(doc);
+        final userModel = UserModel.fromFirestore(doc);
+        debugPrint('AuthService.getCurrentUserModel() - 사용자 문서 조회 성공: ${userModel.nickname} (${userModel.uid})');
+        return userModel;
       } else {
+        debugPrint('AuthService.getCurrentUserModel() - 사용자 문서 없음. 새 문서 생성: ${refreshedUser.uid}');
         // 사용자 문서가 없는 경우 기본 문서 생성
         final newUser = UserModel(
-          uid: user.uid,
-          nickname: user.displayName ?? 'User${user.uid.substring(0, 4)}',
+          uid: refreshedUser.uid,
+          email: refreshedUser.email ?? '',
+          nickname: refreshedUser.displayName ?? 'User${refreshedUser.uid.substring(0, 4)}',
           joinedAt: Timestamp.now(),
         );
         
-        await _firestore.collection('users').doc(user.uid).set(newUser.toMap());
+        await _firestore.collection('users').doc(refreshedUser.uid).set(newUser.toMap());
         return newUser;
       }
     } catch (e) {
-      debugPrint('Error getting user model: $e');
+      debugPrint('AuthService.getCurrentUserModel() - 오류 발생: $e');
       return null;
+    }
+  }
+  
+  // Firebase 인증 사용자 정보 새로고침
+  Future<void> reloadCurrentUser() async {
+    try {
+      final user = currentUser;
+      if (user != null) {
+        await user.reload();
+        debugPrint('Reloaded Firebase Auth user: ${currentUser?.email} (${currentUser?.uid})');
+      }
+    } catch (e) {
+      debugPrint('Error reloading current user: $e');
+    }
+  }
+  
+  // 사용자 데이터 초기화 (문제 해결용)
+  Future<void> resetUserData() async {
+    try {
+      final user = currentUser;
+      if (user == null) {
+        debugPrint('resetUserData: No current user logged in');
+        return;
+      }
+      
+      // 현재 사용자 정보 새로고침
+      await user.reload();
+      
+      // 현재 사용자 문서 가져오기
+      final doc = await _firestore.collection('users').doc(user.uid).get();
+      
+      // 이메일 주소 가져오기
+      final email = user.email ?? '';
+      
+      // 디스플레이 이름 가져오기
+      final displayName = user.displayName ?? 'User${user.uid.substring(0, 4)}';
+      
+      debugPrint('resetUserData: Resetting user data for ${user.uid} ($email, $displayName)');
+      
+      // 사용자 문서 업데이트 또는 생성
+      await _firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'email': email,
+        'nickname': displayName,
+        'joinedAt': doc.exists ? (doc.data() as Map<String, dynamic>)['joinedAt'] ?? Timestamp.now() : Timestamp.now(),
+        'lastActiveAt': Timestamp.now(),
+        'credits': doc.exists ? (doc.data() as Map<String, dynamic>)['credits'] ?? 0 : 0,
+        'isPremium': doc.exists ? (doc.data() as Map<String, dynamic>)['isPremium'] ?? false : false,
+        'isVerified': user.emailVerified,
+        'signInProviders': ['password'],
+      }, SetOptions(merge: true));
+      
+      debugPrint('resetUserData: User data has been reset successfully');
+    } catch (e) {
+      debugPrint('Error resetting user data: $e');
     }
   }
   
@@ -140,10 +214,32 @@ class AuthService {
         password: password,
       );
       
-      // 마지막 로그인 시간 업데이트
-      await _firestore.collection('users').doc(credential.user!.uid).update({
-        'lastActiveAt': Timestamp.now(),
-      });
+      // 유저 존재 여부 확인
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(credential.user!.uid).get();
+      
+      // 유저 문서가 없는 경우 생성
+      if (!userDoc.exists) {
+        // 기본 닉네임 생성
+        String nickname = credential.user?.displayName ?? 'User${credential.user!.uid.substring(0, 4)}';
+        
+        // Firestore에 사용자 정보 저장
+        await _firestore.collection('users').doc(credential.user!.uid).set({
+          'uid': credential.user!.uid,
+          'email': email,
+          'nickname': nickname,
+          'joinedAt': Timestamp.now(),
+          'lastActiveAt': Timestamp.now(),
+          'credits': 0,
+          'isPremium': false,
+          'isVerified': credential.user?.emailVerified ?? false,
+          'signInProviders': ['password'],
+        });
+      } else {
+        // 마지막 로그인 시간 업데이트
+        await _firestore.collection('users').doc(credential.user!.uid).update({
+          'lastActiveAt': Timestamp.now(),
+        });
+      }
       
       return credential;
     } on FirebaseAuthException catch (e) {
@@ -168,9 +264,27 @@ class AuthService {
   // 로그아웃
   Future<void> signOut() async {
     try {
+      // 로그아웃 전 현재 사용자 ID 저장 (디버깅용)
+      final currentUid = _auth.currentUser?.uid;
+      final currentEmail = _auth.currentUser?.email;
+      debugPrint('로그아웃 시도: $currentEmail ($currentUid)');
+      
+      // Firebase 인증에서 로그아웃
       await _auth.signOut();
+      
+      // 로그아웃 확인
+      debugPrint('Firebase 로그아웃 완료. 현재 사용자: ${_auth.currentUser?.email ?? "없음"}');
+      
+      // Firebase 인증 상태 명시적으로 확인 (디버깅용)
+      if (_auth.currentUser == null) {
+        debugPrint('로그아웃 성공: 사용자 세션이 정상적으로 종료됨');
+      } else {
+        debugPrint('로그아웃 불완전: 여전히 인증된 사용자가 있음 - ${_auth.currentUser?.email}');
+        // 강제로 다시 시도
+        await FirebaseAuth.instance.signOut();
+      }
     } catch (e) {
-      debugPrint('Error signing out: $e');
+      debugPrint('로그아웃 중 오류 발생: $e');
       rethrow;
     }
   }

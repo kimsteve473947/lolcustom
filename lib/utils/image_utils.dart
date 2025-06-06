@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:lol_custom_game_manager/models/user_model.dart';
 
 /// 안전하게 이미지를 로드하기 위한 유틸리티 클래스
 class ImageUtils {
@@ -91,5 +92,32 @@ class ImageUtils {
         );
       },
     );
+  }
+
+  // 티어별 로고 이미지 경로 반환
+  static String getTierLogoPath(PlayerTier tier) {
+    switch (tier) {
+      case PlayerTier.iron:
+        return 'assets/images/tiers/아이언로고.png';
+      case PlayerTier.bronze:
+        return 'assets/images/tiers/브론즈로고.png';
+      case PlayerTier.silver:
+        return 'assets/images/tiers/실버로고.png';
+      case PlayerTier.gold:
+        return 'assets/images/tiers/골드로고.png';
+      case PlayerTier.platinum:
+        return 'assets/images/tiers/플레티넘로고.png';
+      case PlayerTier.emerald:
+        return 'assets/images/tiers/에메랄드로고.png';
+      case PlayerTier.diamond:
+        return 'assets/images/tiers/다이아로고.png';
+      case PlayerTier.master:
+        return 'assets/images/tiers/마스터로고.png';
+      case PlayerTier.grandmaster:
+      case PlayerTier.challenger:
+      case PlayerTier.unranked:
+      default:
+        return 'assets/images/tiers/마스터로고.png';
+    }
   }
 } 

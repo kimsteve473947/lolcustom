@@ -15,6 +15,7 @@ import 'package:shimmer/shimmer.dart';
 import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:lol_custom_game_manager/widgets/tournament_card_simplified.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_screen.dart';
+import 'package:lol_custom_game_manager/widgets/lane_icon_widget.dart';
 
 class MatchListTab extends StatefulWidget {
   final DateTime? selectedDate;
@@ -99,14 +100,13 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     try {
       final tournamentService = Provider.of<TournamentService>(context, listen: false);
       
-      // 날짜 필터 적용
-      if (widget.selectedDate != null) {
-        final startDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day);
-        final endDate = DateTime(widget.selectedDate!.year, widget.selectedDate!.month, widget.selectedDate!.day, 23, 59, 59);
-        
-        _filters['startDate'] = startDate;
-        _filters['endDate'] = endDate;
-      }
+      // 날짜 필터 적용 - selectedDate가 없으면 오늘 날짜 사용
+      final DateTime filterDate = widget.selectedDate ?? DateTime.now();
+      final startDate = DateTime(filterDate.year, filterDate.month, filterDate.day);
+      final endDate = DateTime(filterDate.year, filterDate.month, filterDate.day, 23, 59, 59);
+      
+      _filters['startDate'] = startDate;
+      _filters['endDate'] = endDate;
       
       final tournaments = await tournamentService.getTournaments(
         filters: _filters,
@@ -142,14 +142,17 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     try {
       final tournamentService = Provider.of<TournamentService>(context, listen: false);
       
-      // Use limit and offset-based pagination instead of cursor-based pagination
+      // 마지막 대회 ID를 오프셋으로 사용
+      final lastId = _tournaments.last.id;
+      
+      // 현재 필터 그대로 사용하여 추가 데이터 로드
       final tournaments = await tournamentService.getTournaments(
         filters: _filters,
         limit: 10,
       );
       
       setState(() {
-        // Only add tournaments that aren't already in the list (to avoid duplicates)
+        // 중복 제거 후 추가
         for (final tournament in tournaments) {
           if (!_tournaments.any((t) => t.id == tournament.id)) {
             _tournaments.add(tournament);
@@ -200,7 +203,7 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
   Widget _buildTournamentsList() {
     if (_errorMessage != null) {
       return ErrorView(
-        message: _errorMessage!,
+        errorMessage: _errorMessage!,
         onRetry: _loadTournaments,
       );
     }
@@ -270,27 +273,46 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
   }
   
   Widget _buildTournamentCard(TournamentModel tournament) {
-    // 역할 아이콘 맵
-    final roleIcons = {
-      'top': Icons.arrow_upward,
-      'jungle': Icons.nature_people,
-      'mid': Icons.adjust,
-      'adc': Icons.gps_fixed,
-      'support': Icons.shield,
-    };
-    
-    // 역할 색상 맵
-    final roleColors = {
-      'top': AppColors.roleTop,
-      'jungle': AppColors.roleJungle,
-      'mid': AppColors.roleMid,
-      'adc': AppColors.roleAdc,
-      'support': AppColors.roleSupport,
-    };
+    // 역할 순서 정의 (순서대로 표시하기 위함)
+    final orderedRoles = ['top', 'jungle', 'mid', 'adc', 'support'];
     
     // 총 참가자 수와 총 슬롯 수 계산
     final totalParticipants = tournament.participants.length;
     final totalSlots = tournament.slotsByRole.values.fold(0, (sum, count) => sum + count);
+    
+    // 대회 이름에서 티어 정보 추출
+    Map<String, String> tierInfo = {};
+    
+    // 티어 확인 함수
+    void checkAndAddTier(String tierName, String iconPath, int tierRank) {
+      if (tournament.title.toLowerCase().contains(tierName)) {
+        tierInfo[tierName] = iconPath;
+      }
+    }
+    
+    // 티어 순위와 함께 각 티어 확인 (낮은 숫자가 낮은 티어)
+    checkAndAddTier('아이언', 'assets/images/tiers/아이언로고.png', 1);
+    checkAndAddTier('브론즈', 'assets/images/tiers/브론즈로고.png', 2);
+    checkAndAddTier('실버', 'assets/images/tiers/실버로고.png', 3);
+    checkAndAddTier('골드', 'assets/images/tiers/골드로고.png', 4);
+    checkAndAddTier('플레티넘', 'assets/images/tiers/플레티넘로고.png', 5);
+    checkAndAddTier('플래티넘', 'assets/images/tiers/플레티넘로고.png', 5);
+    checkAndAddTier('에메랄드', 'assets/images/tiers/에메랄드로고.png', 6);
+    checkAndAddTier('다이아', 'assets/images/tiers/다이아로고.png', 7);
+    checkAndAddTier('마스터', 'assets/images/tiers/마스터로고.png', 8);
+    
+    // 티어 순서대로 정렬된 아이콘 경로 배열 생성
+    List<String> tierIconPaths = [];
+    
+    // 순서대로 티어 아이콘 추가 (낮은 티어부터 높은 티어로)
+    if (tierInfo.containsKey('아이언')) tierIconPaths.add('assets/images/tiers/아이언로고.png');
+    if (tierInfo.containsKey('브론즈')) tierIconPaths.add('assets/images/tiers/브론즈로고.png');
+    if (tierInfo.containsKey('실버')) tierIconPaths.add('assets/images/tiers/실버로고.png');
+    if (tierInfo.containsKey('골드')) tierIconPaths.add('assets/images/tiers/골드로고.png');
+    if (tierInfo.containsKey('플레티넘') || tierInfo.containsKey('플래티넘')) tierIconPaths.add('assets/images/tiers/플레티넘로고.png');
+    if (tierInfo.containsKey('에메랄드')) tierIconPaths.add('assets/images/tiers/에메랄드로고.png');
+    if (tierInfo.containsKey('다이아')) tierIconPaths.add('assets/images/tiers/다이아로고.png');
+    if (tierInfo.containsKey('마스터')) tierIconPaths.add('assets/images/tiers/마스터로고.png');
     
     return Card(
       margin: const EdgeInsets.only(bottom: 16),
@@ -304,27 +326,22 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
         },
         borderRadius: BorderRadius.circular(12),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             // 상단 정보 (시간, 상태, 호스트)
             Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: [
                   Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(
-                        Icons.access_time,
-                        size: 16,
-                        color: AppColors.textSecondary,
-                      ),
-                      const SizedBox(width: 4),
                       Text(
-                        DateFormat('M월 d일 (E) HH:mm', 'ko_KR').format(tournament.startsAt.toDate()),
+                        DateFormat('HH:mm', 'ko_KR').format(tournament.startsAt.toDate()),
                         style: const TextStyle(
-                          fontSize: 14,
-                          color: AppColors.textSecondary,
+                          fontSize: 22,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
                         ),
                       ),
                       const Spacer(),
@@ -345,38 +362,54 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   Text(
                     tournament.title,
                     style: const TextStyle(
-                      fontSize: 18,
+                      fontSize: 20,
                       fontWeight: FontWeight.bold,
                     ),
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
                   ),
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      CircleAvatar(
-                        radius: 12,
-                        backgroundImage: tournament.hostProfileImageUrl != null
-                            ? NetworkImage(tournament.hostProfileImageUrl!)
-                            : null,
-                        child: tournament.hostProfileImageUrl == null
-                            ? const Icon(Icons.person, size: 12)
-                            : null,
+                  const SizedBox(height: 8),
+                  
+                  // 티어 아이콘 표시
+                  if (tierIconPaths.isNotEmpty)
+                    SizedBox(
+                      height: 24,
+                      child: ListView(
+                        scrollDirection: Axis.horizontal,
+                        shrinkWrap: true,
+                        children: tierIconPaths.map((path) => 
+                          Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 4),
+                            child: Image.asset(
+                              path,
+                              width: 24,
+                              height: 24,
+                            ),
+                          )
+                        ).toList(),
                       ),
-                      const SizedBox(width: 4),
-                      Text(
-                        tournament.hostNickname ?? tournament.hostName,
-                        style: const TextStyle(
+                    )
+                  else if (tournament.title.toLowerCase().contains('랜덤'))
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                      decoration: BoxDecoration(
+                        color: Colors.purple.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: const Text(
+                        '랜덤',
+                        style: TextStyle(
                           fontSize: 14,
-                          color: AppColors.textSecondary,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.purple,
                         ),
                       ),
-                    ],
-                  ),
+                    ),
                 ],
               ),
             ),
@@ -390,75 +423,62 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
                   // 총 참가자 수 표시
                   Row(
                     children: [
-                      Text(
+                      const Text(
                         '참가 현황',
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
                         ),
                       ),
                       const Spacer(),
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: AppColors.primary.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Text(
-                          '$totalParticipants/$totalSlots',
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: AppColors.primary,
-                          ),
+                      Text(
+                        '$totalParticipants/$totalSlots',
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                          color: _getParticipantCountColor(totalParticipants, totalSlots),
                         ),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   
-                  // 각 역할별 인원 표시
+                  // 각 역할별 인원 표시 (순서대로)
                   Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: tournament.slotsByRole.entries.map((entry) {
-                      final role = entry.key;
-                      final totalForRole = entry.value;
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: orderedRoles.map((role) {
+                      final totalForRole = tournament.slotsByRole[role] ?? 2;
                       final filledForRole = tournament.filledSlotsByRole[role] ?? 0;
                       
-                      return Expanded(
-                        child: Column(
-                          children: [
-                            Icon(
-                              roleIcons[role],
-                              color: roleColors[role],
-                              size: 16,
+                      return Column(
+                        children: [
+                          LaneIconWidget(
+                            lane: role,
+                            size: 36, // 아이콘 크기 증가
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '$filledForRole/$totalForRole',
+                            style: TextStyle(
+                              fontSize: 14, // 폰트 크기 증가
+                              fontWeight: FontWeight.bold,
+                              color: _getParticipantCountColor(filledForRole, totalForRole),
                             ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '$filledForRole/$totalForRole',
-                              style: TextStyle(
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                                color: filledForRole == totalForRole
-                                    ? AppColors.success
-                                    : roleColors[role],
-                              ),
-                            ),
-                          ],
-                        ),
+                          ),
+                        ],
                       );
                     }).toList(),
                   ),
                   
                   // 전체 진행 상황 표시 바
-                  const SizedBox(height: 8),
+                  const SizedBox(height: 12),
                   ClipRRect(
                     borderRadius: BorderRadius.circular(4),
                     child: LinearProgressIndicator(
                       value: totalSlots > 0 ? totalParticipants / totalSlots : 0,
                       backgroundColor: Colors.grey.shade200,
-                      color: AppColors.primary,
-                      minHeight: 6,
+                      color: _getProgressBarColor(totalParticipants, totalSlots),
+                      minHeight: 8, // 프로그레스 바 높이 증가
                     ),
                   ),
                 ],
@@ -468,6 +488,20 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
         ),
       ),
     );
+  }
+  
+  // 참가자 수에 따른 색상 변경
+  Color _getParticipantCountColor(int filled, int total) {
+    if (filled == 0) return Colors.black;  // 0/2: 검정색
+    if (filled < total) return Colors.amber.shade700;  // 1/2: 노란색
+    return Colors.red;  // 2/2: 빨간색
+  }
+  
+  // 프로그레스 바 색상
+  Color _getProgressBarColor(int filled, int total) {
+    if (filled == 0) return Colors.grey.shade700;
+    if (filled < total) return Colors.amber.shade700;
+    return Colors.red;
   }
   
   String _getStatusText(TournamentStatus status) {

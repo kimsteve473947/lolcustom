@@ -16,15 +16,41 @@ class FirebaseService {
     try {
       User? user = _auth.currentUser;
       if (user == null) {
+        debugPrint('getCurrentUser: No current user found in Firebase Auth');
         return null;
       }
       
+      // Reload the user to ensure we have the latest data
+      await user.reload();
+      user = _auth.currentUser; // Get the refreshed user
+      
+      if (user == null) {
+        debugPrint('getCurrentUser: User is null after reload');
+        return null;
+      }
+      
+      debugPrint('getCurrentUser: Getting user document for uid: ${user.uid}, email: ${user.email}');
       DocumentSnapshot doc = await _firestore.collection('users').doc(user.uid).get();
+      
       if (!doc.exists) {
-        return null;
+        debugPrint('getCurrentUser: User document does not exist for uid: ${user.uid}');
+        
+        // Create a new user document if it doesn't exist
+        final newUser = UserModel(
+          uid: user.uid,
+          email: user.email ?? '',
+          nickname: user.displayName ?? 'User${user.uid.substring(0, 4)}',
+          joinedAt: Timestamp.now(),
+        );
+        
+        debugPrint('getCurrentUser: Creating new user document with nickname: ${newUser.nickname}');
+        await _firestore.collection('users').doc(user.uid).set(newUser.toFirestore());
+        return newUser;
       }
       
-      return UserModel.fromFirestore(doc);
+      UserModel userModel = UserModel.fromFirestore(doc);
+      debugPrint('getCurrentUser: Retrieved user: ${userModel.nickname} with ID: ${userModel.uid}');
+      return userModel;
     } catch (e) {
       debugPrint('Error getting current user: $e');
       return null;

@@ -14,6 +14,7 @@ enum PlayerTier {
   silver,
   gold,
   platinum,
+  emerald,
   diamond,
   master,
   grandmaster,
@@ -37,6 +38,7 @@ class UserModel extends Equatable {
   final String? position;
   final int? totalRatingsCount;
   final int credits;
+  final List<String>? preferredPositions;
 
   const UserModel({
     required this.uid,
@@ -55,6 +57,7 @@ class UserModel extends Equatable {
     this.position,
     this.totalRatingsCount,
     this.credits = 0,
+    this.preferredPositions,
   });
 
   // 파이어스토어에서 데이터 불러오기
@@ -65,6 +68,12 @@ class UserModel extends Equatable {
     String profileImageUrl = data['profileImageUrl'] ?? '';
     if (profileImageUrl.isEmpty || !profileImageUrl.startsWith('http')) {
       profileImageUrl = '';
+    }
+    
+    // preferredPositions 변환
+    List<String>? preferredPositions;
+    if (data['preferredPositions'] != null) {
+      preferredPositions = List<String>.from(data['preferredPositions']);
     }
     
     return UserModel(
@@ -84,6 +93,7 @@ class UserModel extends Equatable {
       position: data['position'] as String?,
       totalRatingsCount: data['totalRatingsCount'] as int?,
       credits: data['credits'] as int? ?? 0,
+      preferredPositions: preferredPositions,
     );
   }
 
@@ -105,6 +115,7 @@ class UserModel extends Equatable {
       'position': position,
       'totalRatingsCount': totalRatingsCount,
       'credits': credits,
+      'preferredPositions': preferredPositions,
     };
   }
   
@@ -130,6 +141,7 @@ class UserModel extends Equatable {
       case 'silver': return PlayerTier.silver;
       case 'gold': return PlayerTier.gold;
       case 'platinum': return PlayerTier.platinum;
+      case 'emerald': return PlayerTier.emerald;
       case 'diamond': return PlayerTier.diamond;
       case 'master': return PlayerTier.master;
       case 'grandmaster': return PlayerTier.grandmaster;
@@ -166,6 +178,7 @@ class UserModel extends Equatable {
     String? position,
     int? totalRatingsCount,
     int? credits,
+    List<String>? preferredPositions,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -184,6 +197,7 @@ class UserModel extends Equatable {
       position: position ?? this.position,
       totalRatingsCount: totalRatingsCount ?? this.totalRatingsCount,
       credits: credits ?? this.credits,
+      preferredPositions: preferredPositions ?? this.preferredPositions,
     );
   }
 
@@ -205,5 +219,6 @@ class UserModel extends Equatable {
         position,
         totalRatingsCount,
         credits,
+        preferredPositions,
       ];
 } 

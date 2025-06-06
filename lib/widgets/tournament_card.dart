@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/constants/lol_constants.dart';
 import 'package:lol_custom_game_manager/models/tournament_model.dart';
+import 'package:lol_custom_game_manager/widgets/lane_icon_widget.dart';
 
 class TournamentCard extends StatelessWidget {
   final TournamentModel tournament;
@@ -45,18 +46,40 @@ class TournamentCard extends StatelessWidget {
   }
 
   Widget _buildHeader() {
+    // 대회 이름에서 티어 정보 추출
+    List<String> tierIconPaths = [];
+    
+    // 티어 확인 함수
+    void checkAndAddTier(String tierName, String iconPath) {
+      if (tournament.title.toLowerCase().contains(tierName)) {
+        tierIconPaths.add(iconPath);
+      }
+    }
+    
+    // 각 티어 확인
+    checkAndAddTier('플레티넘', 'assets/images/tiers/플레티넘로고.png');
+    checkAndAddTier('플래티넘', 'assets/images/tiers/플레티넘로고.png');
+    checkAndAddTier('다이아', 'assets/images/tiers/다이아로고.png');
+    checkAndAddTier('골드', 'assets/images/tiers/골드로고.png');
+    checkAndAddTier('실버', 'assets/images/tiers/실버로고.png');
+    checkAndAddTier('브론즈', 'assets/images/tiers/브론즈로고.png');
+    checkAndAddTier('아이언', 'assets/images/tiers/아이언로고.png');
+    checkAndAddTier('에메랄드', 'assets/images/tiers/에메랄드로고.png');
+    checkAndAddTier('마스터', 'assets/images/tiers/마스터로고.png');
+    
     return Row(
       children: [
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 더 큰 시간 표시
               Text(
                 DateFormat('M월 d일 (E) HH:mm', 'ko_KR').format(tournament.startsAt.toDate()),
                 style: const TextStyle(
-                  fontSize: 14,
+                  fontSize: 18,
                   fontWeight: FontWeight.bold,
-                  color: AppColors.textSecondary,
+                  color: AppColors.primary,
                 ),
               ),
               const SizedBox(height: 4),
@@ -72,39 +95,42 @@ class TournamentCard extends StatelessWidget {
             ],
           ),
         ),
-        _buildHostInfo(),
-      ],
-    );
-  }
-  
-  Widget _buildHostInfo() {
-    return Row(
-      children: [
-        if (tournament.premiumBadge)
-          Padding(
-            padding: const EdgeInsets.only(right: 8),
-            child: Icon(
-              Icons.verified,
-              size: 18,
-              color: Colors.amber.shade600,
-            ),
-          ),
-        if (tournament.hostProfileImageUrl != null)
-          CircleAvatar(
-            radius: 18,
-            backgroundImage: NetworkImage(tournament.hostProfileImageUrl!),
+        // 티어 아이콘 표시
+        if (tierIconPaths.isNotEmpty)
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: tierIconPaths.map((path) => 
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 2),
+                child: Image.asset(
+                  path,
+                  width: 24,
+                  height: 24,
+                ),
+              )
+            ).toList(),
           )
-        else
-          CircleAvatar(
-            radius: 18,
-            backgroundColor: AppColors.primary,
-            child: Text(
-              tournament.hostNickname?.substring(0, 1).toUpperCase() ?? 'H',
-              style: const TextStyle(
+        else if (tournament.title.toLowerCase().contains('랜덤'))
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+            decoration: BoxDecoration(
+              color: Colors.purple.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
+              '랜덤',
+              style: TextStyle(
+                fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Colors.white,
+                color: Colors.purple,
               ),
             ),
+          )
+        else if (tournament.premiumBadge)
+          Icon(
+            Icons.verified,
+            size: 24,
+            color: Colors.amber.shade600,
           ),
       ],
     );
@@ -208,28 +234,14 @@ class TournamentCard extends StatelessWidget {
         final key = lane.toString().split('.').last;
         final filled = tournament.filledSlotsByRole[key] ?? 0;
         final total = tournament.slotsByRole[key] ?? 2;
-        final isFull = filled >= total;
 
         return Container(
           margin: const EdgeInsets.only(right: 8),
           child: Column(
             children: [
-              Container(
-                width: 28,
-                height: 28,
-                padding: const EdgeInsets.all(2),
-                decoration: BoxDecoration(
-                  color: isFull ? Colors.grey.shade200 : Colors.white,
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: isFull ? Colors.grey.shade400 : AppColors.primary,
-                    width: 1,
-                  ),
-                ),
-                child: Image.asset(
-                  LolLaneIcons.paths[lane] ?? 'assets/images/lane_top.png', 
-                  color: isFull ? Colors.grey.shade400 : null,
-                ),
+              LaneIconWidget(
+                lane: key,
+                size: 24,
               ),
               const SizedBox(height: 2),
               Text(
@@ -237,7 +249,7 @@ class TournamentCard extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 10,
                   fontWeight: FontWeight.bold,
-                  color: isFull ? Colors.grey.shade600 : AppColors.primary,
+                  color: _getParticipantCountColor(filled, total),
                 ),
               ),
             ],
@@ -245,6 +257,13 @@ class TournamentCard extends StatelessWidget {
         );
       }).toList(),
     );
+  }
+
+  // 참가자 수에 따른 색상 변경
+  Color _getParticipantCountColor(int filled, int total) {
+    if (filled == 0) return Colors.black;  // 0/2: 검정색
+    if (filled < total) return Colors.amber.shade700;  // 1/2: 노란색
+    return Colors.red;  // 2/2: 빨간색
   }
 
   Widget _buildStatusBadge() {

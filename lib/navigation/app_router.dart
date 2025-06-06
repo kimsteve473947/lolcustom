@@ -21,6 +21,7 @@ import 'package:lol_custom_game_manager/screens/tournaments/tournament_detail_sc
 import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_screen.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/create_tournament_screen.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
+import 'package:lol_custom_game_manager/widgets/admin_tools.dart';
 
 class AppRouter {
   final AuthService authService;
@@ -89,7 +90,9 @@ class AppRouter {
       ),
       GoRoute(
         path: '/tournaments',
-        builder: (context, state) => const TournamentMainScreen(),
+        builder: (context, state) => const MainScreen(
+          initialTabIndex: 0,
+        ),
       ),
       GoRoute(
         path: '/tournaments/create',
@@ -108,46 +111,70 @@ class AppRouter {
         path: '/mercenaries/:id',
         builder: (context, state) {
           final userId = state.pathParameters['id']!;
-          return MercenaryDetailScreen(mercenaryId: userId);
+          return MainScreen(
+            child: MercenaryDetailScreen(mercenaryId: userId),
+          );
         },
       ),
       GoRoute(
         path: '/mercenaries/edit',
-        builder: (context, state) => const MercenaryEditScreen(),
+        builder: (context, state) => MainScreen(
+          child: const MercenaryEditScreen(),
+        ),
       ),
       GoRoute(
         path: '/clans',
-        builder: (context, state) => const ClanListScreen(),
+        builder: (context, state) => const MainScreen(
+          initialTabIndex: 1,
+        ),
       ),
       GoRoute(
         path: '/clans/create',
-        builder: (context, state) => const CreateClanScreen(),
+        builder: (context, state) => MainScreen(
+          child: const CreateClanScreen(),
+        ),
       ),
       GoRoute(
         path: '/clans/:id',
         builder: (context, state) {
           final clanId = state.pathParameters['id']!;
-          return ClanDetailScreen(clanId: clanId);
+          return MainScreen(
+            child: ClanDetailScreen(clanId: clanId),
+          );
         },
       ),
       GoRoute(
         path: '/chat',
-        builder: (context, state) => const ChatListScreen(),
+        builder: (context, state) => const MainScreen(
+          initialTabIndex: 2,
+        ),
       ),
       GoRoute(
         path: '/chat/:id',
         builder: (context, state) {
           final chatId = state.pathParameters['id']!;
-          return ChatRoomScreen(chatRoomId: chatId);
+          return MainScreen(
+            child: ChatRoomScreen(chatRoomId: chatId),
+          );
         },
       ),
       GoRoute(
         path: '/rankings',
-        builder: (context, state) => const RankingsScreen(),
+        builder: (context, state) => const MainScreen(
+          initialTabIndex: 3,
+        ),
       ),
       GoRoute(
         path: '/mypage',
-        builder: (context, state) => const MyPageScreen(),
+        builder: (context, state) => const MainScreen(
+          initialTabIndex: 4,
+        ),
+      ),
+      GoRoute(
+        path: '/admin',
+        builder: (context, state) => MainScreen(
+          child: const AdminToolsScreen(),
+        ),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

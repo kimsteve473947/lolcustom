@@ -8,6 +8,8 @@ import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:lol_custom_game_manager/widgets/error_view.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lol_custom_game_manager/constants/lol_constants.dart';
+import 'package:lol_custom_game_manager/utils/tournament_ui_utils.dart';
 
 class MercenaryDetailScreen extends StatefulWidget {
   final String mercenaryId;
@@ -39,6 +41,7 @@ class _MercenaryDetailScreenState extends State<MercenaryDetailScreen> {
       case PlayerTier.silver: return '실버';
       case PlayerTier.gold: return '골드';
       case PlayerTier.platinum: return '플래티넘';
+      case PlayerTier.emerald: return '에메랄드';
       case PlayerTier.diamond: return '다이아몬드';
       case PlayerTier.master: return '마스터';
       case PlayerTier.grandmaster: return '그랜드마스터';
@@ -144,7 +147,7 @@ class _MercenaryDetailScreenState extends State<MercenaryDetailScreen> {
       ),
       body: _errorMessage != null
           ? ErrorView(
-              message: _errorMessage!,
+              errorMessage: _errorMessage!,
               onRetry: _loadMercenary,
             )
           : _isLoading
@@ -286,39 +289,65 @@ class _MercenaryDetailScreenState extends State<MercenaryDetailScreen> {
                   Row(
                     children: _mercenary!.preferredPositions.map((position) {
                       Color positionColor;
+                      String imagePath;
+                      
                       switch (position.toLowerCase()) {
                         case 'top':
                           positionColor = AppColors.roleTop;
+                          imagePath = LolLaneIcons.top;
                           break;
                         case 'jungle':
                           positionColor = AppColors.roleJungle;
+                          imagePath = LolLaneIcons.jungle;
                           break;
                         case 'mid':
                           positionColor = AppColors.roleMid;
+                          imagePath = LolLaneIcons.mid;
                           break;
                         case 'adc':
                           positionColor = AppColors.roleAdc;
+                          imagePath = LolLaneIcons.adc;
                           break;
                         case 'support':
                           positionColor = AppColors.roleSupport;
+                          imagePath = LolLaneIcons.support;
                           break;
                         default:
                           positionColor = AppColors.textSecondary;
+                          imagePath = LolLaneIcons.top;
                       }
                       
-                      return Container(
-                        margin: const EdgeInsets.only(right: 8),
-                        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: positionColor.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          position.toUpperCase(),
-                          style: TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: positionColor,
+                      return Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: positionColor.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(
+                              color: positionColor,
+                              width: 1,
+                            ),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset(
+                                imagePath,
+                                width: 14,
+                                height: 14,
+                                color: positionColor,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                TournamentUIUtils.getRoleName(position.toLowerCase()),
+                                style: TextStyle(
+                                  color: positionColor,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       );
@@ -347,11 +376,11 @@ class _MercenaryDetailScreenState extends State<MercenaryDetailScreen> {
   Widget _buildPositionStats() {
     // Define position data
     final positions = [
-      {'name': 'TOP', 'key': 'top', 'color': AppColors.roleTop},
-      {'name': 'JGL', 'key': 'jungle', 'color': AppColors.roleJungle},
-      {'name': 'MID', 'key': 'mid', 'color': AppColors.roleMid},
-      {'name': 'ADC', 'key': 'adc', 'color': AppColors.roleAdc},
-      {'name': 'SUP', 'key': 'support', 'color': AppColors.roleSupport},
+      {'name': 'TOP', 'key': 'top', 'color': AppColors.roleTop, 'imagePath': LolLaneIcons.top},
+      {'name': 'JGL', 'key': 'jungle', 'color': AppColors.roleJungle, 'imagePath': LolLaneIcons.jungle},
+      {'name': 'MID', 'key': 'mid', 'color': AppColors.roleMid, 'imagePath': LolLaneIcons.mid},
+      {'name': 'ADC', 'key': 'adc', 'color': AppColors.roleAdc, 'imagePath': LolLaneIcons.adc},
+      {'name': 'SUP', 'key': 'support', 'color': AppColors.roleSupport, 'imagePath': LolLaneIcons.support},
     ];
     
     return Card(

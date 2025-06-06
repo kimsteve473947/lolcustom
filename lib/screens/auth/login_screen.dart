@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/providers/auth_provider.dart';
+import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:provider/provider.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -33,12 +34,17 @@ class _LoginScreenState extends State<LoginScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final appStateProvider = Provider.of<AppStateProvider>(context, listen: false);
     
     try {
       await authProvider.signIn(
         _emailController.text.trim(),
         _passwordController.text,
       );
+      
+      // 로그인 성공 후 AppStateProvider의 사용자 정보 동기화
+      await appStateProvider.syncCurrentUser();
+      debugPrint('LoginScreen - 로그인 성공 후 AppStateProvider 동기화 완료');
       
       if (mounted) {
         // 로그인 성공 후 리다이렉트 URL이 있으면 해당 URL로 이동

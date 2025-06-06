@@ -18,6 +18,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Firebase background message handler
 @pragma('vm:entry-point')
@@ -44,6 +45,9 @@ Future<void> main() async {
     final auth = FirebaseAuth.instance;
     await auth.authStateChanges().first;
     debugPrint('Firebase Auth initialized successfully');
+    
+    // 로그인 사용자 상태 확인 및 필요시 데이터 수정
+    await _checkAndFixUserData();
     
     // Set up background message handler
     FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
@@ -79,6 +83,79 @@ Future<void> main() async {
   }
   
   runApp(const MyApp());
+}
+
+// 사용자 로그인 데이터 검증 및 수정
+Future<void> _checkAndFixUserData() async {
+  try {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      debugPrint('No user logged in, skipping user data check');
+      return;
+    }
+    
+    // 사용자 정보 강제 새로고침
+    await user.reload();
+    debugPrint('Reloaded user: ${user.email} (${user.uid})');
+    
+    // Firestore 문서 확인
+    final firestore = FirebaseFirestore.instance;
+    final doc = await firestore.collection('users').doc(user.uid).get();
+    
+    if (!doc.exists) {
+      debugPrint('User document does not exist for uid: ${user.uid}, creating new document');
+      // 문서가 없는 경우 새로 생성
+      await firestore.collection('users').doc(user.uid).set({
+        'uid': user.uid,
+        'email': user.email ?? '',
+        'nickname': user.displayName ?? 'User${user.uid.substring(0, 4)}',
+        'joinedAt': Timestamp.now(),
+        'lastActiveAt': Timestamp.now(),
+        'credits': 0,
+        'isPremium': false,
+        'isVerified': user.emailVerified,
+        'signInProviders': ['password'],
+      });
+    } else {
+      final data = doc.data() as Map<String, dynamic>;
+      final nickname = data['nickname'] as String?;
+      debugPrint('User document exists with nickname: $nickname');
+      
+      // 닉네임이 비어있거나 문제가 있는 경우 업데이트
+      if (nickname == null || nickname.isEmpty) {
+        debugPrint('User nickname is missing, updating...');
+        await firestore.collection('users').doc(user.uid).update({
+          'nickname': user.displayName ?? 'User${user.uid.substring(0, 4)}',
+          'lastActiveAt': Timestamp.now(),
+        });
+      } else {
+        // 마지막 활동 시간 업데이트
+        await firestore.collection('users').doc(user.uid).update({
+          'lastActiveAt': Timestamp.now(),
+          'email': user.email ?? '', // 이메일 동기화
+        });
+      }
+    }
+    
+    // Firebase Auth와 Firestore 데이터 동기화 확인
+    if (user.displayName != null && user.displayName!.isNotEmpty) {
+      final userDoc = await firestore.collection('users').doc(user.uid).get();
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        final firestoreNickname = userData['nickname'] as String?;
+        
+        // Firebase Auth와 Firestore의 닉네임이 다른 경우 동기화
+        if (firestoreNickname != user.displayName) {
+          debugPrint('Nickname mismatch between Auth (${user.displayName}) and Firestore ($firestoreNickname). Synchronizing...');
+          await firestore.collection('users').doc(user.uid).update({
+            'nickname': user.displayName,
+          });
+        }
+      }
+    }
+  } catch (e) {
+    debugPrint('Error checking/fixing user data: $e');
+  }
 }
 
 class MyApp extends StatelessWidget {
@@ -121,8 +198,11 @@ class MyApp extends StatelessWidget {
       ],
       child: Builder(
         builder: (context) {
+          // 두 프로바이더 간의 상태 동기화 설정
+          _setupProviderSynchronization(context);
+          
           return MaterialApp.router(
-            title: 'LoL 내전 매니저',
+            title: '스크림져드',
             theme: AppTheme.lightTheme,
             darkTheme: AppTheme.darkTheme,
             themeMode: ThemeMode.system,
@@ -141,5 +221,35 @@ class MyApp extends StatelessWidget {
         },
       ),
     );
+  }
+
+  void _setupProviderSynchronization(BuildContext context) {
+    // AuthProvider와 AppStateProvider 참조
+    final authProvider = Provider.of<CustomAuth.AuthProvider>(context, listen: false);
+    final appStateProvider = Provider.of<AppStateProvider>(context, listen: false);
+    
+    // AuthProvider 변경 감지 후 AppStateProvider 동기화
+    authProvider.addListener(() async {
+      debugPrint('MyApp - AuthProvider 상태 변경 감지. 로그인 상태: ${authProvider.isLoggedIn}');
+      
+      // 현재 사용자가 변경되었거나 로그아웃 상태가 변경된 경우
+      final authUser = authProvider.user;
+      final appUser = appStateProvider.currentUser;
+      
+      // 사용자 ID가 다르거나 로그인/로그아웃 상태가 변경된 경우 동기화
+      if (authUser?.uid != appUser?.uid) {
+        debugPrint('MyApp - 사용자 ID 불일치 감지: AuthProvider(${authUser?.uid}) vs AppStateProvider(${appUser?.uid})');
+        
+        if (authProvider.isLoggedIn) {
+          // 로그인 상태면 AppStateProvider 사용자 정보 갱신
+          debugPrint('MyApp - AppStateProvider 사용자 정보 동기화 시작');
+          await appStateProvider.syncCurrentUser();
+        } else if (appUser != null) {
+          // 로그아웃 상태인데 AppStateProvider에 사용자 정보가 남아있으면 명시적으로 초기화
+          debugPrint('MyApp - 로그아웃 상태에서 AppStateProvider 초기화 시작');
+          await appStateProvider.signOut();
+        }
+      }
+    });
   }
 }

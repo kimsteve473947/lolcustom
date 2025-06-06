@@ -31,11 +31,11 @@ class LolLaneNames {
 
 // 롤 라인별 아이콘 경로
 class LolLaneIcons {
-  static const String top = 'assets/images/lane_top.png';
-  static const String jungle = 'assets/images/lane_jungle.png';
-  static const String mid = 'assets/images/lane_mid.png';
-  static const String adc = 'assets/images/lane_adc.png';
-  static const String support = 'assets/images/lane_support.png';
+  static const String top = 'assets/images/lanes/lane_top.png';
+  static const String jungle = 'assets/images/lanes/lane_jungle.png';
+  static const String mid = 'assets/images/lanes/lane_mid.png';
+  static const String adc = 'assets/images/lanes/lane_adc.png';
+  static const String support = 'assets/images/lanes/lane_support.png';
   
   static const Map<LolLane, String> paths = {
     LolLane.top: top,

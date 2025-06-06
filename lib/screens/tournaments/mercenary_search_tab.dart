@@ -57,7 +57,7 @@ class _MercenarySearchTabState extends State<MercenarySearchTab> {
           Expanded(
             child: _errorMessage != null
                 ? ErrorView(
-                    message: _errorMessage!,
+                    errorMessage: _errorMessage!,
                     onRetry: _loadMercenaries,
                   )
                 : _isLoading
@@ -208,6 +208,7 @@ class _MercenarySearchTabState extends State<MercenarySearchTab> {
       case PlayerTier.silver: return '실버';
       case PlayerTier.gold: return '골드';
       case PlayerTier.platinum: return '플래티넘';
+      case PlayerTier.emerald: return '에메랄드';
       case PlayerTier.diamond: return '다이아몬드';
       case PlayerTier.master: return '마스터';
       case PlayerTier.grandmaster: return '그랜드마스터';
