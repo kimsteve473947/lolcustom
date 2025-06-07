@@ -104,6 +104,17 @@ class TournamentService {
         if (filters.containsKey('status') && filters['status'] != null) {
           query = query.where('status', isEqualTo: filters['status']);
         }
+        
+        // 현재 시간 이후 토너먼트만 보여주기 위한 필터
+        if (filters.containsKey('showOnlyFuture') && filters['showOnlyFuture'] == true) {
+          // 현재 시간 기준 Timestamp 생성
+          final now = Timestamp.fromDate(DateTime.now());
+          query = query.where('startsAt', isGreaterThanOrEqualTo: now);
+        }
+      } else {
+        // 기본적으로 현재 시간 이후 토너먼트만 표시
+        final now = Timestamp.fromDate(DateTime.now());
+        query = query.where('startsAt', isGreaterThanOrEqualTo: now);
       }
       
       // 기본 정렬: 시작 시간 오름차순
@@ -127,8 +138,12 @@ class TournamentService {
         debugPrint('복합 쿼리 실행 중 오류 발생: $e');
         debugPrint('단순화된 쿼리로 폴백합니다.');
         
-        // 기본 쿼리만 사용
-        query = _tournamentsRef.orderBy('startsAt', descending: false).limit(limit);
+        // 기본 쿼리만 사용하되, 현재 시간 이후 토너먼트만 필터링
+        final now = Timestamp.fromDate(DateTime.now());
+        query = _tournamentsRef.where('startsAt', isGreaterThanOrEqualTo: now)
+            .orderBy('startsAt', descending: false)
+            .limit(limit);
+            
         if (startAfter != null) {
           query = query.startAfterDocument(startAfter);
         }
@@ -212,6 +227,18 @@ class TournamentService {
           tournaments = tournaments.where((t) => 
             t.status.index == status).toList();
         }
+        
+        // 현재 시간 이후 토너먼트만 표시 (폴백 쿼리에서 처리 못한 경우)
+        if (filters.containsKey('showOnlyFuture') && filters['showOnlyFuture'] == true) {
+          final now = DateTime.now();
+          tournaments = tournaments.where((t) => 
+            t.startsAt.toDate().isAfter(now)).toList();
+        }
+      } else {
+        // 기본적으로 현재 시간 이후 토너먼트만 표시 (폴백 쿼리에서 처리 못한 경우)
+        final now = DateTime.now();
+        tournaments = tournaments.where((t) => 
+          t.startsAt.toDate().isAfter(now)).toList();
       }
       
       return tournaments;

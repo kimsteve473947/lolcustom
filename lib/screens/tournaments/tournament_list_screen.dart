@@ -113,7 +113,7 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
     
     try {
       // 날짜 필터 적용
-      Map<String, dynamic> filterMap = {..._filters, 'isPaid': false};
+      Map<String, dynamic> filterMap = {..._filters, 'isPaid': false, 'showOnlyFuture': true};
       if (_startDate != null && _endDate != null) {
         filterMap['startDate'] = _startDate;
         filterMap['endDate'] = _endDate;
@@ -178,7 +178,7 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
     
     try {
       // 날짜 필터 적용
-      Map<String, dynamic> filterMap = {..._filters, 'isPaid': true};
+      Map<String, dynamic> filterMap = {..._filters, 'isPaid': true, 'showOnlyFuture': true};
       if (_startDate != null && _endDate != null) {
         filterMap['startDate'] = _startDate;
         filterMap['endDate'] = _endDate;
@@ -244,7 +244,7 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
       final tournaments = await _tournamentService.getTournaments(
         limit: 20,
         startAfter: _lastFreeDocument,
-        filters: {..._filters, 'isPaid': false},
+        filters: {..._filters, 'isPaid': false, 'showOnlyFuture': true},
       );
       
       DocumentSnapshot? lastDoc;
@@ -281,7 +281,7 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
       final tournaments = await _tournamentService.getTournaments(
         limit: 20,
         startAfter: _lastPaidDocument,
-        filters: {..._filters, 'isPaid': true},
+        filters: {..._filters, 'isPaid': true, 'showOnlyFuture': true},
       );
       
       DocumentSnapshot? lastDoc;

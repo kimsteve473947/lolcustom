@@ -89,6 +89,7 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
   // 필터 설정
   final Map<String, dynamic> _filters = {
     'tournamentType': TournamentType.casual.index,  // 명확한 기본값 설정
+    'showOnlyFuture': true, // 현재 시간 이후의 토너먼트만 표시
   };
   
   Future<void> _loadTournaments() async {
@@ -147,7 +148,7 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
       
       // 현재 필터 그대로 사용하여 추가 데이터 로드
       final tournaments = await tournamentService.getTournaments(
-        filters: _filters,
+        filters: _filters, // 이미 showOnlyFuture가 포함되어 있음
         limit: 10,
       );
       

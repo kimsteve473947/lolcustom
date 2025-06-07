@@ -64,30 +64,33 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     // 기본 타이틀 설정 - 티어가 선택되지 않았을 때 기본값
     _updateGeneratedTitle('랜덤 멸망전');
     
-    // 시간을 30분 단위로 조정
-    _roundTimeToHalfHour();
+    // 현재 시간에서 최소 30분 이후로 초기 시간 설정
+    _initializeMinimumFutureTime();
   }
   
-  // 30분 단위로 시간 반올림
-  void _roundTimeToHalfHour() {
+  // 현재 시간에서 최소 30분 이후로 시간 설정
+  void _initializeMinimumFutureTime() {
     final now = DateTime.now();
-    final minute = now.minute;
     
-    // 30분 단위로 반올림
+    // 현재 시간에서 30분 추가
+    final minimumTime = now.add(const Duration(minutes: 30));
+    
+    // 30분 단위로 조정 (30분 또는 정각으로)
+    final minute = minimumTime.minute;
     final roundedMinute = minute < 30 ? 30 : 0;
     final hourAdjust = minute < 30 ? 0 : 1;
     
     final adjustedTime = TimeOfDay(
-      hour: (now.hour + hourAdjust) % 24, 
+      hour: (minimumTime.hour + hourAdjust) % 24, 
       minute: roundedMinute
     );
     
     setState(() {
       _selectedTime = adjustedTime;
       _selectedDate = DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
+        minimumTime.year,
+        minimumTime.month,
+        minimumTime.day,
         adjustedTime.hour,
         adjustedTime.minute,
       );
@@ -137,6 +140,49 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
     );
     
     if (picked != null && picked != _selectedDate && _isMounted) {
+      // 선택한 날짜가 오늘이고, 선택된 시간이 현재 시간으로부터 30분 이내인지 확인
+      final now = DateTime.now();
+      final isToday = picked.year == now.year && picked.month == now.month && picked.day == now.day;
+      
+      // 오늘을 선택한 경우, 최소 30분 이후의 시간이 설정되도록 함
+      if (isToday) {
+        // 최소 30분 이후 시간 계산
+        final minimumTime = now.add(const Duration(minutes: 30));
+        
+        // 선택된 시간이 최소 시간보다 이전인 경우, 최소 시간으로 조정
+        final selectedDateTime = DateTime(
+          picked.year,
+          picked.month,
+          picked.day,
+          _selectedTime.hour,
+          _selectedTime.minute,
+        );
+        
+        if (selectedDateTime.isBefore(minimumTime)) {
+          // 30분 단위로 조정
+          final minute = minimumTime.minute;
+          final roundedMinute = minute < 30 ? 30 : 0;
+          final hourAdjust = minute < 30 ? 0 : 1;
+          
+          final adjustedTime = TimeOfDay(
+            hour: (minimumTime.hour + hourAdjust) % 24, 
+            minute: roundedMinute
+          );
+          
+          setState(() {
+            _selectedTime = adjustedTime;
+            _selectedDate = DateTime(
+              picked.year,
+              picked.month,
+              picked.day,
+              adjustedTime.hour,
+              adjustedTime.minute,
+            );
+          });
+          return;
+        }
+      }
+      
       setState(() {
         _selectedDate = DateTime(
           picked.year,
@@ -150,243 +196,285 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   }
   
   Future<void> _selectTime(BuildContext context) async {
-    showModalBottomSheet(
+    // 현재 선택된 시간 값을 임시 변수에 저장
+    int selectedHour = _selectedTime.hour;
+    int selectedMinute = _selectedTime.minute;
+    
+    // 현재 시간 + 30분 (최소 선택 가능 시간)
+    final now = DateTime.now();
+    final minimumSelectableTime = now.add(const Duration(minutes: 30));
+    final todayDate = DateTime(now.year, now.month, now.day);
+    final selectedDay = DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day);
+    final isToday = selectedDay.isAtSameMomentAs(todayDate);
+    
+    await showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _buildTimePickerBottomSheet(),
-    );
-  }
-  
-  Widget _buildTimePickerBottomSheet() {
-    final List<Widget> hourWidgets = [];
-    final List<Widget> minuteWidgets = [];
-    
-    final currentHour = _selectedTime.hour;
-    final currentMinute = _selectedTime.minute;
-
-    // Generate hour widgets
-    for (int hour = 0; hour < 24; hour++) {
-      final bool isSelected = hour == currentHour;
-      
-      hourWidgets.add(
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedTime = TimeOfDay(hour: hour, minute: _selectedTime.minute);
-              _selectedDate = DateTime(
-                _selectedDate.year,
-                _selectedDate.month,
-                _selectedDate.day,
-                hour,
-                _selectedTime.minute,
-              );
-            });
-            Navigator.pop(context);
-          },
-          child: Container(
-            width: double.infinity,
-            height: 56,
-            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary : Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null,
-              border: !isSelected ? Border.all(color: Colors.grey.shade300) : null,
-            ),
-            child: Center(
-              child: Text(
-                '${hour.toString().padLeft(2, '0')}시',
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.black87,
-                  fontSize: 16,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+      builder: (BuildContext context) {
+        return StatefulBuilder(
+          builder: (BuildContext context, StateSetter setModalState) {
+            return Container(
+              padding: const EdgeInsets.only(top: 16, bottom: 32),
+              decoration: const BoxDecoration(
+                color: Colors.white,
+                borderRadius: BorderRadius.only(
+                  topLeft: Radius.circular(16),
+                  topRight: Radius.circular(16),
                 ),
               ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    // Generate minute widgets - only 0 and 30 minutes
-    for (int minute in [0, 30]) {
-      final bool isSelected = minute == currentMinute;
-      
-      minuteWidgets.add(
-        GestureDetector(
-          onTap: () {
-            setState(() {
-              _selectedTime = TimeOfDay(hour: _selectedTime.hour, minute: minute);
-              _selectedDate = DateTime(
-                _selectedDate.year,
-                _selectedDate.month,
-                _selectedDate.day,
-                _selectedTime.hour,
-                minute,
-              );
-            });
-            Navigator.pop(context);
-          },
-          child: Container(
-            width: double.infinity,
-            height: 56,
-            margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
-            decoration: BoxDecoration(
-              color: isSelected ? AppColors.primary : Colors.white,
-              borderRadius: BorderRadius.circular(8),
-              boxShadow: isSelected
-                  ? [
-                      BoxShadow(
-                        color: AppColors.primary.withOpacity(0.3),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ]
-                  : null,
-              border: !isSelected ? Border.all(color: Colors.grey.shade300) : null,
-            ),
-            child: Center(
-              child: Text(
-                '${minute.toString().padLeft(2, '0')}분',
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.black87,
-                  fontSize: 16,
-                  fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
-                ),
-              ),
-            ),
-          ),
-        ),
-      );
-    }
-
-    return Container(
-      padding: const EdgeInsets.only(top: 16, bottom: 32),
-      decoration: const BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.only(
-          topLeft: Radius.circular(16),
-          topRight: Radius.circular(16),
-        ),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Container(
-            width: 40,
-            height: 4,
-            margin: const EdgeInsets.only(bottom: 16),
-            decoration: BoxDecoration(
-              color: Colors.grey.shade300,
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.all(16.0),
-            child: Text(
-              '시간 선택',
-              style: TextStyle(
-                fontSize: 20,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-          ),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(left: 20, bottom: 8),
-                      child: Text(
-                        '시',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ),
-                    SizedBox(
-                      height: 300,
-                      child: ListView(
-                        padding: EdgeInsets.zero,
-                        children: hourWidgets,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Padding(
-                      padding: EdgeInsets.only(left: 20, bottom: 8),
-                      child: Text(
-                        '분',
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.black54,
-                        ),
-                      ),
-                    ),
-                    Column(
-                      children: minuteWidgets,
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 16, left: 16, right: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.end,
-              children: [
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.grey.shade700,
-                    textStyle: const TextStyle(
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Container(
+                    width: 40,
+                    height: 4,
+                    margin: const EdgeInsets.only(bottom: 16),
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade300,
+                      borderRadius: BorderRadius.circular(2),
                     ),
                   ),
-                  child: const Text('취소'),
-                ),
-                const SizedBox(width: 16),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(8),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                      children: [
+                        const Text(
+                          '시간 선택',
+                          style: TextStyle(
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${selectedHour.toString().padLeft(2, '0')}:${selectedMinute.toString().padLeft(2, '0')}',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                      ],
                     ),
                   ),
-                  child: const Text('확인'),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+                  Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(left: 20, bottom: 8),
+                              child: Text(
+                                '시',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ),
+                            SizedBox(
+                              height: 300,
+                              child: ListView.builder(
+                                padding: EdgeInsets.zero,
+                                itemCount: 24,
+                                itemBuilder: (context, index) {
+                                  final hour = index;
+                                  // 오늘 날짜를 선택한 경우에만 시간 제한 적용
+                                  bool isDisabled = false;
+                                  if (isToday) {
+                                    // 현재 시간보다 이전 시간은 비활성화
+                                    if (hour < minimumSelectableTime.hour) {
+                                      isDisabled = true;
+                                    } 
+                                    // 현재 시간과 같은 경우, 분 조건도 확인
+                                    else if (hour == minimumSelectableTime.hour && minimumSelectableTime.minute > 30) {
+                                      isDisabled = true;
+                                    }
+                                  }
+                                  
+                                  return GestureDetector(
+                                    onTap: isDisabled 
+                                        ? null 
+                                        : () {
+                                            setModalState(() {
+                                              selectedHour = hour;
+                                              
+                                              // 오늘이고 선택한 시간이 현재 시간+30분보다 이전인 경우, 분을 자동 조정
+                                              if (isToday && hour == minimumSelectableTime.hour && selectedMinute < 30) {
+                                                selectedMinute = 30;
+                                              }
+                                            });
+                                          },
+                                    child: Container(
+                                      width: double.infinity,
+                                      height: 56,
+                                      margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+                                      decoration: BoxDecoration(
+                                        color: selectedHour == hour ? AppColors.primary : Colors.white,
+                                        borderRadius: BorderRadius.circular(8),
+                                        boxShadow: selectedHour == hour && !isDisabled
+                                            ? [
+                                                BoxShadow(
+                                                  color: AppColors.primary.withOpacity(0.3),
+                                                  blurRadius: 8,
+                                                  offset: const Offset(0, 2),
+                                                ),
+                                              ]
+                                            : null,
+                                        border: selectedHour != hour ? Border.all(color: Colors.grey.shade300) : null,
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          '${hour.toString().padLeft(2, '0')}시',
+                                          style: TextStyle(
+                                            color: isDisabled 
+                                                ? Colors.grey.shade400 
+                                                : (selectedHour == hour ? Colors.white : Colors.black87),
+                                            fontSize: 16,
+                                            fontWeight: selectedHour == hour ? FontWeight.bold : FontWeight.normal,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Padding(
+                              padding: EdgeInsets.only(left: 20, bottom: 8),
+                              child: Text(
+                                '분',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.black54,
+                                ),
+                              ),
+                            ),
+                            Column(
+                              children: [0, 30].map((minute) {
+                                // 오늘 날짜와 현재 시간대를 선택한 경우에만 분 제한 적용
+                                bool isDisabled = false;
+                                if (isToday && selectedHour == minimumSelectableTime.hour) {
+                                  // 현재 분이 30분 이상이면 0분은 선택 불가
+                                  if (minimumSelectableTime.minute > 0 && minute == 0) {
+                                    isDisabled = true;
+                                  }
+                                  // 현재 분이 30분 이상이면 30분도 선택 불가
+                                  if (minimumSelectableTime.minute > 30 && minute == 30) {
+                                    isDisabled = true;
+                                  }
+                                }
+                                
+                                return GestureDetector(
+                                  onTap: isDisabled 
+                                      ? null 
+                                      : () {
+                                          setModalState(() {
+                                            selectedMinute = minute;
+                                          });
+                                        },
+                                  child: Container(
+                                    width: double.infinity,
+                                    height: 56,
+                                    margin: const EdgeInsets.symmetric(vertical: 4, horizontal: 16),
+                                    decoration: BoxDecoration(
+                                      color: selectedMinute == minute ? AppColors.primary : Colors.white,
+                                      borderRadius: BorderRadius.circular(8),
+                                      boxShadow: selectedMinute == minute && !isDisabled
+                                          ? [
+                                              BoxShadow(
+                                                color: AppColors.primary.withOpacity(0.3),
+                                                blurRadius: 8,
+                                                offset: const Offset(0, 2),
+                                              ),
+                                            ]
+                                          : null,
+                                      border: selectedMinute != minute ? Border.all(color: Colors.grey.shade300) : null,
+                                    ),
+                                    child: Center(
+                                      child: Text(
+                                        '${minute.toString().padLeft(2, '0')}분',
+                                        style: TextStyle(
+                                          color: isDisabled 
+                                              ? Colors.grey.shade400 
+                                              : (selectedMinute == minute ? Colors.white : Colors.black87),
+                                          fontSize: 16,
+                                          fontWeight: selectedMinute == minute ? FontWeight.bold : FontWeight.normal,
+                                        ),
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16, left: 16, right: 16),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.end,
+                      children: [
+                        TextButton(
+                          onPressed: () => Navigator.pop(context),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.grey.shade700,
+                            textStyle: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          child: const Text('취소'),
+                        ),
+                        const SizedBox(width: 16),
+                        ElevatedButton(
+                          onPressed: () {
+                            // 확인 버튼을 눌렀을 때만 값 적용
+                            setState(() {
+                              _selectedTime = TimeOfDay(hour: selectedHour, minute: selectedMinute);
+                              _selectedDate = DateTime(
+                                _selectedDate.year,
+                                _selectedDate.month,
+                                _selectedDate.day,
+                                selectedHour,
+                                selectedMinute,
+                              );
+                            });
+                            Navigator.pop(context);
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: AppColors.primary,
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                          ),
+                          child: const Text('확인'),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            );
+          },
+        );
+      },
     );
   }
   
@@ -399,6 +487,26 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
         const SnackBar(
           content: Text('주최자 포지션을 선택해주세요'),
           backgroundColor: AppColors.error,
+        ),
+      );
+      return;
+    }
+    
+    // 현재 시간보다 최소 30분 이후인지 검증
+    final now = DateTime.now();
+    final minimumStartTime = now.add(const Duration(minutes: 30));
+    
+    if (_selectedDate.isBefore(minimumStartTime)) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('내전 시작 시간은 현재 시간으로부터 최소 30분 이후여야 합니다'),
+          backgroundColor: AppColors.error,
+          duration: const Duration(seconds: 3),
+          action: SnackBarAction(
+            label: '확인',
+            textColor: Colors.white,
+            onPressed: () {},
+          ),
         ),
       );
       return;
@@ -452,7 +560,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
         );
       }
     } finally {
-      if (_isMounted) {
+      if (mounted) {
         setState(() {
           _isLoading = false;
         });
