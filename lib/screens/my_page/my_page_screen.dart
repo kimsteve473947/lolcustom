@@ -138,6 +138,19 @@ class _MyPageScreenState extends State<MyPageScreen> {
                 ),
                 const SizedBox(height: 8),
                 ListTile(
+                  leading: const Icon(Icons.notifications_active, color: Colors.blue),
+                  title: const Text('FCM 알림 테스트'),
+                  subtitle: const Text('푸시 알림 설정 및 테스트'),
+                  onTap: () {
+                    context.push('/settings/fcm-test');
+                  },
+                  tileColor: Colors.blue.shade50,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ListTile(
                   leading: const Icon(Icons.sync_problem, color: Colors.orange),
                   title: const Text('사용자 데이터 초기화'),
                   subtitle: const Text('로그인 문제 해결을 위한 도구'),

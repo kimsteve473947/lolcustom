@@ -3,13 +3,29 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/foundation.dart';
 import 'package:lol_custom_game_manager/models/tournament_model.dart';
 import 'package:lol_custom_game_manager/models/user_model.dart';
+import 'package:lol_custom_game_manager/models/chat_model.dart';
+import 'package:lol_custom_game_manager/services/firebase_service.dart';
+import 'package:lol_custom_game_manager/services/firebase_messaging_service.dart';
 import 'package:uuid/uuid.dart';
+import 'package:flutter/material.dart';
 
 class TournamentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final String _collectionPath = 'tournaments';
   final String _usersPath = 'users';
+  
+  // 추가: FirebaseService와 FirebaseMessagingService 의존성
+  final FirebaseService _firebaseService;
+  final FirebaseMessagingService _messagingService;
+  
+  // 생성자를 통한 의존성 주입
+  TournamentService({
+    FirebaseService? firebaseService,
+    FirebaseMessagingService? messagingService,
+  }) : 
+    _firebaseService = firebaseService ?? FirebaseService(),
+    _messagingService = messagingService ?? FirebaseMessagingService();
   
   // 사용자 ID 가져오기
   String? get _userId => _auth.currentUser?.uid;
@@ -342,10 +358,155 @@ class TournamentService {
         }
       });
       
+      // 4. 토너먼트 생성 후 채팅방 자동 생성
+      await _createTournamentChatRoom(newTournamentId, tournament);
+      
       return newTournamentId;
     } catch (e) {
       debugPrint('Error creating tournament: $e');
       rethrow;
+    }
+  }
+  
+  // 내전용 채팅방 생성 메서드
+  Future<void> _createTournamentChatRoom(String tournamentId, TournamentModel tournament) async {
+    try {
+      // 이미 채팅방이 있는지 확인
+      final existingChatRoomId = await _firebaseService.findChatRoomByTournamentId(tournamentId);
+      if (existingChatRoomId != null) {
+        debugPrint('Chat room for tournament $tournamentId already exists: $existingChatRoomId');
+        return;
+      }
+      
+      // 호스트 정보 가져오기
+      final hostUser = await _firebaseService.getUserById(tournament.hostId);
+      if (hostUser == null) {
+        debugPrint('Error: Host user not found');
+        return;
+      }
+      
+      // 채팅방 참가자 초기화 (호스트만 포함)
+      final participantIds = [tournament.hostId];
+      final participantNames = {tournament.hostId: hostUser.nickname};
+      final participantProfileImages = {tournament.hostId: hostUser.profileImageUrl};
+      final unreadCount = {tournament.hostId: 0};
+      
+      // 채팅방 모델 생성
+      final chatRoom = ChatRoomModel(
+        id: '', // Firestore에서 자동 생성될 ID
+        title: '${tournament.title} 채팅방',
+        participantIds: participantIds,
+        participantNames: participantNames,
+        participantProfileImages: participantProfileImages,
+        unreadCount: unreadCount,
+        type: ChatRoomType.tournamentRecruitment,
+        tournamentId: tournamentId,
+        createdAt: Timestamp.now(),
+      );
+      
+      // 채팅방 생성
+      final chatRoomId = await _firebaseService.createChatRoom(chatRoom);
+      
+      // 채팅방과 토너먼트 연결
+      await _firebaseService.linkChatRoomToTournament(chatRoomId, tournamentId);
+      
+      // 시스템 메시지 전송
+      await _sendSystemMessage(
+        chatRoomId,
+        '내전 채팅방이 생성되었습니다. 참가자가 모이면 알림이 전송됩니다.',
+      );
+      
+      debugPrint('Created chat room for tournament $tournamentId: $chatRoomId');
+    } catch (e) {
+      debugPrint('Error creating tournament chat room: $e');
+    }
+  }
+  
+  // 채팅방에 참가자 추가
+  Future<void> _addParticipantToChatRoom(String tournamentId, String userId) async {
+    try {
+      // 토너먼트 관련 채팅방 찾기
+      final chatRoomId = await _firebaseService.findChatRoomByTournamentId(tournamentId);
+      if (chatRoomId == null) {
+        debugPrint('No chat room found for tournament $tournamentId');
+        return;
+      }
+      
+      // 채팅방 정보 가져오기
+      final chatRoomDoc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
+      if (!chatRoomDoc.exists) {
+        debugPrint('Chat room $chatRoomId does not exist');
+        return;
+      }
+      
+      // 채팅방 모델로 변환
+      final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
+      
+      // 이미 참가자인지 확인
+      if (chatRoom.participantIds.contains(userId)) {
+        debugPrint('User $userId is already a participant in chat room $chatRoomId');
+        return;
+      }
+      
+      // 사용자 정보 가져오기
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (!userDoc.exists) {
+        debugPrint('User $userId not found');
+        return;
+      }
+      
+      final user = UserModel.fromFirestore(userDoc);
+      
+      // 참가자 목록, 이름, 프로필 이미지, 읽지 않은 메시지 수 업데이트
+      final updatedParticipantIds = List<String>.from(chatRoom.participantIds)..add(userId);
+      final updatedParticipantNames = Map<String, String>.from(chatRoom.participantNames)
+        ..addAll({userId: user.nickname});
+      final updatedParticipantProfileImages = Map<String, String?>.from(chatRoom.participantProfileImages)
+        ..addAll({userId: user.profileImageUrl});
+      final updatedUnreadCount = Map<String, int>.from(chatRoom.unreadCount)
+        ..addAll({userId: 0});
+      
+      // 채팅방 업데이트
+      await _firestore.collection('chatRooms').doc(chatRoomId).update({
+        'participantIds': updatedParticipantIds,
+        'participantNames': updatedParticipantNames,
+        'participantProfileImages': updatedParticipantProfileImages,
+        'unreadCount': updatedUnreadCount,
+      });
+      
+      // 시스템 메시지 전송
+      await _sendSystemMessage(
+        chatRoomId,
+        '${user.nickname}님이 채팅방에 참가했습니다.',
+      );
+      
+      debugPrint('Added user $userId to chat room $chatRoomId');
+    } catch (e) {
+      debugPrint('Error adding participant to chat room: $e');
+    }
+  }
+  
+  // 시스템 메시지 전송
+  Future<void> _sendSystemMessage(String chatRoomId, String text) async {
+    try {
+      // 시스템 메시지용 모델 생성
+      final message = MessageModel(
+        id: '', // Firestore에서 자동 생성
+        chatRoomId: chatRoomId,
+        senderId: 'system',
+        senderName: '시스템',
+        text: text,
+        readStatus: {}, // 시스템 메시지는 읽음 상태 추적 불필요
+        timestamp: Timestamp.now(),
+        metadata: {'isSystem': true},
+      );
+      
+      // 메시지 전송
+      await _firebaseService.sendMessage(message);
+      
+      debugPrint('Sent system message to chat room $chatRoomId: $text');
+    } catch (e) {
+      debugPrint('Error sending system message: $e');
     }
   }
   
@@ -375,89 +536,92 @@ class TournamentService {
     if (userId == null) throw Exception('로그인이 필요합니다.');
     
     try {
+      // 트랜잭션을 통한 토너먼트 참가 처리
+      bool isTournamentFull = false;
+      TournamentModel? updatedTournament;
+      
       await _firestore.runTransaction((transaction) async {
         // 토너먼트 문서 가져오기
-        final docRef = _tournamentsRef.doc(tournamentId);
-        final docSnapshot = await transaction.get(docRef);
+        final tournamentDoc = await transaction.get(_firestore.collection('tournaments').doc(tournamentId));
         
-        if (!docSnapshot.exists) {
+        if (!tournamentDoc.exists) {
           throw Exception('토너먼트를 찾을 수 없습니다.');
         }
         
-        // 토너먼트 모델로 변환
-        final tournament = TournamentModel.fromFirestore(docSnapshot);
+        // 토너먼트 데이터 파싱
+        final tournament = TournamentModel.fromFirestore(tournamentDoc);
         
-        // 이미 참가했는지 확인
+        // 이미 참가 중인지 확인
         if (tournament.participants.contains(userId)) {
-          throw Exception('이미 참가 중인 토너먼트입니다.');
+          throw Exception('이미 해당 토너먼트에 참가 중입니다.');
         }
         
-        // 참가 가능한지 확인
-        if (!tournament.canJoinRole(role)) {
-          throw Exception('해당 포지션은 이미 가득 찼거나 참가할 수 없습니다.');
+        // 자리가 있는지 확인
+        final slotsByRole = tournament.slotsByRole[role] ?? 0;
+        final filledSlotsByRole = tournament.filledSlotsByRole[role] ?? 0;
+        
+        if (filledSlotsByRole >= slotsByRole) {
+          throw Exception('해당 역할의 자리가 이미 모두 찼습니다.');
         }
         
-        // 사용자 정보 가져오기
-        final userDoc = await _usersRef.doc(userId).get();
-        if (!userDoc.exists) {
-          throw Exception('사용자 정보를 찾을 수 없습니다.');
+        // 업데이트할 참가자 목록 생성
+        final updatedParticipants = List<String>.from(tournament.participants)..add(userId);
+        
+        // 업데이트할 역할별 참가자 목록 생성
+        final updatedParticipantsByRole = Map<String, List<String>>.from(tournament.participantsByRole);
+        if (!updatedParticipantsByRole.containsKey(role)) {
+          updatedParticipantsByRole[role] = [];
         }
+        updatedParticipantsByRole[role] = List<String>.from(updatedParticipantsByRole[role]!)..add(userId);
         
-        // 경쟁전인 경우 항상 20 크레딧 차감
-        if (tournament.tournamentType == TournamentType.competitive) {
-          final userData = userDoc.data() as Map<String, dynamic>;
-          final userCredits = userData['credits'] as int? ?? 0;
-          const requiredCredits = 20; // 항상 고정 20 크레딧
-          
-          if (userCredits < requiredCredits) {
-            throw Exception('크레딧이 부족합니다. 필요 크레딧: $requiredCredits, 보유 크레딧: $userCredits');
-          }
-          
-          // 크레딧 차감
-          transaction.update(_usersRef.doc(userId), {
-            'credits': userCredits - requiredCredits
-          });
-        }
-        
-        // 필드 값 업데이트
-        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
-        updatedFilledSlots[role] = (updatedFilledSlots[role] ?? 0) + 1;
-        
+        // 업데이트할 역할별 참가 인원 생성
         final updatedFilledSlotsByRole = Map<String, int>.from(tournament.filledSlotsByRole);
         updatedFilledSlotsByRole[role] = (updatedFilledSlotsByRole[role] ?? 0) + 1;
         
-        final updatedParticipants = List<String>.from(tournament.participants)..add(userId);
+        // 업데이트할 전체 참가 인원 계산
+        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
+        updatedFilledSlots['total'] = (updatedFilledSlots['total'] ?? 0) + 1;
         
-        // 역할별 참가자 목록 업데이트
-        final updatedParticipantsByRole = Map<String, List<String>>.from(tournament.participantsByRole);
-        if (updatedParticipantsByRole[role] == null) {
-          updatedParticipantsByRole[role] = [];
-        }
-        updatedParticipantsByRole[role]!.add(userId);
+        // 토너먼트 꽉 찼는지 확인
+        isTournamentFull = updatedParticipants.length >= tournament.totalSlots;
         
-        // 모든 슬롯이 채워졌는지 확인하여 상태 업데이트
-        TournamentStatus updatedStatus = tournament.status;
-        final willBeFull = updatedFilledSlotsByRole.entries.every((entry) {
-          final totalSlots = tournament.slotsByRole[entry.key] ?? 0;
-          return entry.value >= totalSlots;
-        });
+        // 업데이트된 토너먼트 모델 생성 (알림 전송 등에 사용)
+        updatedTournament = tournament.copyWith(
+          participants: updatedParticipants,
+          participantsByRole: updatedParticipantsByRole,
+          filledSlotsByRole: updatedFilledSlotsByRole,
+          filledSlots: updatedFilledSlots,
+        );
         
-        if (willBeFull) {
-          updatedStatus = TournamentStatus.full;
-        }
-        
-        // 트랜잭션 업데이트
-        transaction.update(docRef, {
-          'filledSlots': updatedFilledSlots,
-          'filledSlotsByRole': updatedFilledSlotsByRole,
-          'participants': updatedParticipants,
-          'participantsByRole': updatedParticipantsByRole,
-          'status': updatedStatus.index,
-          'updatedAt': Timestamp.now(),
-        });
+        // 토너먼트 문서 업데이트
+        transaction.update(
+          _firestore.collection('tournaments').doc(tournamentId),
+          {
+            'participants': updatedParticipants,
+            'participantsByRole': updatedParticipantsByRole,
+            'filledSlotsByRole': updatedFilledSlotsByRole,
+            'filledSlots': updatedFilledSlots,
+          },
+        );
       });
+      
+      // 토너먼트가 꽉 찼으면 모든 참가자에게 알림
+      if (isTournamentFull && updatedTournament != null) {
+        await _notifyTournamentFull(updatedTournament);
+      }
+      
+      // 토너먼트 채팅방 찾기
+      final chatRoomId = await _firebaseService.findChatRoomByTournamentId(tournamentId);
+      
+      // 채팅방에 시스템 메시지 전송
+      if (chatRoomId != null) {
+        await _sendSystemMessage(
+          chatRoomId, 
+          '$role 역할로 새로운 참가자가 참여했습니다.'
+        );
+      }
+      
     } catch (e) {
-      print('Error joining tournament: $e');
       rethrow;
     }
   }
@@ -846,6 +1010,43 @@ class TournamentService {
     } catch (e) {
       debugPrint('사용자 토너먼트 날짜 조회 오류: $e');
       return [];
+    }
+  }
+  
+  // 토너먼트가 꽉 찼을 때 모든 참가자에게 알림 전송
+  Future<void> _notifyTournamentFull(TournamentModel? tournament) async {
+    if (tournament == null) return; // null 체크 추가
+    
+    try {
+      // 메시지 준비
+      final title = '내전 참가자 모집 완료';
+      final body = '${tournament.title} 내전의 참가자가 모두 모였습니다!';
+      
+      // 토너먼트 채팅방 찾기
+      final chatRoomId = await _firebaseService.findChatRoomByTournamentId(tournament.id);
+      
+      // 채팅방에 시스템 메시지 전송
+      if (chatRoomId != null) {
+        await _sendSystemMessage(
+          chatRoomId,
+          '모든 참가자가 모였습니다! 곧 내전이 시작됩니다.',
+        );
+      }
+      
+      // FCM 메시징 서비스 인스턴스 가져오기
+      final messagingService = FirebaseMessagingService();
+      
+      // 토너먼트 참가자들에게 알림 전송
+      await messagingService.sendTournamentNotification(
+        tournamentId: tournament.id,
+        title: title,
+        body: body,
+        userIds: tournament.participants,
+      );
+      
+      debugPrint('Sent notifications to all participants of tournament ${tournament.id}');
+    } catch (e) {
+      debugPrint('Error sending tournament full notifications: $e');
     }
   }
 } 

@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'dart:io';
-
+import 'package:http/http.dart' as http;
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:flutter/foundation.dart';
@@ -10,6 +10,18 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 class FirebaseMessagingService {
   final FirebaseMessaging _messaging = FirebaseMessaging.instance;
   final FlutterLocalNotificationsPlugin _localNotifications = FlutterLocalNotificationsPlugin();
+  final FirebaseFirestore _firestore = FirebaseFirestore.instance;
+  
+  // 싱글톤 패턴 구현
+  static final FirebaseMessagingService _instance = FirebaseMessagingService._internal();
+  
+  // 팩토리 생성자
+  factory FirebaseMessagingService() {
+    return _instance;
+  }
+  
+  // 내부 생성자
+  FirebaseMessagingService._internal();
   
   // Method to initialize Firebase Messaging
   Future<void> initialize() async {
@@ -47,7 +59,11 @@ class FirebaseMessagingService {
     // Get token
     try {
       String? token = await _messaging.getToken();
+      
+      // FCM 토큰 콘솔에 출력 (디버깅 및 테스트용)
+      debugPrint('==================== FCM TOKEN ====================');
       debugPrint('FCM Token: $token');
+      debugPrint('===================================================');
       
       // 토큰이 없는 경우 지연 후 다시 시도
       if (token == null) {
@@ -124,6 +140,14 @@ class FirebaseMessagingService {
       enableVibration: true,
     );
     
+    const AndroidNotificationChannel tournamentChannel = AndroidNotificationChannel(
+      'tournament_channel',
+      'Tournament Notifications',
+      importance: Importance.max,
+      enableLights: true,
+      enableVibration: true,
+    );
+    
     await _localNotifications
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(mainChannel);
@@ -131,6 +155,10 @@ class FirebaseMessagingService {
     await _localNotifications
         .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
         ?.createNotificationChannel(chatChannel);
+    
+    await _localNotifications
+        .resolvePlatformSpecificImplementation<AndroidFlutterLocalNotificationsPlugin>()
+        ?.createNotificationChannel(tournamentChannel);
   }
   
   // iOS 특화 알림 설정
@@ -174,6 +202,9 @@ class FirebaseMessagingService {
       debugPrint('A new onMessageOpenedApp event was published!');
       _handleNotificationClick(jsonEncode(message.data));
     });
+    
+    // Background message handling
+    FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
   }
   
   // Method to show local notification
@@ -181,47 +212,80 @@ class FirebaseMessagingService {
     final RemoteNotification? notification = message.notification;
     final AndroidNotification? android = message.notification?.android;
     
-    if (notification != null && android != null && !kIsWeb && Platform.isAndroid) {
-      _localNotifications.show(
-        notification.hashCode,
-        notification.title,
-        notification.body,
-        NotificationDetails(
-          android: AndroidNotificationDetails(
-            message.data['channel_id'] ?? 'main_channel',
-            message.data['channel_name'] ?? 'Main Notifications',
-            icon: android.smallIcon,
+    if (notification != null && !kIsWeb) {
+      String channelId = 'main_channel';
+      String channelName = 'Main Notifications';
+      
+      // 알림 타입에 따라 채널 설정
+      if (message.data.containsKey('type')) {
+        final type = message.data['type'];
+        if (type == 'chat') {
+          channelId = 'chat_channel';
+          channelName = 'Chat Notifications';
+        } else if (type == 'tournament') {
+          channelId = 'tournament_channel';
+          channelName = 'Tournament Notifications';
+        }
+      }
+      
+      // Android 디바이스에서 알림 표시
+      if (Platform.isAndroid) {
+        _localNotifications.show(
+          notification.hashCode,
+          notification.title,
+          notification.body,
+          NotificationDetails(
+            android: AndroidNotificationDetails(
+              channelId,
+              channelName,
+              icon: android?.smallIcon,
+            ),
           ),
-        ),
-        payload: jsonEncode(message.data),
-      );
+          payload: jsonEncode(message.data),
+        );
+      } 
+      // iOS 디바이스에서 알림 표시
+      else if (Platform.isIOS) {
+        _localNotifications.show(
+          notification.hashCode,
+          notification.title,
+          notification.body,
+          NotificationDetails(
+            iOS: const DarwinNotificationDetails(
+              presentAlert: true,
+              presentBadge: true,
+              presentSound: true,
+            ),
+          ),
+          payload: jsonEncode(message.data),
+        );
+      }
     }
   }
   
   // Method to handle notification click
   void _handleNotificationClick(String? payload) {
-    if (payload != null) {
-      try {
-        final data = jsonDecode(payload) as Map<String, dynamic>;
+    if (payload == null) return;
+    
+    try {
+      final data = jsonDecode(payload) as Map<String, dynamic>;
+      
+      if (data.containsKey('type')) {
         final type = data['type'];
         
-        switch (type) {
-          case 'tournament':
-            final tournamentId = data['tournament_id'];
-            debugPrint('Navigate to tournament: $tournamentId');
-            // TODO: Implement navigation
-            break;
-          case 'chat':
-            final chatId = data['chat_id'];
-            debugPrint('Navigate to chat: $chatId');
-            // TODO: Implement navigation
-            break;
-          default:
-            debugPrint('Unknown notification type: $type');
+        if (type == 'chat') {
+          final chatId = data['chat_id'];
+          debugPrint('Navigate to chat: $chatId');
+          // 여기서 채팅 화면으로 이동하는 로직을 구현합니다.
+          // 실제 구현에서는 GlobalKey<NavigatorState>나 GoRouter 같은 라우팅 시스템을 사용해야 합니다.
+        } else if (type == 'tournament') {
+          final tournamentId = data['tournament_id'];
+          debugPrint('Navigate to tournament: $tournamentId');
+          // 여기서 토너먼트 화면으로 이동하는 로직을 구현합니다.
         }
-      } catch (e) {
-        debugPrint('Error parsing notification payload: $e');
       }
+    } catch (e) {
+      debugPrint('Error parsing notification payload: $e');
     }
   }
   
@@ -240,63 +304,147 @@ class FirebaseMessagingService {
   // Method to save FCM token to the database
   Future<void> _saveFcmTokenToFirestore(String token) async {
     try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        debugPrint('Cannot save FCM token: No user logged in');
+      final user = FirebaseAuth.instance.currentUser;
+      if (user == null) {
+        debugPrint('User not logged in, skipping FCM token save');
         return;
       }
       
-      final userId = currentUser.uid;
-      final tokenData = {
-        'token': token,
-        'device': Platform.isIOS ? 'iOS' : 'Android',
-        'createdAt': FieldValue.serverTimestamp(),
-        'updatedAt': FieldValue.serverTimestamp(),
-        'appVersion': '1.0.0', // 앱 버전 정보 (나중에 동적으로 가져올 수 있음)
-      };
+      final userDoc = await _firestore.collection('users').doc(user.uid).get();
       
-      // 사용자 문서에 토큰 업데이트
-      try {
-        await FirebaseFirestore.instance
-            .collection('users')
-            .doc(userId)
-            .update({
-          'fcmTokens': FieldValue.arrayUnion([token]),
-          'lastActiveAt': FieldValue.serverTimestamp(),
-        });
-      } catch (e) {
-        // 사용자 문서가 없는 경우 새로 생성
-        if (e is FirebaseException && e.code == 'not-found') {
-          await FirebaseFirestore.instance
-              .collection('users')
-              .doc(userId)
-              .set({
-            'uid': userId,
-            'email': currentUser.email ?? '',
-            'nickname': currentUser.displayName ?? 'User${userId.substring(0, 4)}',
-            'fcmTokens': [token],
-            'joinedAt': FieldValue.serverTimestamp(),
-            'lastActiveAt': FieldValue.serverTimestamp(),
-            'isPremium': false,
-          }, SetOptions(merge: true));
-          debugPrint('Created new user document with FCM token');
+      if (userDoc.exists) {
+        final userData = userDoc.data() as Map<String, dynamic>;
+        final tokens = List<String>.from(userData['fcmTokens'] ?? []);
+        
+        // 중복 토큰 방지
+        if (!tokens.contains(token)) {
+          tokens.add(token);
+          await _firestore.collection('users').doc(user.uid).update({
+            'fcmTokens': tokens,
+            'lastTokenUpdate': FieldValue.serverTimestamp(),
+          });
+          debugPrint('FCM token saved to Firestore for user ${user.uid}');
         } else {
-          debugPrint('Error updating user with FCM token: $e');
-          return;
+          debugPrint('FCM token already exists in Firestore for user ${user.uid}');
         }
+      } else {
+        // 사용자 문서가 없는 경우, 새로 생성
+        await _firestore.collection('users').doc(user.uid).set({
+          'fcmTokens': [token],
+          'lastTokenUpdate': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        debugPrint('Created new FCM token entry for user ${user.uid}');
       }
-      
-      // 토큰 컬렉션에 토큰 정보 저장 (기기별 관리를 위해)
-      await FirebaseFirestore.instance
-          .collection('users')
-          .doc(userId)
-          .collection('tokens')
-          .doc(token)
-          .set(tokenData, SetOptions(merge: true));
-      
-      debugPrint('FCM token saved successfully for user: $userId');
     } catch (e) {
-      debugPrint('Error saving FCM token: $e');
+      debugPrint('Error saving FCM token to Firestore: $e');
     }
   }
+  
+  // 사용자에게 로컬 알림 전송
+  Future<void> showLocalNotification({
+    required String title,
+    required String body,
+    String? payload,
+    String channelId = 'main_channel',
+  }) async {
+    int notificationId = DateTime.now().millisecondsSinceEpoch ~/ 1000;
+    
+    AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
+      channelId,
+      channelId == 'chat_channel' ? 'Chat Notifications' : 
+      channelId == 'tournament_channel' ? 'Tournament Notifications' : 'Main Notifications',
+      importance: Importance.max,
+      priority: Priority.high,
+    );
+    
+    DarwinNotificationDetails iosDetails = const DarwinNotificationDetails(
+      presentAlert: true,
+      presentBadge: true,
+      presentSound: true,
+    );
+    
+    NotificationDetails notificationDetails = NotificationDetails(
+      android: androidDetails,
+      iOS: iosDetails,
+    );
+    
+    await _localNotifications.show(
+      notificationId,
+      title,
+      body,
+      notificationDetails,
+      payload: payload,
+    );
+  }
+  
+  // 토너먼트 알림 전송 (내부적으로는 클라우드 함수를 호출하거나 서버를 통해 전송해야 함)
+  Future<void> sendTournamentNotification({
+    required String tournamentId,
+    required String title,
+    required String body,
+    required List<String> userIds,
+  }) async {
+    // 실제 프로덕션에서는 이 메서드를 통해 클라우드 함수를 호출합니다.
+    // 현재는 로컬 알림만 전송합니다.
+    
+    // 현재 로그인한 사용자에게만 로컬 알림 전송
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null && userIds.contains(currentUser.uid)) {
+      await showLocalNotification(
+        title: title,
+        body: body,
+        channelId: 'tournament_channel',
+        payload: jsonEncode({
+          'type': 'tournament',
+          'tournament_id': tournamentId,
+        }),
+      );
+    }
+    
+    // 서버 측 구현이 있다면 아래와 같이 API 호출을 할 수 있습니다.
+    // 보안상의 이유로 클라이언트에서 직접 FCM API를 호출하지 않습니다.
+    // await _callCloudFunction('sendTournamentNotification', {
+    //   'tournamentId': tournamentId,
+    //   'title': title,
+    //   'body': body,
+    //   'userIds': userIds,
+    // });
+    
+    debugPrint('Tournament notification sent to ${userIds.length} users');
+  }
+  
+  // 채팅 알림 전송
+  Future<void> sendChatNotification({
+    required String chatRoomId,
+    required String title,
+    required String body,
+    required List<String> userIds,
+  }) async {
+    // 실제 프로덕션에서는 이 메서드를 통해 클라우드 함수를 호출합니다.
+    // 현재는 로컬 알림만 전송합니다.
+    
+    // 현재 로그인한 사용자에게만 로컬 알림 전송
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null && userIds.contains(currentUser.uid)) {
+      await showLocalNotification(
+        title: title,
+        body: body,
+        channelId: 'chat_channel',
+        payload: jsonEncode({
+          'type': 'chat',
+          'chat_id': chatRoomId,
+        }),
+      );
+    }
+    
+    debugPrint('Chat notification sent to ${userIds.length} users');
+  }
+}
+
+// 백그라운드 메시지 처리 핸들러 (최상위 함수여야 함)
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  // 백그라운드 메시지를 처리하는 로직
+  // 이 함수는 앱이 백그라운드에 있을 때 호출됩니다.
+  debugPrint('Handling a background message: ${message.messageId}');
 } 

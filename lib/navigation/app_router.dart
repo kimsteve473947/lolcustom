@@ -16,6 +16,7 @@ import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_detail_scr
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_edit_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/my_page_screen.dart';
 import 'package:lol_custom_game_manager/screens/rankings/rankings_screen.dart';
+import 'package:lol_custom_game_manager/screens/settings/fcm_test_screen.dart';
 import 'package:lol_custom_game_manager/screens/splash_screen.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/tournament_detail_screen.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_screen.dart';
@@ -175,6 +176,10 @@ class AppRouter {
         builder: (context, state) => MainScreen(
           child: const AdminToolsScreen(),
         ),
+      ),
+      GoRoute(
+        path: '/settings/fcm-test',
+        builder: (context, state) => const FCMTestScreen(),
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
