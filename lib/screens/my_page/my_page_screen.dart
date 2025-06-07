@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/providers/auth_provider.dart' as CustomAuth;
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
+import 'package:lol_custom_game_manager/widgets/calendar/user_calendar_widget.dart';
+import 'package:lol_custom_game_manager/screens/my_page/tournaments_by_date_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 
@@ -75,6 +77,33 @@ class _MyPageScreenState extends State<MyPageScreen> {
               children: [
                 // 사용자 프로필 정보
                 _buildProfileSection(displayName, userId),
+                
+                const SizedBox(height: 24),
+                const Divider(),
+                
+                // 캘린더 위젯 추가
+                const SizedBox(height: 16),
+                const Text(
+                  '내 내전 일정',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                UserCalendarWidget(
+                  onDateSelected: (selectedDate) {
+                    // 선택한 날짜의 토너먼트 목록 페이지로 이동
+                    Navigator.of(context).push(
+                      MaterialPageRoute(
+                        builder: (context) => TournamentsByDateScreen(
+                          selectedDate: selectedDate,
+                        ),
+                      ),
+                    );
+                  },
+                ),
                 
                 const SizedBox(height: 24),
                 const Divider(),

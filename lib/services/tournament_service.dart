@@ -709,4 +709,143 @@ class TournamentService {
       rethrow;
     }
   }
+  
+  // 추가: 사용자가 참여하거나 생성한 토너먼트를 특정 날짜별로 조회
+  Future<List<TournamentModel>> getUserTournamentsByDate(DateTime date) async {
+    if (_userId == null) {
+      debugPrint('사용자가 로그인하지 않았습니다.');
+      return [];
+    }
+
+    // 날짜 범위 설정 (해당 날짜의 00:00:00부터 23:59:59까지)
+    final startOfDay = DateTime(date.year, date.month, date.day);
+    final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
+    
+    final startTimestamp = Timestamp.fromDate(startOfDay);
+    final endTimestamp = Timestamp.fromDate(endOfDay);
+    
+    try {
+      // 사용자가 호스트인 토너먼트 조회
+      final hostTournamentsQuery = await _tournamentsRef
+          .where('hostId', isEqualTo: _userId)
+          .where('startsAt', isGreaterThanOrEqualTo: startTimestamp)
+          .where('startsAt', isLessThanOrEqualTo: endTimestamp)
+          .get();
+      
+      // 사용자가 참가자인 토너먼트 조회
+      final participantTournamentsQuery = await _tournamentsRef
+          .where('participants', arrayContains: _userId)
+          .where('startsAt', isGreaterThanOrEqualTo: startTimestamp)
+          .where('startsAt', isLessThanOrEqualTo: endTimestamp)
+          .get();
+      
+      // 결과 합치기 (중복 제거)
+      final Map<String, TournamentModel> tournamentsMap = {};
+      
+      // 호스트 토너먼트 추가
+      for (final doc in hostTournamentsQuery.docs) {
+        try {
+          final tournament = TournamentModel.fromFirestore(doc);
+          tournamentsMap[tournament.id] = tournament;
+        } catch (e) {
+          debugPrint('호스트 토너먼트 파싱 오류 (${doc.id}): $e');
+        }
+      }
+      
+      // 참가자 토너먼트 추가
+      for (final doc in participantTournamentsQuery.docs) {
+        try {
+          final tournament = TournamentModel.fromFirestore(doc);
+          tournamentsMap[tournament.id] = tournament;
+        } catch (e) {
+          debugPrint('참가자 토너먼트 파싱 오류 (${doc.id}): $e');
+        }
+      }
+      
+      // 최종 결과 리스트로 변환 (최신순 정렬)
+      final tournaments = tournamentsMap.values.toList()
+        ..sort((a, b) => b.startsAt.compareTo(a.startsAt)); // 내림차순 정렬
+      
+      debugPrint('${date.toString().split(' ')[0]} 날짜에 ${tournaments.length}개의 토너먼트를 찾았습니다.');
+      return tournaments;
+    } catch (e) {
+      debugPrint('날짜별 토너먼트 조회 오류: $e');
+      return [];
+    }
+  }
+  
+  // 추가: 사용자가 참여하거나 생성한 토너먼트가 있는 날짜 목록 조회
+  Future<List<DateTime>> getUserTournamentDates({DateTime? startDate, DateTime? endDate}) async {
+    if (_userId == null) {
+      debugPrint('사용자가 로그인하지 않았습니다.');
+      return [];
+    }
+    
+    // 날짜 범위 설정 (기본값: 현재 달)
+    final now = DateTime.now();
+    final start = startDate ?? DateTime(now.year, now.month, 1);
+    final end = endDate ?? DateTime(now.year, now.month + 1, 0, 23, 59, 59);
+    
+    final startTimestamp = Timestamp.fromDate(start);
+    final endTimestamp = Timestamp.fromDate(end);
+    
+    try {
+      // 사용자가 호스트인 토너먼트 조회
+      final hostTournamentsQuery = await _tournamentsRef
+          .where('hostId', isEqualTo: _userId)
+          .where('startsAt', isGreaterThanOrEqualTo: startTimestamp)
+          .where('startsAt', isLessThanOrEqualTo: endTimestamp)
+          .get();
+      
+      // 사용자가 참가자인 토너먼트 조회
+      final participantTournamentsQuery = await _tournamentsRef
+          .where('participants', arrayContains: _userId)
+          .where('startsAt', isGreaterThanOrEqualTo: startTimestamp)
+          .where('startsAt', isLessThanOrEqualTo: endTimestamp)
+          .get();
+      
+      // 날짜 집합 생성 (중복 제거)
+      final Set<String> dateStrings = {};
+      
+      // 호스트 토너먼트 날짜 추가
+      for (final doc in hostTournamentsQuery.docs) {
+        try {
+          final timestamp = doc.get('startsAt') as Timestamp;
+          final date = timestamp.toDate();
+          final dateString = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+          dateStrings.add(dateString);
+        } catch (e) {
+          debugPrint('호스트 토너먼트 날짜 파싱 오류: $e');
+        }
+      }
+      
+      // 참가자 토너먼트 날짜 추가
+      for (final doc in participantTournamentsQuery.docs) {
+        try {
+          final timestamp = doc.get('startsAt') as Timestamp;
+          final date = timestamp.toDate();
+          final dateString = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+          dateStrings.add(dateString);
+        } catch (e) {
+          debugPrint('참가자 토너먼트 날짜 파싱 오류: $e');
+        }
+      }
+      
+      // 날짜 문자열을 DateTime 객체로 변환
+      final dates = dateStrings.map((dateStr) {
+        final parts = dateStr.split('-');
+        return DateTime(
+          int.parse(parts[0]), 
+          int.parse(parts[1]), 
+          int.parse(parts[2])
+        );
+      }).toList();
+      
+      debugPrint('사용자 토너먼트가 있는 날짜 수: ${dates.length}');
+      return dates;
+    } catch (e) {
+      debugPrint('사용자 토너먼트 날짜 조회 오류: $e');
+      return [];
+    }
+  }
 } 
