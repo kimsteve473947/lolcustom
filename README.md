@@ -1,4 +1,4 @@
-# LoL 내전 매니저 (LoL Custom Game Manager)
+# 스크림져드
 
 League of Legends 내전(Custom Game) 매니저 앱으로 용병 모집과 참가를 쉽게 관리할 수 있습니다.
 
