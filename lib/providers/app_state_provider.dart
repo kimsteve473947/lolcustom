@@ -631,6 +631,7 @@ class AppStateProvider extends ChangeNotifier {
     required String title,
     required ChatRoomType type,
     String? initialMessage,
+    String? tournamentId,
   }) async {
     if (_currentUser == null) return null;
     
@@ -638,17 +639,62 @@ class AppStateProvider extends ChangeNotifier {
     _clearError();
     
     try {
-      // Create chat room and send notification using cloud function
+      debugPrint('Creating chat room - type: ${type.index}, tournamentId: $tournamentId');
+      
+      // 채팅방 생성
       final chatRoomId = await _cloudFunctionsService.createChatRoomWithNotification(
         participantIds: [_currentUser!.uid, targetUserId],
         title: title,
         type: type,
         initialMessage: initialMessage,
+        tournamentId: tournamentId,
       );
+      
+      debugPrint('Chat room created with ID: $chatRoomId');
+      
+      // 토너먼트 채팅방인 경우 토너먼트와 연결
+      if (type == ChatRoomType.tournamentRecruitment && tournamentId != null) {
+        debugPrint('Linking chat room $chatRoomId to tournament $tournamentId');
+        await _firebaseService.linkChatRoomToTournament(chatRoomId, tournamentId);
+        
+        // 토너먼트 참가자들을 모두 채팅방에 추가
+        final tournament = await _firebaseService.getTournament(tournamentId);
+        if (tournament != null) {
+          // 포지션별 참가자 목록 가져오기
+          final participants = <String>{};
+          
+          // 모든 포지션의 참가자 추가
+          tournament.participantsByRole.forEach((position, playerList) {
+            participants.addAll(playerList);
+          });
+          
+          // 호스트 추가
+          participants.add(tournament.hostId);
+          
+          debugPrint('Adding ${participants.length} participants to chat room $chatRoomId');
+          
+          // 각 참가자를 채팅방에 추가
+          for (final userId in participants) {
+            if (userId != _currentUser!.uid && userId != targetUserId) {
+              // 이미 생성자와 대상자는 추가되어 있으므로 제외
+              final user = await _firebaseService.getUserById(userId);
+              if (user != null) {
+                await _firebaseService.addParticipantToChatRoom(
+                  chatRoomId, 
+                  userId,
+                  user.nickname,
+                  user.profileImageUrl
+                );
+              }
+            }
+          }
+        }
+      }
       
       return chatRoomId;
     } catch (e) {
-      _setError('Failed to create chat room: $e');
+      _setError('채팅방 생성 중 오류가 발생했습니다: $e');
+      debugPrint('Error creating chat room: $e');
       return null;
     } finally {
       _setLoading(false);

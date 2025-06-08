@@ -307,25 +307,63 @@ class FirebaseService {
   // Chat methods
   Future<String> createChatRoom(ChatRoomModel chatRoom) async {
     try {
-      DocumentReference ref =
-          await _firestore.collection('chatRooms').add(chatRoom.toFirestore());
-      return ref.id;
+      debugPrint('=== 채팅방 생성 메서드 호출 ===');
+      debugPrint('채팅방 제목: ${chatRoom.title}');
+      debugPrint('참가자 목록: ${chatRoom.participantIds.join(', ')}');
+      debugPrint('채팅방 타입: ${chatRoom.type}');
+      debugPrint('연결된 토너먼트 ID: ${chatRoom.tournamentId}');
+      
+      // Firestore에 채팅방 문서 생성
+      debugPrint('Firestore에 채팅방 문서 생성 시작...');
+      final docRef = await _firestore.collection('chatRooms').add(chatRoom.toFirestore());
+      debugPrint('채팅방 문서 생성 완료, ID: ${docRef.id}');
+      
+      // 생성된 ID로 채팅방 모델 업데이트
+      final updatedChatRoom = chatRoom.copyWith(id: docRef.id);
+      
+      // ID가 포함된 데이터로 문서 업데이트
+      debugPrint('채팅방 ID 업데이트 시작...');
+      await docRef.update(updatedChatRoom.toFirestore());
+      debugPrint('채팅방 ID 업데이트 완료');
+      
+      debugPrint('=== 채팅방 생성 완료: ${docRef.id} ===');
+      return docRef.id;
     } catch (e) {
-      debugPrint('Error creating chat room: $e');
-      throw e;
+      debugPrint('!!! 채팅방 생성 실패: $e !!!');
+      throw Exception('채팅방 생성 실패: $e');
     }
   }
 
   Future<List<ChatRoomModel>> getUserChatRooms(String userId) async {
     try {
+      debugPrint('Fetching chat rooms for user: $userId');
+      
       final snapshot = await _firestore
           .collection('chatRooms')
           .where('participantIds', arrayContains: userId)
           .orderBy('lastMessageTime', descending: true)
           .get();
-      return snapshot.docs
-          .map((doc) => ChatRoomModel.fromFirestore(doc))
-          .toList();
+      
+      debugPrint('Found ${snapshot.docs.length} chat rooms for user $userId');
+      
+      // 결과 검증 및 변환
+      List<ChatRoomModel> chatRooms = [];
+      for (var doc in snapshot.docs) {
+        try {
+          final room = ChatRoomModel.fromFirestore(doc);
+          
+          // ChatRoomType 검증
+          if (room.type == ChatRoomType.tournamentRecruitment) {
+            debugPrint('Found tournament chat room: ${doc.id}, title: ${room.title}');
+          }
+          
+          chatRooms.add(room);
+        } catch (e) {
+          debugPrint('Error converting chat room doc: $e');
+        }
+      }
+      
+      return chatRooms;
     } catch (e) {
       debugPrint('Error getting user chat rooms: $e');
       return [];
@@ -334,20 +372,40 @@ class FirebaseService {
 
   Future<String> sendMessage(MessageModel message) async {
     try {
-      // Add the message
-      DocumentReference ref =
-          await _firestore.collection('messages').add(message.toFirestore());
-
-      // Update the chat room with last message
+      // Firestore에 메시지 저장
+      final docRef = await _firestore.collection('messages').add(message.toFirestore());
+      
+      // 채팅방 마지막 메시지 정보 업데이트
       await _firestore.collection('chatRooms').doc(message.chatRoomId).update({
         'lastMessageText': message.text,
         'lastMessageTime': message.timestamp,
       });
-
-      return ref.id;
+      
+      // 채팅방 참가자들의 읽지 않은 메시지 수 업데이트
+      final chatRoomDoc = await _firestore.collection('chatRooms').doc(message.chatRoomId).get();
+      if (chatRoomDoc.exists) {
+        final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
+        
+        // 읽지 않은 메시지 카운트 업데이트
+        Map<String, int> updatedUnreadCount = Map<String, int>.from(chatRoom.unreadCount);
+        for (String participantId in chatRoom.participantIds) {
+          // 메시지 발신자는 읽음 처리
+          if (participantId != message.senderId) {
+            updatedUnreadCount[participantId] = (updatedUnreadCount[participantId] ?? 0) + 1;
+          }
+        }
+        
+        // 채팅방 읽지 않은 메시지 수 업데이트
+        await _firestore.collection('chatRooms').doc(message.chatRoomId).update({
+          'unreadCount': updatedUnreadCount
+        });
+      }
+      
+      debugPrint('Message sent successfully with ID: ${docRef.id}');
+      return docRef.id;
     } catch (e) {
       debugPrint('Error sending message: $e');
-      throw e;
+      throw Exception('메시지 전송 실패: $e');
     }
   }
 
@@ -712,26 +770,80 @@ class FirebaseService {
   // 내전 ID로 채팅방 찾기
   Future<String?> findChatRoomByTournamentId(String tournamentId) async {
     try {
+      debugPrint('=== 토너먼트 ID로 채팅방 찾기: $tournamentId ===');
+      
+      debugPrint('Firestore 쿼리 실행 중...');
       final querySnapshot = await _firestore
           .collection('chatRooms')
           .where('tournamentId', isEqualTo: tournamentId)
           .limit(1)
           .get();
       
+      debugPrint('쿼리 결과: ${querySnapshot.docs.length}개의 문서 찾음');
+      
       if (querySnapshot.docs.isNotEmpty) {
-        return querySnapshot.docs.first.id;
+        final chatRoomId = querySnapshot.docs.first.id;
+        debugPrint('채팅방 찾음: $chatRoomId');
+        return chatRoomId;
       }
       
+      debugPrint('해당 토너먼트의 채팅방을 찾을 수 없음');
       return null;
     } catch (e) {
-      debugPrint('Error finding chat room by tournament ID: $e');
+      debugPrint('!!! 토너먼트 ID로 채팅방 찾기 오류: $e !!!');
       return null;
+    }
+  }
+  
+  // 채팅방에 참가자 추가
+  Future<void> addParticipantToChatRoom(
+      String chatRoomId,
+      String userId,
+      String userName,
+      String? userProfileImageUrl) async {
+    try {
+      // 채팅방 정보 가져오기
+      final chatRoomDoc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
+      if (!chatRoomDoc.exists) {
+        debugPrint('Chat room $chatRoomId does not exist');
+        return;
+      }
+      
+      // 채팅방 모델로 변환
+      final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
+      
+      // 이미 참가자인지 확인
+      if (chatRoom.participantIds.contains(userId)) {
+        debugPrint('User $userId is already a participant in chat room $chatRoomId');
+        return;
+      }
+      
+      // 참가자 목록, 이름, 프로필 이미지, 읽지 않은 메시지 수 업데이트
+      final updatedParticipantIds = List<String>.from(chatRoom.participantIds)..add(userId);
+      final updatedParticipantNames = Map<String, String>.from(chatRoom.participantNames)..addAll({userId: userName});
+      final updatedParticipantProfileImages = Map<String, String?>.from(chatRoom.participantProfileImages)..addAll({userId: userProfileImageUrl});
+      final updatedUnreadCount = Map<String, int>.from(chatRoom.unreadCount)..addAll({userId: 0});
+      
+      // 채팅방 업데이트
+      await _firestore.collection('chatRooms').doc(chatRoomId).update({
+        'participantIds': updatedParticipantIds,
+        'participantNames': updatedParticipantNames,
+        'participantProfileImages': updatedParticipantProfileImages,
+        'unreadCount': updatedUnreadCount,
+      });
+      
+      debugPrint('Added user $userId to chat room $chatRoomId');
+    } catch (e) {
+      debugPrint('Error adding participant to chat room: $e');
+      throw e;
     }
   }
   
   // 채팅방과 내전 연결
   Future<void> linkChatRoomToTournament(String chatRoomId, String tournamentId) async {
     try {
+      debugPrint('Linking chat room $chatRoomId to tournament $tournamentId');
+      
       await _firestore
           .collection('chatRooms')
           .doc(chatRoomId)
@@ -739,6 +851,13 @@ class FirebaseService {
             'tournamentId': tournamentId,
             'type': ChatRoomType.tournamentRecruitment.index,
           });
+      
+      // 업데이트 후 검증
+      final chatRoomDoc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
+      if (chatRoomDoc.exists) {
+        final data = chatRoomDoc.data() as Map<String, dynamic>;
+        debugPrint('Chat room after linking - tournamentId: ${data['tournamentId']}, type: ${data['type']}');
+      }
     } catch (e) {
       debugPrint('Error linking chat room to tournament: $e');
       throw Exception('채팅방과 내전을 연결하는 중 오류가 발생했습니다: $e');

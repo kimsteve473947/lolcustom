@@ -29,9 +29,14 @@ class AppRouter {
   
   AppRouter({required this.authService});
   
+  // 라우터용 네비게이터 키 정의
+  final _rootNavigatorKey = GlobalKey<NavigatorState>();
+  final _shellNavigatorKey = GlobalKey<NavigatorState>();
+  
   late final router = GoRouter(
     initialLocation: '/',
     debugLogDiagnostics: true,
+    navigatorKey: _rootNavigatorKey,
     refreshListenable: GoRouterRefreshStream(authService.authStateChanges()),
     redirect: (BuildContext context, GoRouterState state) {
       final isLoggedIn = authService.isLoggedIn;
@@ -152,10 +157,17 @@ class AppRouter {
       ),
       GoRoute(
         path: '/chat/:id',
-        builder: (context, state) {
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) {
           final chatId = state.pathParameters['id']!;
-          return MainScreen(
+          return CustomTransitionPage(
             child: ChatRoomScreen(chatRoomId: chatId),
+            transitionsBuilder: (context, animation, secondaryAnimation, child) {
+              return FadeTransition(
+                opacity: animation,
+                child: child,
+              );
+            },
           );
         },
       ),

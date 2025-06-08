@@ -14,51 +14,52 @@ class TournamentService {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final String _collectionPath = 'tournaments';
   final String _usersPath = 'users';
-  
+
   // 추가: FirebaseService와 FirebaseMessagingService 의존성
   final FirebaseService _firebaseService;
   final FirebaseMessagingService _messagingService;
-  
+
   // 생성자를 통한 의존성 주입
   TournamentService({
     FirebaseService? firebaseService,
     FirebaseMessagingService? messagingService,
-  }) : 
-    _firebaseService = firebaseService ?? FirebaseService(),
-    _messagingService = messagingService ?? FirebaseMessagingService();
-  
+  })  : _firebaseService = firebaseService ?? FirebaseService(),
+        _messagingService = messagingService ?? FirebaseMessagingService();
+
   // 사용자 ID 가져오기
   String? get _userId => _auth.currentUser?.uid;
-  
+
   // 콜렉션 참조
-  CollectionReference get _tournamentsRef => _firestore.collection(_collectionPath);
+  CollectionReference get _tournamentsRef =>
+      _firestore.collection(_collectionPath);
   CollectionReference get _usersRef => _firestore.collection(_usersPath);
-  
+
   // 모든 토너먼트 조회 (최신순)
   Stream<List<TournamentModel>> getTournamentsStream() {
     return _tournamentsRef
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => TournamentModel.fromFirestore(doc))
-              .toList();
-        });
+      return snapshot.docs
+          .map((doc) => TournamentModel.fromFirestore(doc))
+          .toList();
+    });
   }
-  
+
   // 상태별 토너먼트 조회
-  Stream<List<TournamentModel>> getTournamentsByStatusStream(TournamentStatus status) {
+  Stream<List<TournamentModel>> getTournamentsByStatusStream(
+      TournamentStatus status) {
     return _tournamentsRef
         .where('status', isEqualTo: status.index)
         .orderBy('startsAt', descending: false)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => TournamentModel.fromFirestore(doc))
-              .toList();
-        });
+      return snapshot.docs
+          .map((doc) => TournamentModel.fromFirestore(doc))
+          .toList();
+    });
   }
-  
+
   // 활성 상태 토너먼트 조회 (시작 시간 순)
   Stream<List<TournamentModel>> getActiveTournamentsStream() {
     return _tournamentsRef
@@ -66,25 +67,22 @@ class TournamentService {
         .orderBy('startsAt', descending: false)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => TournamentModel.fromFirestore(doc))
-              .toList();
-        });
+      return snapshot.docs
+          .map((doc) => TournamentModel.fromFirestore(doc))
+          .toList();
+    });
   }
-  
+
   // 특정 토너먼트 조회
   Stream<TournamentModel?> getTournamentStream(String id) {
-    return _tournamentsRef
-        .doc(id)
-        .snapshots()
-        .map((doc) {
-          if (doc.exists) {
-            return TournamentModel.fromFirestore(doc);
-          }
-          return null;
-        });
+    return _tournamentsRef.doc(id).snapshots().map((doc) {
+      if (doc.exists) {
+        return TournamentModel.fromFirestore(doc);
+      }
+      return null;
+    });
   }
-  
+
   // 특정 토너먼트 데이터 가져오기 (Future)
   Future<TournamentModel?> getTournament(String id) async {
     try {
@@ -98,7 +96,7 @@ class TournamentService {
       rethrow;
     }
   }
-  
+
   // 토너먼트 목록 가져오기 - 필터링 지원
   Future<List<TournamentModel>> getTournaments({
     Map<String, dynamic>? filters,
@@ -108,21 +106,24 @@ class TournamentService {
     try {
       // 쿼리 생성
       Query query = _tournamentsRef;
-      
+
       // 필터 적용
       if (filters != null) {
         // 토너먼트 타입 필터 (일반전/경쟁전)
-        if (filters.containsKey('tournamentType') && filters['tournamentType'] != null) {
-          query = query.where('tournamentType', isEqualTo: filters['tournamentType']);
+        if (filters.containsKey('tournamentType') &&
+            filters['tournamentType'] != null) {
+          query = query.where('tournamentType',
+              isEqualTo: filters['tournamentType']);
         }
-        
+
         // 상태 필터
         if (filters.containsKey('status') && filters['status'] != null) {
           query = query.where('status', isEqualTo: filters['status']);
         }
-        
+
         // 현재 시간 이후 토너먼트만 보여주기 위한 필터
-        if (filters.containsKey('showOnlyFuture') && filters['showOnlyFuture'] == true) {
+        if (filters.containsKey('showOnlyFuture') &&
+            filters['showOnlyFuture'] == true) {
           // 현재 시간 기준 Timestamp 생성
           final now = Timestamp.fromDate(DateTime.now());
           query = query.where('startsAt', isGreaterThanOrEqualTo: now);
@@ -132,18 +133,18 @@ class TournamentService {
         final now = Timestamp.fromDate(DateTime.now());
         query = query.where('startsAt', isGreaterThanOrEqualTo: now);
       }
-      
+
       // 기본 정렬: 시작 시간 오름차순
       query = query.orderBy('startsAt', descending: false);
-      
+
       // 페이지네이션
       if (startAfter != null) {
         query = query.startAfterDocument(startAfter);
       }
-      
+
       // 결과 제한
       query = query.limit(limit);
-      
+
       // 쿼리 실행
       QuerySnapshot querySnapshot;
       try {
@@ -153,110 +154,122 @@ class TournamentService {
         // 인덱스 오류 발생 시 단순화된 쿼리로 폴백
         debugPrint('복합 쿼리 실행 중 오류 발생: $e');
         debugPrint('단순화된 쿼리로 폴백합니다.');
-        
+
         // 기본 쿼리만 사용하되, 현재 시간 이후 토너먼트만 필터링
         final now = Timestamp.fromDate(DateTime.now());
-        query = _tournamentsRef.where('startsAt', isGreaterThanOrEqualTo: now)
+        query = _tournamentsRef
+            .where('startsAt', isGreaterThanOrEqualTo: now)
             .orderBy('startsAt', descending: false)
             .limit(limit);
-            
+
         if (startAfter != null) {
           query = query.startAfterDocument(startAfter);
         }
-        
+
         querySnapshot = await query.get();
       }
-      
+
       // 결과가 없는 경우
       if (querySnapshot.docs.isEmpty) {
         debugPrint('No tournaments found matching the criteria');
         return [];
       }
-      
+
       // 모델 변환
       var tournaments = <TournamentModel>[];
-      
+
       for (final doc in querySnapshot.docs) {
         try {
           final tournament = TournamentModel.fromFirestore(doc);
           tournaments.add(tournament);
         } catch (e) {
-          debugPrint('Error parsing tournament data for document ${doc.id}: $e');
+          debugPrint(
+              'Error parsing tournament data for document ${doc.id}: $e');
           // 오류가 있는 문서는 건너뛰고 계속 진행
           continue;
         }
       }
-      
+
       debugPrint('Successfully loaded ${tournaments.length} tournaments');
-      
+
       // 날짜 필터 적용 (Firebase 쿼리로 처리할 수 없는 필터)
-      if (filters != null && 
-          filters.containsKey('startDate') && filters['startDate'] != null &&
-          filters.containsKey('endDate') && filters['endDate'] != null) {
+      if (filters != null &&
+          filters.containsKey('startDate') &&
+          filters['startDate'] != null &&
+          filters.containsKey('endDate') &&
+          filters['endDate'] != null) {
         final startDate = filters['startDate'] as DateTime;
         final endDate = filters['endDate'] as DateTime;
-        
+
         // 날짜 필터링을 더 엄격하게 적용 - 해당 날짜에 속하는 대회만 포함
         tournaments = tournaments.where((t) {
           final tournamentDate = t.startsAt.toDate();
-          return tournamentDate.year == startDate.year && 
-                 tournamentDate.month == startDate.month && 
-                 tournamentDate.day == startDate.day;
+          return tournamentDate.year == startDate.year &&
+              tournamentDate.month == startDate.month &&
+              tournamentDate.day == startDate.day;
         }).toList();
-        
+
         debugPrint('After date filtering: ${tournaments.length} tournaments');
       }
-      
+
       // 추가 필터링 적용 (Firebase 쿼리로 처리할 수 없는 필터)
       if (filters != null) {
         // 토너먼트 타입 필터 (폴백 쿼리에서 처리 못한 경우)
-        if (filters.containsKey('tournamentType') && filters['tournamentType'] != null) {
+        if (filters.containsKey('tournamentType') &&
+            filters['tournamentType'] != null) {
           final tournamentType = filters['tournamentType'];
-          tournaments = tournaments.where((t) => 
-            t.tournamentType.index == tournamentType).toList();
+          tournaments = tournaments
+              .where((t) => t.tournamentType.index == tournamentType)
+              .toList();
         }
-        
+
         // 거리 필터
-        if (filters.containsKey('maxDistance') && filters['maxDistance'] != null) {
+        if (filters.containsKey('maxDistance') &&
+            filters['maxDistance'] != null) {
           final maxDistance = filters['maxDistance'] as double;
-          tournaments = tournaments.where((t) => 
-            t.distance == null || t.distance! <= maxDistance).toList();
+          tournaments = tournaments
+              .where((t) => t.distance == null || t.distance! <= maxDistance)
+              .toList();
         }
-        
+
         // OVR 제한 필터
         if (filters.containsKey('ovrLimit') && filters['ovrLimit'] != null) {
           final ovrLimit = filters['ovrLimit'];
-          tournaments = tournaments.where((t) => 
-            t.ovrLimit == null || t.ovrLimit! <= ovrLimit).toList();
+          tournaments = tournaments
+              .where((t) => t.ovrLimit == null || t.ovrLimit! <= ovrLimit)
+              .toList();
         }
-        
+
         // 티어 제한 필터
         if (filters.containsKey('tierLimit') && filters['tierLimit'] != null) {
           final tierLimit = filters['tierLimit'] as PlayerTier;
-          tournaments = tournaments.where((t) => 
-            t.isUserTierEligible(tierLimit)).toList();
+          tournaments = tournaments
+              .where((t) => t.isUserTierEligible(tierLimit))
+              .toList();
         }
-        
+
         // 상태 필터 (폴백 쿼리에서 처리 못한 경우)
         if (filters.containsKey('status') && filters['status'] != null) {
           final status = filters['status'];
-          tournaments = tournaments.where((t) => 
-            t.status.index == status).toList();
+          tournaments =
+              tournaments.where((t) => t.status.index == status).toList();
         }
-        
+
         // 현재 시간 이후 토너먼트만 표시 (폴백 쿼리에서 처리 못한 경우)
-        if (filters.containsKey('showOnlyFuture') && filters['showOnlyFuture'] == true) {
+        if (filters.containsKey('showOnlyFuture') &&
+            filters['showOnlyFuture'] == true) {
           final now = DateTime.now();
-          tournaments = tournaments.where((t) => 
-            t.startsAt.toDate().isAfter(now)).toList();
+          tournaments = tournaments
+              .where((t) => t.startsAt.toDate().isAfter(now))
+              .toList();
         }
       } else {
         // 기본적으로 현재 시간 이후 토너먼트만 표시 (폴백 쿼리에서 처리 못한 경우)
         final now = DateTime.now();
-        tournaments = tournaments.where((t) => 
-          t.startsAt.toDate().isAfter(now)).toList();
+        tournaments =
+            tournaments.where((t) => t.startsAt.toDate().isAfter(now)).toList();
       }
-      
+
       return tournaments;
     } catch (e) {
       debugPrint('Error getting tournaments: $e');
@@ -264,137 +277,168 @@ class TournamentService {
       return [];
     }
   }
-  
+
   // 내가 주최한 토너먼트 조회
   Stream<List<TournamentModel>> getMyHostedTournamentsStream() {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return Stream.value([]);
-    
+
     return _tournamentsRef
         .where('hostId', isEqualTo: userId)
         .orderBy('createdAt', descending: true)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => TournamentModel.fromFirestore(doc))
-              .toList();
-        });
+      return snapshot.docs
+          .map((doc) => TournamentModel.fromFirestore(doc))
+          .toList();
+    });
   }
-  
+
   // 내가 참가한 토너먼트 조회
   Stream<List<TournamentModel>> getMyJoinedTournamentsStream() {
     final userId = _auth.currentUser?.uid;
     if (userId == null) return Stream.value([]);
-    
+
     return _tournamentsRef
         .where('participants', arrayContains: userId)
         .orderBy('startsAt', descending: false)
         .snapshots()
         .map((snapshot) {
-          return snapshot.docs
-              .map((doc) => TournamentModel.fromFirestore(doc))
-              .toList();
-        });
+      return snapshot.docs
+          .map((doc) => TournamentModel.fromFirestore(doc))
+          .toList();
+    });
   }
-  
+
   // 토너먼트 생성
   Future<String> createTournament(TournamentModel tournament) async {
     try {
+      debugPrint('=== 토너먼트 생성 시작 ===');
       // 기본 유효성 검사
       if (tournament.title.isEmpty) {
         throw Exception('제목이 비어있습니다');
       }
-      
+
       if (tournament.hostId.isEmpty) {
         throw Exception('호스트 ID가 비어있습니다');
       }
-      
+
       // 사용자 인증 확인
       final userId = _auth.currentUser?.uid;
       if (userId == null) {
         throw Exception('사용자 인증이 필요합니다');
       }
-      
+
       // 데이터 변환 및 검증
       final data = tournament.toFirestore();
       final requiredFields = ['title', 'hostId', 'startsAt', 'status'];
-      
+
       for (final field in requiredFields) {
         if (!data.containsKey(field) || data[field] == null) {
           throw Exception('필수 필드 누락: $field');
         }
       }
-      
+
       // 트랜잭션을 사용하여 토너먼트 생성 및 사용자 데이터 업데이트
       String newTournamentId = '';
-      
+
       await _firestore.runTransaction((transaction) async {
         try {
           // 1. 새 토너먼트 문서 생성
           final docRef = _tournamentsRef.doc();
           newTournamentId = docRef.id;
-          
+          debugPrint('새 토너먼트 ID 생성: $newTournamentId');
+
           // 2. 트랜잭션에 토너먼트 데이터 쓰기 추가
           transaction.set(docRef, data);
-          
+          debugPrint('토너먼트 데이터 저장 완료');
+
           // 3. 사용자 문서에 생성한 토너먼트 ID 추가 (옵션)
           final userRef = _usersRef.doc(userId);
           final userDoc = await transaction.get(userRef);
-          
+
           if (userDoc.exists) {
             final userData = userDoc.data() as Map<String, dynamic>;
-            final hostedTournaments = List<String>.from(userData['hostedTournaments'] ?? []);
-            
+            final hostedTournaments =
+                List<String>.from(userData['hostedTournaments'] ?? []);
+
             if (!hostedTournaments.contains(newTournamentId)) {
               hostedTournaments.add(newTournamentId);
-              transaction.update(userRef, {'hostedTournaments': hostedTournaments});
+              transaction
+                  .update(userRef, {'hostedTournaments': hostedTournaments});
+              debugPrint('사용자 문서에 토너먼트 ID 추가 완료');
             }
           }
-          
-          debugPrint('Tournament created successfully with ID: $newTournamentId');
+
+          debugPrint('토너먼트 생성 트랜잭션 완료: $newTournamentId');
         } catch (e) {
-          debugPrint('Error in tournament creation transaction: $e');
+          debugPrint('토너먼트 생성 트랜잭션 중 오류: $e');
           throw Exception('토너먼트 생성 실패: $e');
         }
       });
-      
+
       // 4. 토너먼트 생성 후 채팅방 자동 생성
-      await _createTournamentChatRoom(newTournamentId, tournament);
+      debugPrint('토너먼트 생성 후 채팅방 생성 시작');
       
+      // 완전한 토너먼트 데이터 로드
+      final tournamentDoc = await _tournamentsRef.doc(newTournamentId).get();
+      if (!tournamentDoc.exists) {
+        debugPrint('오류: 생성된 토너먼트 문서를 찾을 수 없음');
+        throw Exception('생성된 토너먼트를 찾을 수 없습니다');
+      }
+      
+      final createdTournament = TournamentModel.fromFirestore(tournamentDoc);
+      debugPrint('생성된 토너먼트 데이터 로드 완료: ${createdTournament.title}');
+      
+      // 채팅방 생성 명시적 호출
+      await _createTournamentChatRoom(newTournamentId, createdTournament);
+      debugPrint('=== 토너먼트 생성 완료 ===');
+
       return newTournamentId;
     } catch (e) {
-      debugPrint('Error creating tournament: $e');
+      debugPrint('토너먼트 생성 중 오류: $e');
       rethrow;
     }
   }
-  
+
   // 내전용 채팅방 생성 메서드
-  Future<void> _createTournamentChatRoom(String tournamentId, TournamentModel tournament) async {
+  Future<void> _createTournamentChatRoom(
+      String tournamentId, TournamentModel tournament) async {
     try {
+      debugPrint('=== 채팅방 생성 시작: 토너먼트 ID = $tournamentId ===');
+      
       // 이미 채팅방이 있는지 확인
-      final existingChatRoomId = await _firebaseService.findChatRoomByTournamentId(tournamentId);
+      final existingChatRoomId =
+          await _firebaseService.findChatRoomByTournamentId(tournamentId);
       if (existingChatRoomId != null) {
-        debugPrint('Chat room for tournament $tournamentId already exists: $existingChatRoomId');
+        debugPrint(
+            '채팅방이 이미 존재합니다: 토너먼트 ID = $tournamentId, 채팅방 ID = $existingChatRoomId');
         return;
       }
       
+      debugPrint('기존 채팅방 없음, 새 채팅방 생성 시작');
+
       // 호스트 정보 가져오기
       final hostUser = await _firebaseService.getUserById(tournament.hostId);
       if (hostUser == null) {
-        debugPrint('Error: Host user not found');
+        debugPrint('오류: 호스트 사용자를 찾을 수 없습니다. ID = ${tournament.hostId}');
         return;
       }
       
+      debugPrint('호스트 정보 조회 성공: ${hostUser.nickname}');
+
       // 채팅방 참가자 초기화 (호스트만 포함)
       final participantIds = [tournament.hostId];
       final participantNames = {tournament.hostId: hostUser.nickname};
-      final participantProfileImages = {tournament.hostId: hostUser.profileImageUrl};
+      final participantProfileImages = {
+        tournament.hostId: hostUser.profileImageUrl
+      };
       final unreadCount = {tournament.hostId: 0};
-      
+
       // 채팅방 모델 생성
       final chatRoom = ChatRoomModel(
         id: '', // Firestore에서 자동 생성될 ID
-        title: '${tournament.title} 채팅방',
+        title: '${tournament.title} (${_formatDate(tournament.startsAt.toDate())}) (0/${tournament.totalSlots}명)',
         participantIds: participantIds,
         participantNames: participantNames,
         participantProfileImages: participantProfileImages,
@@ -402,90 +446,97 @@ class TournamentService {
         type: ChatRoomType.tournamentRecruitment,
         tournamentId: tournamentId,
         createdAt: Timestamp.now(),
+        lastMessageTime: Timestamp.now(), // 메시지 정렬을 위해 마지막 메시지 시간 설정
       );
       
+      debugPrint('채팅방 모델 생성 완료: ${chatRoom.title}');
+
       // 채팅방 생성
       final chatRoomId = await _firebaseService.createChatRoom(chatRoom);
-      
-      // 채팅방과 토너먼트 연결
+      debugPrint('채팅방 생성 성공! ID: $chatRoomId');
+
+      // 채팅방과 토너먼트 연결 - 이 부분이 중요함
       await _firebaseService.linkChatRoomToTournament(chatRoomId, tournamentId);
-      
+      debugPrint('채팅방과 토너먼트 연결 완료: 채팅방 ID = $chatRoomId, 토너먼트 ID = $tournamentId');
+
       // 시스템 메시지 전송
       await _sendSystemMessage(
         chatRoomId,
         '내전 채팅방이 생성되었습니다. 참가자가 모이면 알림이 전송됩니다.',
       );
+      debugPrint('시스템 메시지 전송 완료');
       
-      debugPrint('Created chat room for tournament $tournamentId: $chatRoomId');
+      debugPrint('=== 채팅방 생성 완료 ===');
     } catch (e) {
-      debugPrint('Error creating tournament chat room: $e');
+      debugPrint('!!! 채팅방 생성 중 오류 발생: $e !!!');
     }
   }
-  
+
+  // 날짜 포맷 유틸리티 메서드
+  String _formatDate(DateTime date) {
+    return '${date.month}/${date.day} ${date.hour}:${date.minute.toString().padLeft(2, '0')}';
+  }
+
   // 채팅방에 참가자 추가
   Future<void> _addParticipantToChatRoom(String tournamentId, String userId) async {
     try {
-      // 토너먼트 관련 채팅방 찾기
-      final chatRoomId = await _firebaseService.findChatRoomByTournamentId(tournamentId);
-      if (chatRoomId == null) {
-        debugPrint('No chat room found for tournament $tournamentId');
-        return;
-      }
-      
-      // 채팅방 정보 가져오기
-      final chatRoomDoc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
-      if (!chatRoomDoc.exists) {
-        debugPrint('Chat room $chatRoomId does not exist');
-        return;
-      }
-      
-      // 채팅방 모델로 변환
-      final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
-      
-      // 이미 참가자인지 확인
-      if (chatRoom.participantIds.contains(userId)) {
-        debugPrint('User $userId is already a participant in chat room $chatRoomId');
-        return;
-      }
-      
       // 사용자 정보 가져오기
-      final userDoc = await _firestore.collection('users').doc(userId).get();
-      if (!userDoc.exists) {
+      final user = await _firebaseService.getUserById(userId);
+      if (user == null) {
         debugPrint('User $userId not found');
         return;
       }
+
+      // 채팅방 ID 찾기
+      final chatRoomId = await _firebaseService.findChatRoomByTournamentId(tournamentId);
+      if (chatRoomId == null) {
+        debugPrint('Chat room for tournament $tournamentId not found');
+        return;
+      }
       
-      final user = UserModel.fromFirestore(userDoc);
+      // 토너먼트 정보 가져오기
+      final tournamentDoc = await _tournamentsRef.doc(tournamentId).get();
+      if (!tournamentDoc.exists) {
+        debugPrint('Tournament $tournamentId not found');
+        return;
+      }
+      final tournament = TournamentModel.fromFirestore(tournamentDoc);
+
+      // 채팅방 정보 가져오기
+      final chatRoomDoc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
+      if (!chatRoomDoc.exists) {
+        debugPrint('Chat room $chatRoomId not found');
+        return;
+      }
+      final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
       
-      // 참가자 목록, 이름, 프로필 이미지, 읽지 않은 메시지 수 업데이트
-      final updatedParticipantIds = List<String>.from(chatRoom.participantIds)..add(userId);
-      final updatedParticipantNames = Map<String, String>.from(chatRoom.participantNames)
-        ..addAll({userId: user.nickname});
-      final updatedParticipantProfileImages = Map<String, String?>.from(chatRoom.participantProfileImages)
-        ..addAll({userId: user.profileImageUrl});
-      final updatedUnreadCount = Map<String, int>.from(chatRoom.unreadCount)
-        ..addAll({userId: 0});
-      
-      // 채팅방 업데이트
+      // 채팅방 제목 업데이트 - 참가자 수 반영
+      final currentParticipants = tournament.participants.length;
+      final title = '${tournament.title} (${_formatDate(tournament.startsAt.toDate())}) (${currentParticipants}/${tournament.totalSlots}명)';
       await _firestore.collection('chatRooms').doc(chatRoomId).update({
-        'participantIds': updatedParticipantIds,
-        'participantNames': updatedParticipantNames,
-        'participantProfileImages': updatedParticipantProfileImages,
-        'unreadCount': updatedUnreadCount,
+        'title': title
       });
-      
+
+      // 채팅방에 참가자 추가
+      await _firebaseService.addParticipantToChatRoom(
+        chatRoomId,
+        userId,
+        user.nickname,
+        user.profileImageUrl,
+      );
+
       // 시스템 메시지 전송
       await _sendSystemMessage(
         chatRoomId,
-        '${user.nickname}님이 채팅방에 참가했습니다.',
+        '${user.nickname}님이 채팅방에 참가했습니다. (${currentParticipants}/${tournament.totalSlots}명)',
       );
-      
+
       debugPrint('Added user $userId to chat room $chatRoomId');
     } catch (e) {
       debugPrint('Error adding participant to chat room: $e');
     }
   }
-  
+
   // 시스템 메시지 전송
   Future<void> _sendSystemMessage(String chatRoomId, String text) async {
     try {
@@ -500,16 +551,16 @@ class TournamentService {
         timestamp: Timestamp.now(),
         metadata: {'isSystem': true},
       );
-      
+
       // 메시지 전송
       await _firebaseService.sendMessage(message);
-      
+
       debugPrint('Sent system message to chat room $chatRoomId: $text');
     } catch (e) {
       debugPrint('Error sending system message: $e');
     }
   }
-  
+
   // 토너먼트 업데이트
   Future<void> updateTournament(TournamentModel tournament) async {
     try {
@@ -519,10 +570,14 @@ class TournamentService {
       rethrow;
     }
   }
-  
+
   // 토너먼트 삭제
   Future<void> deleteTournament(String id) async {
     try {
+      // 채팅방 먼저 삭제
+      await _deleteTournamentChatRoom(id);
+      
+      // 토너먼트 삭제
       await _tournamentsRef.doc(id).delete();
     } catch (e) {
       print('Error deleting tournament: $e');
@@ -530,61 +585,105 @@ class TournamentService {
     }
   }
   
+  // 토너먼트 채팅방 삭제
+  Future<void> _deleteTournamentChatRoom(String tournamentId) async {
+    try {
+      // 토너먼트 관련 채팅방 찾기
+      final chatRoomId = await _firebaseService.findChatRoomByTournamentId(tournamentId);
+      if (chatRoomId == null) {
+        debugPrint('No chat room found for tournament $tournamentId');
+        return;
+      }
+      
+      // 시스템 메시지 전송
+      await _sendSystemMessage(
+        chatRoomId,
+        '내전이 취소되어 채팅방이 곧 삭제됩니다.',
+      );
+      
+      // 채팅방 삭제
+      await _firestore.collection('chatRooms').doc(chatRoomId).delete();
+      
+      // 관련 메시지도 삭제
+      final messagesSnapshot = await _firestore
+          .collection('messages')
+          .where('chatRoomId', isEqualTo: chatRoomId)
+          .get();
+      
+      final batch = _firestore.batch();
+      for (final doc in messagesSnapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+      
+      debugPrint('Deleted chat room $chatRoomId for tournament $tournamentId');
+    } catch (e) {
+      debugPrint('Error deleting tournament chat room: $e');
+    }
+  }
+
   // 토너먼트 특정 라인 참가 (라인별 참가 시스템)
   Future<void> joinTournamentByRole(String tournamentId, String role) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('로그인이 필요합니다.');
-    
+
     try {
       // 트랜잭션을 통한 토너먼트 참가 처리
       bool isTournamentFull = false;
       TournamentModel? updatedTournament;
-      
+
       await _firestore.runTransaction((transaction) async {
         // 토너먼트 문서 가져오기
-        final tournamentDoc = await transaction.get(_firestore.collection('tournaments').doc(tournamentId));
-        
+        final tournamentDoc = await transaction
+            .get(_firestore.collection('tournaments').doc(tournamentId));
+
         if (!tournamentDoc.exists) {
           throw Exception('토너먼트를 찾을 수 없습니다.');
         }
-        
+
         // 토너먼트 데이터 파싱
         final tournament = TournamentModel.fromFirestore(tournamentDoc);
-        
+
         // 이미 참가 중인지 확인
         if (tournament.participants.contains(userId)) {
           throw Exception('이미 해당 토너먼트에 참가 중입니다.');
         }
-        
+
         // 자리가 있는지 확인
         final slotsByRole = tournament.slotsByRole[role] ?? 0;
         final filledSlotsByRole = tournament.filledSlotsByRole[role] ?? 0;
-        
+
         if (filledSlotsByRole >= slotsByRole) {
           throw Exception('해당 역할의 자리가 이미 모두 찼습니다.');
         }
-        
+
         // 업데이트할 참가자 목록 생성
-        final updatedParticipants = List<String>.from(tournament.participants)..add(userId);
-        
+        final updatedParticipants = List<String>.from(tournament.participants)
+          ..add(userId);
+
         // 업데이트할 역할별 참가자 목록 생성
-        final updatedParticipantsByRole = Map<String, List<String>>.from(tournament.participantsByRole);
+        final updatedParticipantsByRole =
+            Map<String, List<String>>.from(tournament.participantsByRole);
         if (!updatedParticipantsByRole.containsKey(role)) {
           updatedParticipantsByRole[role] = [];
         }
-        updatedParticipantsByRole[role] = List<String>.from(updatedParticipantsByRole[role]!)..add(userId);
-        
+        updatedParticipantsByRole[role] =
+            List<String>.from(updatedParticipantsByRole[role]!)..add(userId);
+
         // 업데이트할 역할별 참가 인원 생성
-        final updatedFilledSlotsByRole = Map<String, int>.from(tournament.filledSlotsByRole);
-        updatedFilledSlotsByRole[role] = (updatedFilledSlotsByRole[role] ?? 0) + 1;
-        
+        final updatedFilledSlotsByRole =
+            Map<String, int>.from(tournament.filledSlotsByRole);
+        updatedFilledSlotsByRole[role] =
+            (updatedFilledSlotsByRole[role] ?? 0) + 1;
+
         // 업데이트할 전체 참가 인원 계산
-        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
+        final updatedFilledSlots =
+            Map<String, int>.from(tournament.filledSlots);
         updatedFilledSlots['total'] = (updatedFilledSlots['total'] ?? 0) + 1;
-        
+
         // 토너먼트 꽉 찼는지 확인
         isTournamentFull = updatedParticipants.length >= tournament.totalSlots;
-        
+
         // 업데이트된 토너먼트 모델 생성 (알림 전송 등에 사용)
         updatedTournament = tournament.copyWith(
           participants: updatedParticipants,
@@ -592,7 +691,7 @@ class TournamentService {
           filledSlotsByRole: updatedFilledSlotsByRole,
           filledSlots: updatedFilledSlots,
         );
-        
+
         // 토너먼트 문서 업데이트
         transaction.update(
           _firestore.collection('tournaments').doc(tournamentId),
@@ -604,28 +703,28 @@ class TournamentService {
           },
         );
       });
-      
+
       // 토너먼트가 꽉 찼으면 모든 참가자에게 알림
       if (isTournamentFull && updatedTournament != null) {
         await _notifyTournamentFull(updatedTournament);
       }
-      
+
       // 토너먼트 채팅방 찾기
-      final chatRoomId = await _firebaseService.findChatRoomByTournamentId(tournamentId);
-      
+      final chatRoomId =
+          await _firebaseService.findChatRoomByTournamentId(tournamentId);
+
       // 채팅방에 시스템 메시지 전송
       if (chatRoomId != null) {
-        await _sendSystemMessage(
-          chatRoomId, 
-          '$role 역할로 새로운 참가자가 참여했습니다.'
-        );
+        await _sendSystemMessage(chatRoomId, '$role 역할로 새로운 참가자가 참여했습니다.');
+
+        // 채팅방에 참가자 추가
+        await _addParticipantToChatRoom(tournamentId, userId);
       }
-      
     } catch (e) {
       rethrow;
     }
   }
-  
+
   // 토너먼트 참가 취소
   Future<void> leaveTournamentByRole(String tournamentId, String role) async {
     final userId = _auth.currentUser?.uid;
@@ -656,19 +755,27 @@ class TournamentService {
         }
         
         // 필드 값 업데이트
-        final updatedFilledSlots = Map<String, int>.from(tournament.filledSlots);
+        final updatedFilledSlots =
+            Map<String, int>.from(tournament.filledSlots);
         updatedFilledSlots[role] = (updatedFilledSlots[role] ?? 1) - 1;
-        if (updatedFilledSlots[role]! < 0) updatedFilledSlots[role] = 0;
+        if (updatedFilledSlots[role]! < 0)
+          updatedFilledSlots[role] = 0;
         
-        final updatedFilledSlotsByRole = Map<String, int>.from(tournament.filledSlotsByRole);
-        updatedFilledSlotsByRole[role] = (updatedFilledSlotsByRole[role] ?? 1) - 1;
-        if (updatedFilledSlotsByRole[role]! < 0) updatedFilledSlotsByRole[role] = 0;
+        final updatedFilledSlotsByRole =
+            Map<String, int>.from(tournament.filledSlotsByRole);
+        updatedFilledSlotsByRole[role] =
+            (updatedFilledSlotsByRole[role] ?? 1) - 1;
+        if (updatedFilledSlotsByRole[role]! < 0)
+          updatedFilledSlotsByRole[role] = 0;
         
-        final updatedParticipants = List<String>.from(tournament.participants)..remove(userId);
+        final updatedParticipants = List<String>.from(tournament.participants)
+          ..remove(userId);
         
         // 역할별 참가자 목록 업데이트
-        final updatedParticipantsByRole = Map<String, List<String>>.from(tournament.participantsByRole);
-        updatedParticipantsByRole[role] = roleParticipants.where((id) => id != userId).toList();
+        final updatedParticipantsByRole =
+            Map<String, List<String>>.from(tournament.participantsByRole);
+        updatedParticipantsByRole[role] =
+            roleParticipants.where((id) => id != userId).toList();
         
         // 상태 업데이트
         TournamentStatus updatedStatus = tournament.status;
@@ -689,14 +796,90 @@ class TournamentService {
         // 경쟁전인 경우 취소 시 크레딧 환불은 정책에 따라 결정
         // 이 예제에서는 환불하지 않음
       });
+      
+      // 채팅방에서 참가자 제거
+      await _removeParticipantFromChatRoom(tournamentId, userId);
+      
     } catch (e) {
       print('Error leaving tournament: $e');
       rethrow;
     }
   }
   
+  // 채팅방에서 참가자 제거
+  Future<void> _removeParticipantFromChatRoom(String tournamentId, String userId) async {
+    try {
+      // 토너먼트 관련 채팅방 찾기
+      final chatRoomId = await _firebaseService.findChatRoomByTournamentId(tournamentId);
+      if (chatRoomId == null) {
+        debugPrint('No chat room found for tournament $tournamentId');
+        return;
+      }
+      
+      // 채팅방 정보 가져오기
+      final chatRoomDoc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
+      if (!chatRoomDoc.exists) {
+        debugPrint('Chat room $chatRoomId does not exist');
+        return;
+      }
+      
+      // 채팅방 모델로 변환
+      final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
+      
+      // 호스트인 경우 채팅방을 떠날 수 없음 (호스트는 항상 채팅방에 있어야 함)
+      final tournamentDoc = await _firestore.collection('tournaments').doc(tournamentId).get();
+      if (tournamentDoc.exists) {
+        final tournament = TournamentModel.fromFirestore(tournamentDoc);
+        if (tournament.hostId == userId) {
+          debugPrint('Host cannot leave the tournament chat room');
+          return;
+        }
+      }
+      
+      // 참가자인지 확인
+      if (!chatRoom.participantIds.contains(userId)) {
+        debugPrint('User $userId is not a participant in chat room $chatRoomId');
+        return;
+      }
+      
+      // 참가자 목록, 이름, 프로필 이미지, 읽지 않은 메시지 수 업데이트
+      final updatedParticipantIds = List<String>.from(chatRoom.participantIds)..remove(userId);
+      final updatedParticipantNames = Map<String, String>.from(chatRoom.participantNames)..remove(userId);
+      final updatedParticipantProfileImages = Map<String, String?>.from(chatRoom.participantProfileImages)..remove(userId);
+      final updatedUnreadCount = Map<String, int>.from(chatRoom.unreadCount)..remove(userId);
+      
+      // 채팅방 업데이트
+      await _firestore.collection('chatRooms').doc(chatRoomId).update({
+        'participantIds': updatedParticipantIds,
+        'participantNames': updatedParticipantNames,
+        'participantProfileImages': updatedParticipantProfileImages,
+        'unreadCount': updatedUnreadCount,
+      });
+      
+      // 시스템 메시지 전송
+      final userDoc = await _firestore.collection('users').doc(userId).get();
+      if (userDoc.exists) {
+        final user = UserModel.fromFirestore(userDoc);
+        await _sendSystemMessage(
+          chatRoomId,
+          '${user.nickname}님이 채팅방을 나갔습니다.',
+        );
+      } else {
+        await _sendSystemMessage(
+          chatRoomId,
+          '참가자가 채팅방을 나갔습니다.',
+        );
+      }
+      
+      debugPrint('Removed user $userId from chat room $chatRoomId');
+    } catch (e) {
+      debugPrint('Error removing participant from chat room: $e');
+    }
+  }
+
   // 토너먼트 상태 변경
-  Future<void> updateTournamentStatus(String tournamentId, TournamentStatus status) async {
+  Future<void> updateTournamentStatus(
+      String tournamentId, TournamentStatus status) async {
     try {
       await _tournamentsRef.doc(tournamentId).update({
         'status': status.index,
@@ -707,7 +890,7 @@ class TournamentService {
       rethrow;
     }
   }
-  
+
   // 크레딧 충전
   Future<void> addCredits(String userId, int amount) async {
     try {
@@ -716,20 +899,18 @@ class TournamentService {
       if (!userDoc.exists) {
         throw Exception('사용자 정보를 찾을 수 없습니다.');
       }
-      
+
       final userData = userDoc.data() as Map<String, dynamic>;
       final currentCredits = userData['credits'] as int? ?? 0;
-      
+
       // 크레딧 추가
-      await _usersRef.doc(userId).update({
-        'credits': currentCredits + amount
-      });
+      await _usersRef.doc(userId).update({'credits': currentCredits + amount});
     } catch (e) {
       print('Error adding credits: $e');
       rethrow;
     }
   }
-  
+
   // 현재 로그인한 사용자의 크레딧 조회
   Future<int> getUserCredits() async {
     try {
@@ -737,12 +918,12 @@ class TournamentService {
       if (userId == null) {
         throw Exception('로그인이 필요합니다.');
       }
-      
+
       final userDoc = await _usersRef.doc(userId).get();
       if (!userDoc.exists) {
         throw Exception('사용자 정보를 찾을 수 없습니다.');
       }
-      
+
       final userData = userDoc.data() as Map<String, dynamic>;
       return userData['credits'] as int? ?? 0;
     } catch (e) {
@@ -750,44 +931,44 @@ class TournamentService {
       rethrow;
     }
   }
-  
+
   // 심판 추가하기
   Future<void> addReferee(String tournamentId, String refereeId) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('로그인이 필요합니다.');
-    
+
     try {
       await _firestore.runTransaction((transaction) async {
         // 토너먼트 문서 가져오기
         final docRef = _tournamentsRef.doc(tournamentId);
         final docSnapshot = await transaction.get(docRef);
-        
+
         if (!docSnapshot.exists) {
           throw Exception('토너먼트를 찾을 수 없습니다.');
         }
-        
+
         // 토너먼트 모델로 변환
         final tournament = TournamentModel.fromFirestore(docSnapshot);
-        
+
         // 본인이 주최자인지 확인
         if (tournament.hostId != userId) {
           throw Exception('토너먼트 주최자만 심판을 추가할 수 있습니다.');
         }
-        
+
         // 이미 심판인지 확인
         final referees = tournament.referees ?? [];
         if (referees.contains(refereeId)) {
           throw Exception('이미 심판으로 등록된 사용자입니다.');
         }
-        
+
         // 심판 목록 업데이트
         final updatedReferees = List<String>.from(referees)..add(refereeId);
-        
+
         // 경쟁전이 아닌 경우 심판 추가 불가
         if (tournament.tournamentType != TournamentType.competitive) {
           throw Exception('일반전에는 심판을 추가할 수 없습니다. 경쟁전만 심판을 추가할 수 있습니다.');
         }
-        
+
         // 트랜잭션 업데이트
         transaction.update(docRef, {
           'referees': updatedReferees,
@@ -800,39 +981,39 @@ class TournamentService {
       rethrow;
     }
   }
-  
+
   // 심판 제거하기
   Future<void> removeReferee(String tournamentId, String refereeId) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('로그인이 필요합니다.');
-    
+
     try {
       await _firestore.runTransaction((transaction) async {
         // 토너먼트 문서 가져오기
         final docRef = _tournamentsRef.doc(tournamentId);
         final docSnapshot = await transaction.get(docRef);
-        
+
         if (!docSnapshot.exists) {
           throw Exception('토너먼트를 찾을 수 없습니다.');
         }
-        
+
         // 토너먼트 모델로 변환
         final tournament = TournamentModel.fromFirestore(docSnapshot);
-        
+
         // 본인이 주최자인지 확인
         if (tournament.hostId != userId) {
           throw Exception('토너먼트 주최자만 심판을 제거할 수 있습니다.');
         }
-        
+
         // 심판 목록에 있는지 확인
         final referees = tournament.referees ?? [];
         if (!referees.contains(refereeId)) {
           throw Exception('심판으로 등록되지 않은 사용자입니다.');
         }
-        
+
         // 심판 목록 업데이트
         final updatedReferees = List<String>.from(referees)..remove(refereeId);
-        
+
         // 트랜잭션 업데이트
         transaction.update(docRef, {
           'referees': updatedReferees,
@@ -845,7 +1026,7 @@ class TournamentService {
       rethrow;
     }
   }
-  
+
   // 모든 심판 가져오기
   Future<List<UserModel>> getTournamentReferees(String tournamentId) async {
     try {
@@ -853,12 +1034,12 @@ class TournamentService {
       if (tournament == null) {
         throw Exception('토너먼트를 찾을 수 없습니다.');
       }
-      
+
       final referees = tournament.referees ?? [];
       if (referees.isEmpty) {
         return [];
       }
-      
+
       final List<UserModel> refereeUsers = [];
       for (final refereeId in referees) {
         final userDoc = await _usersRef.doc(refereeId).get();
@@ -866,14 +1047,14 @@ class TournamentService {
           refereeUsers.add(UserModel.fromFirestore(userDoc));
         }
       }
-      
+
       return refereeUsers;
     } catch (e) {
       print('Error getting tournament referees: $e');
       rethrow;
     }
   }
-  
+
   // 추가: 사용자가 참여하거나 생성한 토너먼트를 특정 날짜별로 조회
   Future<List<TournamentModel>> getUserTournamentsByDate(DateTime date) async {
     if (_userId == null) {
@@ -884,10 +1065,10 @@ class TournamentService {
     // 날짜 범위 설정 (해당 날짜의 00:00:00부터 23:59:59까지)
     final startOfDay = DateTime(date.year, date.month, date.day);
     final endOfDay = DateTime(date.year, date.month, date.day, 23, 59, 59);
-    
+
     final startTimestamp = Timestamp.fromDate(startOfDay);
     final endTimestamp = Timestamp.fromDate(endOfDay);
-    
+
     try {
       // 사용자가 호스트인 토너먼트 조회
       final hostTournamentsQuery = await _tournamentsRef
@@ -895,17 +1076,17 @@ class TournamentService {
           .where('startsAt', isGreaterThanOrEqualTo: startTimestamp)
           .where('startsAt', isLessThanOrEqualTo: endTimestamp)
           .get();
-      
+
       // 사용자가 참가자인 토너먼트 조회
       final participantTournamentsQuery = await _tournamentsRef
           .where('participants', arrayContains: _userId)
           .where('startsAt', isGreaterThanOrEqualTo: startTimestamp)
           .where('startsAt', isLessThanOrEqualTo: endTimestamp)
           .get();
-      
+
       // 결과 합치기 (중복 제거)
       final Map<String, TournamentModel> tournamentsMap = {};
-      
+
       // 호스트 토너먼트 추가
       for (final doc in hostTournamentsQuery.docs) {
         try {
@@ -915,7 +1096,7 @@ class TournamentService {
           debugPrint('호스트 토너먼트 파싱 오류 (${doc.id}): $e');
         }
       }
-      
+
       // 참가자 토너먼트 추가
       for (final doc in participantTournamentsQuery.docs) {
         try {
@@ -925,34 +1106,36 @@ class TournamentService {
           debugPrint('참가자 토너먼트 파싱 오류 (${doc.id}): $e');
         }
       }
-      
+
       // 최종 결과 리스트로 변환 (최신순 정렬)
       final tournaments = tournamentsMap.values.toList()
         ..sort((a, b) => b.startsAt.compareTo(a.startsAt)); // 내림차순 정렬
-      
-      debugPrint('${date.toString().split(' ')[0]} 날짜에 ${tournaments.length}개의 토너먼트를 찾았습니다.');
+
+      debugPrint(
+          '${date.toString().split(' ')[0]} 날짜에 ${tournaments.length}개의 토너먼트를 찾았습니다.');
       return tournaments;
     } catch (e) {
       debugPrint('날짜별 토너먼트 조회 오류: $e');
       return [];
     }
   }
-  
+
   // 추가: 사용자가 참여하거나 생성한 토너먼트가 있는 날짜 목록 조회
-  Future<List<DateTime>> getUserTournamentDates({DateTime? startDate, DateTime? endDate}) async {
+  Future<List<DateTime>> getUserTournamentDates(
+      {DateTime? startDate, DateTime? endDate}) async {
     if (_userId == null) {
       debugPrint('사용자가 로그인하지 않았습니다.');
       return [];
     }
-    
+
     // 날짜 범위 설정 (기본값: 현재 달)
     final now = DateTime.now();
     final start = startDate ?? DateTime(now.year, now.month, 1);
     final end = endDate ?? DateTime(now.year, now.month + 1, 0, 23, 59, 59);
-    
+
     final startTimestamp = Timestamp.fromDate(start);
     final endTimestamp = Timestamp.fromDate(end);
-    
+
     try {
       // 사용자가 호스트인 토너먼트 조회
       final hostTournamentsQuery = await _tournamentsRef
@@ -960,51 +1143,50 @@ class TournamentService {
           .where('startsAt', isGreaterThanOrEqualTo: startTimestamp)
           .where('startsAt', isLessThanOrEqualTo: endTimestamp)
           .get();
-      
+
       // 사용자가 참가자인 토너먼트 조회
       final participantTournamentsQuery = await _tournamentsRef
           .where('participants', arrayContains: _userId)
           .where('startsAt', isGreaterThanOrEqualTo: startTimestamp)
           .where('startsAt', isLessThanOrEqualTo: endTimestamp)
           .get();
-      
+
       // 날짜 집합 생성 (중복 제거)
       final Set<String> dateStrings = {};
-      
+
       // 호스트 토너먼트 날짜 추가
       for (final doc in hostTournamentsQuery.docs) {
         try {
           final timestamp = doc.get('startsAt') as Timestamp;
           final date = timestamp.toDate();
-          final dateString = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+          final dateString =
+              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
           dateStrings.add(dateString);
         } catch (e) {
           debugPrint('호스트 토너먼트 날짜 파싱 오류: $e');
         }
       }
-      
+
       // 참가자 토너먼트 날짜 추가
       for (final doc in participantTournamentsQuery.docs) {
         try {
           final timestamp = doc.get('startsAt') as Timestamp;
           final date = timestamp.toDate();
-          final dateString = '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+          final dateString =
+              '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
           dateStrings.add(dateString);
         } catch (e) {
           debugPrint('참가자 토너먼트 날짜 파싱 오류: $e');
         }
       }
-      
+
       // 날짜 문자열을 DateTime 객체로 변환
       final dates = dateStrings.map((dateStr) {
         final parts = dateStr.split('-');
         return DateTime(
-          int.parse(parts[0]), 
-          int.parse(parts[1]), 
-          int.parse(parts[2])
-        );
+            int.parse(parts[0]), int.parse(parts[1]), int.parse(parts[2]));
       }).toList();
-      
+
       debugPrint('사용자 토너먼트가 있는 날짜 수: ${dates.length}');
       return dates;
     } catch (e) {
@@ -1012,19 +1194,20 @@ class TournamentService {
       return [];
     }
   }
-  
+
   // 토너먼트가 꽉 찼을 때 모든 참가자에게 알림 전송
   Future<void> _notifyTournamentFull(TournamentModel? tournament) async {
     if (tournament == null) return; // null 체크 추가
-    
+
     try {
       // 메시지 준비
       final title = '내전 참가자 모집 완료';
       final body = '${tournament.title} 내전의 참가자가 모두 모였습니다!';
-      
+
       // 토너먼트 채팅방 찾기
-      final chatRoomId = await _firebaseService.findChatRoomByTournamentId(tournament.id);
-      
+      final chatRoomId =
+          await _firebaseService.findChatRoomByTournamentId(tournament.id);
+
       // 채팅방에 시스템 메시지 전송
       if (chatRoomId != null) {
         await _sendSystemMessage(
@@ -1032,10 +1215,10 @@ class TournamentService {
           '모든 참가자가 모였습니다! 곧 내전이 시작됩니다.',
         );
       }
-      
+
       // FCM 메시징 서비스 인스턴스 가져오기
       final messagingService = FirebaseMessagingService();
-      
+
       // 토너먼트 참가자들에게 알림 전송
       await messagingService.sendTournamentNotification(
         tournamentId: tournament.id,
@@ -1043,10 +1226,79 @@ class TournamentService {
         body: body,
         userIds: tournament.participants,
       );
-      
-      debugPrint('Sent notifications to all participants of tournament ${tournament.id}');
+
+      debugPrint(
+          'Sent notifications to all participants of tournament ${tournament.id}');
     } catch (e) {
       debugPrint('Error sending tournament full notifications: $e');
     }
   }
-} 
+
+  // 만료된 토너먼트 채팅방 정리
+  Future<void> cleanupExpiredTournamentChatRooms() async {
+    try {
+      // 현재 시간에서 2시간 전 계산
+      final now = DateTime.now();
+      final twoHoursAgo = now.subtract(const Duration(hours: 2));
+      final twoHoursAgoTimestamp = Timestamp.fromDate(twoHoursAgo);
+      
+      // 시작 시간이 2시간 이상 지난 토너먼트 조회
+      final querySnapshot = await _tournamentsRef
+          .where('startsAt', isLessThan: twoHoursAgoTimestamp)
+          .get();
+      
+      debugPrint('Found ${querySnapshot.docs.length} expired tournaments');
+      
+      // 각 토너먼트에 대해 채팅방 정리
+      for (final doc in querySnapshot.docs) {
+        final tournament = TournamentModel.fromFirestore(doc);
+        
+        // 채팅방 찾기
+        final chatRoomId = await _firebaseService.findChatRoomByTournamentId(tournament.id);
+        if (chatRoomId == null) continue;
+        
+        // 채팅방 정보 가져오기
+        final chatRoomDoc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
+        if (!chatRoomDoc.exists) continue;
+        
+        // 모든 참가자에게 채팅방 만료 알림
+        await _sendSystemMessage(
+          chatRoomId,
+          '내전 종료 시간(2시간)이 지나 채팅방이 곧 삭제됩니다.',
+        );
+        
+        // 참가자들에게 푸시 알림 전송
+        final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
+        for (final participantId in chatRoom.participantIds) {
+          try {
+            await _messagingService.sendNotification(
+              userId: participantId,
+              title: '채팅방 만료 알림',
+              body: '${tournament.title} 내전의 채팅방이 종료되었습니다.',
+            );
+          } catch (e) {
+            debugPrint('Error sending notification to user $participantId: $e');
+          }
+        }
+        
+        // 채팅방 및 메시지 삭제
+        await _firestore.collection('chatRooms').doc(chatRoomId).delete();
+        
+        final messagesSnapshot = await _firestore
+            .collection('messages')
+            .where('chatRoomId', isEqualTo: chatRoomId)
+            .get();
+        
+        final batch = _firestore.batch();
+        for (final messageDoc in messagesSnapshot.docs) {
+          batch.delete(messageDoc.reference);
+        }
+        await batch.commit();
+        
+        debugPrint('Deleted expired chat room $chatRoomId for tournament ${tournament.id}');
+      }
+    } catch (e) {
+      debugPrint('Error cleaning up expired tournament chat rooms: $e');
+    }
+  }
+}

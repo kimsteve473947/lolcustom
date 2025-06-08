@@ -8,6 +8,8 @@ import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:lol_custom_game_manager/widgets/error_view.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lol_custom_game_manager/utils/date_utils.dart';
 
 class ChatListScreen extends StatefulWidget {
   const ChatListScreen({Key? key}) : super(key: key);
@@ -16,242 +18,326 @@ class ChatListScreen extends StatefulWidget {
   State<ChatListScreen> createState() => _ChatListScreenState();
 }
 
-class _ChatListScreenState extends State<ChatListScreen> {
+class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProviderStateMixin {
   final FirebaseService _firebaseService = FirebaseService();
   
-  bool _isLoading = false;
+  bool _isLoading = true;
   String? _errorMessage;
   List<ChatRoomModel> _chatRooms = [];
+  List<ChatRoomModel> _tournamentChatRooms = [];
+  List<ChatRoomModel> _personalChatRooms = [];
+  
+  late TabController _tabController;
   
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadChatRooms();
   }
   
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+  
   Future<void> _loadChatRooms() async {
-    final appState = Provider.of<AppStateProvider>(context, listen: false);
-    if (appState.currentUser == null) return;
-    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
     
     try {
+      final appState = Provider.of<AppStateProvider>(context, listen: false);
+      if (appState.currentUser == null) {
+        setState(() {
+          _errorMessage = '로그인이 필요합니다';
+          _isLoading = false;
+        });
+        return;
+      }
+      
+      // 모든 채팅방 가져오기
       final chatRooms = await _firebaseService.getUserChatRooms(appState.currentUser!.uid);
+      
+      // 디버그 로그
+      debugPrint('Loaded ${chatRooms.length} chat rooms');
+      for (final room in chatRooms) {
+        debugPrint('Chat room: ${room.id}, title: ${room.title}, type: ${room.type}');
+      }
+      
+      // 내전 채팅과 개인 채팅 분리
+      final tournamentChatRooms = chatRooms
+          .where((room) => room.type == ChatRoomType.tournamentRecruitment)
+          .toList();
+      
+      final personalChatRooms = chatRooms
+          .where((room) => room.type != ChatRoomType.tournamentRecruitment)
+          .toList();
       
       setState(() {
         _chatRooms = chatRooms;
+        _tournamentChatRooms = tournamentChatRooms;
+        _personalChatRooms = personalChatRooms;
         _isLoading = false;
       });
     } catch (e) {
+      debugPrint('Error loading chat rooms: $e');
       setState(() {
-        _isLoading = false;
         _errorMessage = '채팅방 목록을 불러오는 중 오류가 발생했습니다: $e';
+        _isLoading = false;
       });
     }
   }
 
   @override
   Widget build(BuildContext context) {
-    final appState = Provider.of<AppStateProvider>(context);
-    final currentUser = appState.currentUser;
-    
-    if (currentUser == null) {
-      return Scaffold(
-        appBar: AppBar(
-          title: const Text('채팅'),
-        ),
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Text('로그인이 필요합니다'),
-              const SizedBox(height: 16),
-              ElevatedButton(
-                onPressed: () {
-                  context.go('/login');
-                },
-                child: const Text('로그인하기'),
-              ),
-            ],
-          ),
-        ),
-      );
-    }
-    
     return Scaffold(
       appBar: AppBar(
         title: const Text('채팅'),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
         actions: [
           IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: () {
-              // TODO: Implement search functionality
-            },
+            icon: const Icon(Icons.refresh),
+            onPressed: _loadChatRooms,
           ),
         ],
       ),
-      body: _errorMessage != null
-          ? ErrorView(
-              errorMessage: _errorMessage!,
-              onRetry: _loadChatRooms,
-            )
-          : _isLoading
-              ? const LoadingIndicator()
-              : _chatRooms.isEmpty
-                  ? _buildEmptyState()
-                  : _buildChatRoomsList(),
+      body: _buildContent(),
     );
   }
   
-  Widget _buildEmptyState() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.chat_bubble_outline,
-            size: 64,
-            color: AppColors.textSecondary,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            '채팅 내역이 없습니다',
-            style: TextStyle(
-              fontSize: 18,
-              color: AppColors.textSecondary,
+  Widget _buildContent() {
+    if (_isLoading) {
+      return const LoadingIndicator();
+    } else if (_errorMessage != null) {
+      return ErrorView(
+        errorMessage: _errorMessage!,
+        onRetry: _loadChatRooms,
+      );
+    } else if (_chatRooms.isEmpty) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              '참여 중인 채팅방이 없습니다',
+              style: TextStyle(fontSize: 16),
             ),
-          ),
-          const SizedBox(height: 8),
-          const Text(
-            '내전에 참가하거나 용병에게 메시지를 보내면\n여기에 표시됩니다',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: AppColors.textSecondary,
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadChatRooms,
+              child: const Text('새로고침'),
             ),
-          ),
-          const SizedBox(height: 24),
-          ElevatedButton(
-            onPressed: () {
-              context.go('/tournaments');
-            },
-            child: const Text('내전 찾아보기'),
-          ),
-        ],
-      ),
-    );
+            const SizedBox(height: 16),
+            // 테스트용 버튼 추가
+            ElevatedButton(
+              onPressed: _createTestChatRoom,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.orange,
+              ),
+              child: const Text('테스트 채팅방 생성'),
+            ),
+          ],
+        ),
+      );
+    } else {
+      return RefreshIndicator(
+        onRefresh: () async {
+          await _loadChatRooms();
+        },
+        child: ListView.builder(
+          itemCount: _chatRooms.length,
+          itemBuilder: (context, index) {
+            final chatRoom = _chatRooms[index];
+            return _buildChatRoomItem(chatRoom);
+          },
+        ),
+      );
+    }
   }
   
-  Widget _buildChatRoomsList() {
-    final currentUserId = Provider.of<AppStateProvider>(context).currentUser!.uid;
+  // 테스트용 채팅방 생성 메서드
+  Future<void> _createTestChatRoom() async {
+    setState(() {
+      _isLoading = true;
+    });
     
-    return RefreshIndicator(
-      onRefresh: _loadChatRooms,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(8),
-        itemCount: _chatRooms.length,
-        separatorBuilder: (context, index) => const Divider(height: 1),
-        itemBuilder: (context, index) {
-          final chatRoom = _chatRooms[index];
-          final otherParticipantId = chatRoom.participantIds.firstWhere(
-            (id) => id != currentUserId,
-            orElse: () => currentUserId,
-          );
-          
-          final otherParticipantName = chatRoom.participantNames[otherParticipantId] ?? '알 수 없음';
-          final otherParticipantImage = chatRoom.participantProfileImages[otherParticipantId];
-          final unreadCount = chatRoom.unreadCount[currentUserId] ?? 0;
-          
-          return ListTile(
-            onTap: () {
-              context.push('/chat/${chatRoom.id}');
-            },
-            leading: CircleAvatar(
-              backgroundImage: otherParticipantImage != null
-                  ? NetworkImage(otherParticipantImage)
-                  : null,
-              child: otherParticipantImage == null
-                  ? const Icon(Icons.person)
-                  : null,
-            ),
-            title: Text(
-              chatRoom.type == ChatRoomType.direct
-                  ? otherParticipantName
-                  : chatRoom.title,
-              style: const TextStyle(
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            subtitle: Text(
-              chatRoom.lastMessageText ?? '메시지 없음',
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
+    try {
+      final appState = Provider.of<AppStateProvider>(context, listen: false);
+      if (appState.currentUser == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인이 필요합니다')),
+        );
+        return;
+      }
+      
+      final currentUser = appState.currentUser!;
+      
+      // 채팅방 참가자 초기화 (현재 사용자만 포함)
+      final participantIds = [currentUser.uid];
+      final participantNames = {currentUser.uid: currentUser.nickname};
+      final participantProfileImages = {currentUser.uid: currentUser.profileImageUrl};
+      final unreadCount = {currentUser.uid: 0};
+      
+      // 채팅방 모델 생성
+      final chatRoom = ChatRoomModel(
+        id: '', // Firestore에서 자동 생성될 ID
+        title: '테스트 채팅방 ${DateTime.now().millisecondsSinceEpoch}',
+        participantIds: participantIds,
+        participantNames: participantNames,
+        participantProfileImages: participantProfileImages,
+        unreadCount: unreadCount,
+        type: ChatRoomType.direct,
+        createdAt: Timestamp.now(),
+        lastMessageTime: Timestamp.now(), // 메시지 정렬을 위해 마지막 메시지 시간 설정
+      );
+      
+      // 채팅방 생성
+      final chatRoomId = await FirebaseService().createChatRoom(chatRoom);
+      debugPrint('Created test chat room with ID: $chatRoomId');
+      
+      // 시스템 메시지 전송
+      final message = MessageModel(
+        id: '',
+        chatRoomId: chatRoomId,
+        senderId: 'system',
+        senderName: '시스템',
+        text: '테스트 채팅방이 생성되었습니다.',
+        readStatus: {},
+        timestamp: Timestamp.now(),
+        metadata: {'isSystem': true},
+      );
+      
+      await FirebaseService().sendMessage(message);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('테스트 채팅방이 생성되었습니다. ID: $chatRoomId'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // 채팅방 목록 새로고침
+      await _loadChatRooms();
+    } catch (e) {
+      setState(() {
+        _errorMessage = '채팅방 생성 중 오류가 발생했습니다: $e';
+        _isLoading = false;
+      });
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('채팅방 생성 실패: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  Widget _buildChatRoomItem(ChatRoomModel chatRoom) {
+    // 상대방 이름 표시 (자신 제외)
+    final appState = Provider.of<AppStateProvider>(context, listen: false);
+    String displayName = chatRoom.title;
+    String? displayImage;
+    
+    if (chatRoom.type == ChatRoomType.direct && appState.currentUser != null) {
+      // 1:1 채팅인 경우 상대방 이름 표시
+      final otherParticipants = chatRoom.participantIds
+          .where((id) => id != appState.currentUser!.uid)
+          .toList();
+      
+      if (otherParticipants.isNotEmpty) {
+        final otherUserId = otherParticipants.first;
+        displayName = chatRoom.participantNames[otherUserId] ?? '알 수 없음';
+        displayImage = chatRoom.participantProfileImages[otherUserId];
+      }
+    }
+    
+    // 읽지 않은 메시지 수
+    final unreadCount = appState.currentUser != null
+        ? chatRoom.unreadCount[appState.currentUser!.uid] ?? 0
+        : 0;
+    
+    // 마지막 메시지 시간
+    String lastMessageTime = '';
+    if (chatRoom.lastMessageTime != null) {
+      final messageTime = chatRoom.lastMessageTime!.toDate();
+      
+      if (isToday(messageTime)) {
+        // 오늘
+        lastMessageTime = formatTime(messageTime);
+      } else if (isYesterday(messageTime)) {
+        // 어제
+        lastMessageTime = '어제';
+      } else {
+        // 그 외
+        lastMessageTime = formatDate(messageTime);
+      }
+    }
+    
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      child: ListTile(
+        leading: CircleAvatar(
+          backgroundColor: AppColors.primary.withOpacity(0.2),
+          backgroundImage: displayImage != null && displayImage.isNotEmpty && displayImage.startsWith('http') 
+              ? NetworkImage(displayImage) 
+              : null,
+          child: displayImage == null || displayImage.isEmpty || !displayImage.startsWith('http')
+              ? Icon(
+                  chatRoom.type == ChatRoomType.tournamentRecruitment
+                      ? Icons.group
+                      : Icons.person,
+                  color: AppColors.primary,
+                )
+              : null,
+        ),
+        title: Text(
+          displayName,
+          style: const TextStyle(fontWeight: FontWeight.bold),
+        ),
+        subtitle: Text(
+          chatRoom.lastMessageText ?? '새로운 채팅방',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.end,
+          children: [
+            Text(
+              lastMessageTime,
               style: TextStyle(
-                color: unreadCount > 0
-                    ? AppColors.textPrimary
-                    : AppColors.textSecondary,
+                fontSize: 12,
+                color: Colors.grey[600],
               ),
             ),
-            trailing: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                if (chatRoom.lastMessageTime != null)
-                  Text(
-                    _formatLastMessageTime(chatRoom.lastMessageTime!.toDate()),
-                    style: const TextStyle(
-                      fontSize: 12,
-                      color: AppColors.textSecondary,
-                    ),
+            const SizedBox(height: 4),
+            if (unreadCount > 0)
+              Container(
+                padding: const EdgeInsets.all(6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  shape: BoxShape.circle,
+                ),
+                child: Text(
+                  unreadCount.toString(),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 10,
                   ),
-                const SizedBox(height: 4),
-                if (unreadCount > 0)
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.primary,
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      unreadCount.toString(),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.white,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-              ],
-            ),
-          );
+                ),
+              ),
+          ],
+        ),
+        onTap: () {
+          // 채팅 상세 화면으로 이동
+          context.go('/chat/${chatRoom.id}');
         },
       ),
     );
-  }
-  
-  String _formatLastMessageTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final difference = now.difference(dateTime);
-    
-    if (difference.inDays > 0) {
-      if (difference.inDays < 7) {
-        // Within the week
-        return DateFormat('E', 'ko_KR').format(dateTime);
-      } else {
-        // More than a week
-        return DateFormat('MM/dd').format(dateTime);
-      }
-    } else if (difference.inHours > 0) {
-      // Within the day
-      return '${difference.inHours}시간 전';
-    } else if (difference.inMinutes > 0) {
-      // Within the hour
-      return '${difference.inMinutes}분 전';
-    } else {
-      // Just now
-      return '방금 전';
-    }
   }
 }

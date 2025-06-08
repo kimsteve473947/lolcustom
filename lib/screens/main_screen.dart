@@ -4,6 +4,7 @@ import 'package:lol_custom_game_manager/screens/clans/clan_list_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/my_page_screen.dart';
 import 'package:lol_custom_game_manager/screens/rankings/rankings_screen.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_screen.dart';
+import 'package:go_router/go_router.dart';
 
 class MainScreen extends StatefulWidget {
   final int initialTabIndex;
@@ -41,9 +42,29 @@ class _MainScreenState extends State<MainScreen> {
       bottomNavigationBar: BottomNavigationBar(
         currentIndex: _currentIndex,
         onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
+          if (widget.child != null) {
+            switch (index) {
+              case 0:
+                context.go('/tournaments');
+                break;
+              case 1:
+                context.go('/clans');
+                break;
+              case 2:
+                context.go('/chat');
+                break;
+              case 3:
+                context.go('/rankings');
+                break;
+              case 4:
+                context.go('/mypage');
+                break;
+            }
+          } else {
+            setState(() {
+              _currentIndex = index;
+            });
+          }
         },
         type: BottomNavigationBarType.fixed,
         items: const [

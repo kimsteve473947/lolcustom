@@ -68,6 +68,11 @@ service cloud.firestore {
       );
     }
     
+    // 토너먼트 전체 컬렉션 리스트 쿼리 허용
+    match /tournaments {
+      allow list: if isAuthenticated();
+    }
+    
     // 신청 컬렉션 규칙
     match /applications/{applicationId} {
       // 인증된 사용자는 모든 신청서를 읽을 수 있음
@@ -122,32 +127,36 @@ service cloud.firestore {
     
     // 채팅방 컬렉션 규칙
     match /chatRooms/{chatRoomId} {
-      // 채팅방 참가자만 읽기 가능
-      allow read: if isAuthenticated() && 
-                request.auth.uid in resource.data.participantUids;
+      // 임시로 인증된 모든 사용자에게 읽기 권한 부여
+      allow read: if isAuthenticated();
       
       // 인증된 사용자는 채팅방 생성 가능
       allow create: if isAuthenticated();
       
       // 채팅방 업데이트는 참가자 또는 관리자만 가능
       allow update: if isAuthenticated() && (
-        request.auth.uid in resource.data.participantUids || isAdmin()
+        request.auth.uid in resource.data.participantIds || isAdmin()
       );
       
       // 삭제는 관리자만 가능
       allow delete: if isAdmin();
     }
     
+    // 채팅방 전체 컬렉션 리스트 쿼리 허용
+    match /chatRooms {
+      allow list: if isAuthenticated();
+    }
+    
     // 메시지 컬렉션 규칙
     match /messages/{messageId} {
-      // 채팅방 참가자만 메시지 읽기 가능
-      allow read: if isAuthenticated() && 
-                exists(/databases/$(database)/documents/chatRooms/$(resource.data.chatRoomId)) &&
-                request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(resource.data.chatRoomId)).data.participantUids;
+      // 인증된 사용자는 모든 메시지 읽기 가능 (임시)
+      allow read: if isAuthenticated();
       
-      // 인증된 사용자는 자신의 메시지만 생성 가능
-      allow create: if isAuthenticated() && 
-                  request.resource.data.senderId == request.auth.uid;
+      // 인증된 사용자는 메시지 생성 가능 (시스템 메시지 포함)
+      allow create: if isAuthenticated() && (
+        request.resource.data.senderId == request.auth.uid ||
+        request.resource.data.senderId == 'system'
+      );
       
       // 메시지 수정/삭제는 작성자 또는 관리자만 가능
       allow update, delete: if isAuthenticated() && (

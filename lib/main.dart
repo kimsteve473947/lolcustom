@@ -18,6 +18,7 @@ import 'package:flutter/foundation.dart';
 import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:lol_custom_game_manager/services/background_service.dart';
 
 // Firebase background message handler
 @pragma('vm:entry-point')
@@ -73,6 +74,9 @@ Future<void> main() async {
       debugPrint('Warning: Firebase Messaging initialization error: $e');
       // Messaging 초기화 실패해도 앱은 계속 실행
     }
+    
+    // 백그라운드 서비스 시작
+    BackgroundService().startCleanupService();
     
     debugPrint('Firebase initialized successfully');
   } catch (e, stackTrace) {

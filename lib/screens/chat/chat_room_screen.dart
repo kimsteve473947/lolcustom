@@ -199,33 +199,55 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     context.push('/tournaments/$tournamentId');
   }
 
+  void _handleBackNavigation() {
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop();
+    } else {
+      // 스택에 이전 화면이 없으면 메인 화면으로 이동
+      context.go('/main');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     final currentUser = Provider.of<AppStateProvider>(context).currentUser;
     if (currentUser == null) {
-      return const Scaffold(
-        body: Center(
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('채팅'),
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back),
+            onPressed: () => _handleBackNavigation(),
+          ),
+        ),
+        body: const Center(
           child: Text('로그인이 필요합니다'),
         ),
       );
     }
     
-    return Scaffold(
-      appBar: _buildAppBar(),
-      body: _isLoading
-          ? const LoadingIndicator()
-          : _errorMessage != null
-              ? Center(child: Text(_errorMessage!))
-              : Column(
-                  children: [
-                    if (_chatRoom != null && _chatRoom!.type == ChatRoomType.tournamentRecruitment && _chatRoom!.tournamentId != null)
-                      _buildTournamentBanner(_chatRoom!.tournamentId!),
-                    Expanded(
-                      child: _buildMessagesList(currentUser.uid),
-                    ),
-                    _buildInputArea(),
-                  ],
-                ),
+    return WillPopScope(
+      onWillPop: () async {
+        _handleBackNavigation();
+        return false;
+      },
+      child: Scaffold(
+        appBar: _buildAppBar(),
+        body: _isLoading
+            ? const LoadingIndicator()
+            : _errorMessage != null
+                ? Center(child: Text(_errorMessage!))
+                : Column(
+                    children: [
+                      if (_chatRoom != null && _chatRoom!.type == ChatRoomType.tournamentRecruitment && _chatRoom!.tournamentId != null)
+                        _buildTournamentBanner(_chatRoom!.tournamentId!),
+                      Expanded(
+                        child: _buildMessagesList(currentUser.uid),
+                      ),
+                      _buildInputArea(),
+                    ],
+                  ),
+      ),
     );
   }
 
@@ -233,67 +255,79 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (_chatRoom == null) {
       return AppBar(
         title: const Text('채팅'),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back),
+          onPressed: () => _handleBackNavigation(),
+        ),
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
       );
     }
     
     final currentUser = Provider.of<AppStateProvider>(context).currentUser!;
-    final otherParticipantId = _chatRoom!.participantIds.firstWhere(
-      (id) => id != currentUser.uid,
-      orElse: () => currentUser.uid,
-    );
+    String displayTitle = _chatRoom!.title;
+    Widget? leadingTitle;
     
-    final otherParticipantName = _chatRoom!.participantNames[otherParticipantId] ?? '알 수 없음';
-    final otherParticipantImage = _chatRoom!.participantProfileImages[otherParticipantId];
+    // 내전 채팅방인 경우 토너먼트 정보 표시
+    if (_chatRoom!.type == ChatRoomType.tournamentRecruitment) {
+      final tournamentId = _chatRoom!.tournamentId;
+      if (tournamentId != null) {
+        displayTitle = _chatRoom!.title;
+      }
+    } 
+    // 1:1 채팅인 경우 상대방 이름 표시
+    else if (_chatRoom!.type == ChatRoomType.direct) {
+      final otherParticipantId = _chatRoom!.participantIds.firstWhere(
+        (id) => id != currentUser.uid,
+        orElse: () => currentUser.uid,
+      );
+      
+      final otherParticipantName = _chatRoom!.participantNames[otherParticipantId] ?? '알 수 없음';
+      final otherParticipantImage = _chatRoom!.participantProfileImages[otherParticipantId];
+      
+      displayTitle = otherParticipantName;
+      
+      if (otherParticipantImage != null && otherParticipantImage.isNotEmpty && otherParticipantImage.startsWith('http')) {
+        leadingTitle = CircleAvatar(
+          backgroundImage: NetworkImage(otherParticipantImage),
+          radius: 16,
+        );
+      } else {
+        leadingTitle = const CircleAvatar(
+          child: Icon(Icons.person),
+          radius: 16,
+        );
+      }
+    }
     
     return AppBar(
-      titleSpacing: 0,
+      backgroundColor: AppColors.primary,
+      foregroundColor: Colors.white,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back),
+        onPressed: () => _handleBackNavigation(),
+      ),
       title: Row(
         children: [
-          CircleAvatar(
-            radius: 20,
-            backgroundImage: otherParticipantImage != null
-                ? NetworkImage(otherParticipantImage)
-                : null,
-            child: otherParticipantImage == null
-                ? const Icon(Icons.person, size: 20)
-                : null,
-          ),
-          const SizedBox(width: 12),
+          if (leadingTitle != null) ...[
+            leadingTitle,
+            const SizedBox(width: 8),
+          ],
           Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  _chatRoom!.type == ChatRoomType.direct
-                      ? otherParticipantName
-                      : _chatRoom!.title,
-                  style: const TextStyle(
-                    fontSize: 16,
-                  ),
-                ),
-                Text(
-                  _chatRoom!.type == ChatRoomType.tournamentRecruitment
-                      ? '내전 관련 채팅'
-                      : _chatRoom!.type == ChatRoomType.mercenaryOffer
-                          ? '용병 관련 채팅'
-                          : '',
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: AppColors.textSecondary,
-                  ),
-                ),
-              ],
+            child: Text(
+              displayTitle,
+              style: const TextStyle(fontSize: 16),
+              overflow: TextOverflow.ellipsis,
             ),
           ),
         ],
       ),
       actions: [
-        IconButton(
-          icon: const Icon(Icons.more_vert),
-          onPressed: () {
-            // TODO: Show chat options menu
-          },
-        ),
+        if (_chatRoom!.type == ChatRoomType.tournamentRecruitment && _chatRoom!.tournamentId != null)
+          IconButton(
+            icon: const Icon(Icons.info_outline),
+            onPressed: () => _viewTournament(_chatRoom!.tournamentId!),
+          ),
       ],
     );
   }
@@ -339,10 +373,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           if (!isCurrentUser && showAvatar)
             CircleAvatar(
               radius: 16,
-              backgroundImage: message.senderProfileImageUrl != null
+              backgroundImage: message.senderProfileImageUrl != null && 
+                              message.senderProfileImageUrl!.isNotEmpty && 
+                              message.senderProfileImageUrl!.startsWith('http')
                   ? NetworkImage(message.senderProfileImageUrl!)
                   : null,
-              child: message.senderProfileImageUrl == null
+              child: message.senderProfileImageUrl == null || 
+                    message.senderProfileImageUrl!.isEmpty || 
+                    !message.senderProfileImageUrl!.startsWith('http')
                   ? const Icon(Icons.person, size: 16)
                   : null,
             )

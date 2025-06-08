@@ -31,11 +31,14 @@ class TournamentDetailScreen extends StatefulWidget {
 class _TournamentDetailScreenState extends State<TournamentDetailScreen> with SingleTickerProviderStateMixin {
   final FirebaseService _firebaseService = FirebaseService();
   
-  bool _isLoading = false;
-  String? _errorMessage;
   TournamentModel? _tournament;
   List<ApplicationModel> _applications = [];
-  String _selectedRole = 'top';
+  bool _isLoading = true;
+  bool _isApplying = false; // 신청 중 상태
+  bool _isJoining = false;
+  bool _isLeaving = false;
+  String? _errorMessage;
+  String _selectedRole = 'top'; // nullable이 아닌 타입으로 변경하고 기본값 설정
   
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
@@ -43,21 +46,12 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
   @override
   void initState() {
     super.initState();
-    
-    // Set up animations
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 500),
     );
-    
-    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
-      CurvedAnimation(
-        parent: _animationController,
-        curve: Curves.easeOut,
-      ),
-    );
-    
-    _loadTournament();
+    _fadeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(_animationController);
+    _loadTournamentDetails();
   }
   
   @override
@@ -66,161 +60,113 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
     super.dispose();
   }
   
-  Future<void> _loadTournament() async {
+  Future<void> _loadTournamentDetails() async {
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
-    
+
     try {
+      // 토너먼트 정보 로드
       final tournament = await _firebaseService.getTournament(widget.tournamentId);
-      
       if (tournament == null) {
         setState(() {
+          _errorMessage = '토너먼트 정보를 찾을 수 없습니다';
           _isLoading = false;
-          _errorMessage = '내전을 찾을 수 없습니다';
         });
         return;
       }
-      
+
+      // 신청 목록 로드
       final applications = await _firebaseService.getTournamentApplications(widget.tournamentId);
-      
+
       setState(() {
         _tournament = tournament;
         _applications = applications;
         _isLoading = false;
       });
-      
+
+      // 애니메이션 시작
       _animationController.forward();
     } catch (e) {
       setState(() {
+        _errorMessage = '토너먼트 정보를 불러오는 중 오류가 발생했습니다: $e';
         _isLoading = false;
-        _errorMessage = '내전 정보를 불러오는 중 오류가 발생했습니다: $e';
       });
     }
   }
   
   Future<void> _applyToTournament() async {
-    if (_tournament == null || _selectedRole.isEmpty) {
-      return;
-    }
-    
-    final appState = Provider.of<AppStateProvider>(context, listen: false);
-    if (appState.currentUser == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그인이 필요합니다')),
-      );
-      return;
-    }
-    
-    // Check if tournament is full for the selected role
-    final slotsForRole = _tournament!.slotsByRole[_selectedRole] ?? 0;
-    final filledSlotsForRole = _tournament!.filledSlotsByRole[_selectedRole] ?? 0;
-    
-    if (filledSlotsForRole >= slotsForRole) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('선택한 역할은 이미 가득 찼습니다')),
-      );
-      return;
-    }
-    
-    // Check credits for competitive tournaments
-    if (_tournament!.tournamentType == TournamentType.competitive) {
-      const requiredCredits = 20;
-      
-      if (appState.currentUser!.credits < requiredCredits) {
+    if (_tournament == null) return;
+
+    setState(() {
+      _isApplying = true;
+    });
+
+    try {
+      final appState = Provider.of<AppStateProvider>(context, listen: false);
+      if (appState.currentUser == null) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('크레딧이 부족합니다. 필요: $requiredCredits, 보유: ${appState.currentUser!.credits}'),
-            backgroundColor: AppColors.error,
-            action: SnackBarAction(
-              label: '충전하기',
-              textColor: Colors.white,
-              onPressed: () {
-                // Navigate to credit purchase screen
-                context.push('/credits/purchase');
-              },
-            ),
-          ),
+          const SnackBar(content: Text('로그인이 필요합니다')),
         );
         return;
       }
-      
-      // Ask for confirmation before spending credits
-      final confirmed = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('크레딧 사용 확인'),
-          content: Text('이 경쟁전에 참가하기 위해 $requiredCredits 크레딧이 소모됩니다. 계속하시겠습니까?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('취소'),
-            ),
-            TextButton(
-              onPressed: () => Navigator.pop(context, true),
-              child: const Text('확인'),
-            ),
-          ],
-        ),
-      ) ?? false;
-      
-      if (!confirmed) return;
-    }
-    
-    setState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      // 메시지 파라미터는 선택 사항
+
       final success = await appState.joinTournamentByRole(
-        tournamentId: widget.tournamentId,
+        tournamentId: _tournament!.id,
         role: _selectedRole,
       );
-      
+
       if (success) {
-        // 신청 성공 메시지 표시
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('신청이 완료되었습니다'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // 토너먼트 정보 다시 로드
-        await _loadTournament();
-      } else if (appState.errorMessage != null) {
-        // 에러 메시지가 있다면 표시
+        // 참가 후 채팅방이 있는지 확인하여 자동으로 추가
+        final chatRoomId = await _firebaseService.findChatRoomByTournamentId(_tournament!.id);
+        if (chatRoomId != null) {
+          // 채팅방에 사용자 추가
+          await _firebaseService.addParticipantToChatRoom(
+            chatRoomId,
+            appState.currentUser!.uid,
+            appState.currentUser!.nickname,
+            appState.currentUser!.profileImageUrl,
+          );
+        }
+
+        // 알림 표시
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('신청이 완료되었습니다'),
+              backgroundColor: AppColors.success,
+            ),
+          );
+        }
+
+        // 토너먼트 정보 새로고침
+        _loadTournamentDetails();
+      } else {
+        // 오류 발생
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(appState.errorMessage ?? '신청 중 오류가 발생했습니다'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint('Error applying to tournament: $e');
+      if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(appState.errorMessage!),
-            backgroundColor: AppColors.error,
-          ),
-        );
-      } else {
-        // 기본 에러 메시지
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('신청 중 오류가 발생했습니다'),
+            content: Text('신청 중 오류가 발생했습니다: $e'),
             backgroundColor: AppColors.error,
           ),
         );
       }
-    } catch (e) {
-      // 예외 발생 시 에러 메시지
-      debugPrint('Error applying to tournament: $e');
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('신청 중 오류가 발생했습니다: $e'),
-          backgroundColor: AppColors.error,
-        ),
-      );
     } finally {
-      // 로딩 상태 종료
       if (mounted) {
         setState(() {
-          _isLoading = false;
+          _isApplying = false;
         });
       }
     }
@@ -257,51 +203,44 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
       
       // 채팅방이 이미 존재하는지 확인
       final existingChatRoomId = await _firebaseService.findChatRoomByTournamentId(_tournament!.id);
+      debugPrint('Existing chat room ID for tournament ${_tournament!.id}: $existingChatRoomId');
       
       if (existingChatRoomId != null) {
-        // 이미 채팅방이 있으면 해당 채팅방으로 이동
-        context.push('/chat/$existingChatRoomId');
-        return;
-      }
-      
-      // 새 채팅방 생성
-      final chatRoomId = await appState.createChatRoom(
-        targetUserId: _tournament!.hostId,
-        title: _tournament!.title,
-        type: ChatRoomType.tournamentRecruitment,
-        initialMessage: '${appState.currentUser!.nickname}님이 내전 채팅방에 참가했습니다.',
-      );
-      
-      if (chatRoomId != null) {
-        // 채팅방과 내전 연결
-        await _firebaseService.linkChatRoomToTournament(chatRoomId, _tournament!.id);
-        
-        // 채팅방으로 이동
-        if (mounted) {
-          context.push('/chat/$chatRoomId');
-        }
+        // 이미 존재하는 채팅방으로 이동
+        context.go('/chat/$existingChatRoomId');
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('채팅방 생성에 실패했습니다'),
-            backgroundColor: AppColors.error,
-          ),
+        // 새 채팅방 생성
+        final chatRoomId = await appState.createChatRoom(
+          targetUserId: _tournament!.hostId,
+          title: _tournament!.title,
+          type: ChatRoomType.tournamentRecruitment,
+          initialMessage: '${appState.currentUser!.nickname}님이 내전 채팅방에 참가했습니다.',
+          tournamentId: _tournament!.id,
         );
+        
+        if (chatRoomId != null) {
+          // 채팅방으로 이동 - 채팅방 아이디로 직접 이동하기
+          context.go('/chat/$chatRoomId');
+        } else {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('채팅방 생성에 실패했습니다'),
+              backgroundColor: AppColors.error,
+            ),
+          );
+        }
       }
     } catch (e) {
-      debugPrint('Error starting chat: $e');
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('채팅방 생성 중 오류가 발생했습니다: $e'),
+          content: Text('오류가 발생했습니다: $e'),
           backgroundColor: AppColors.error,
         ),
       );
     } finally {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
   
@@ -371,7 +310,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
         child: _errorMessage != null
           ? ErrorView(
               errorMessage: _errorMessage!,
-              onRetry: _loadTournament,
+              onRetry: _loadTournamentDetails,
             )
           : _isLoading && _tournament == null
               ? const LoadingIndicator()
@@ -1042,10 +981,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                 duration: const Duration(milliseconds: 300),
                 curve: Curves.easeInOut,
                 padding: const EdgeInsets.symmetric(vertical: 16),
-                child: Wrap(
-                  alignment: WrapAlignment.spaceEvenly,
-                  spacing: 4.0,
-                  runSpacing: 12.0,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: roles.map((role) {
                     final key = role['key'] as String;
                     final filled = _tournament!.filledSlotsByRole[key] ?? 0;
@@ -1068,7 +1005,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                     final roleColor = getRoleColor();
                     
                     return SizedBox(
-                      width: 60, // 모든 아이콘을 한 줄에 표시하기 위한 너비
+                      width: 55, // 모든 아이콘을 한 줄에 표시하기 위해 너비 조정
                       child: GestureDetector(
                         onTap: isFull ? null : () {
                           setState(() {
@@ -1089,8 +1026,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                                     if (isSelected)
                                       AnimatedContainer(
                                         duration: const Duration(milliseconds: 300),
-                                        width: 58,
-                                        height: 58,
+                                        width: 48,
+                                        height: 48,
                                         decoration: BoxDecoration(
                                           color: roleColor.withOpacity(0.1),
                                           shape: BoxShape.circle,
@@ -1105,8 +1042,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                                     AnimatedContainer(
                                       duration: const Duration(milliseconds: 300),
                                       curve: Curves.easeInOut,
-                                      width: isSelected ? 52 : 50,
-                                      height: isSelected ? 52 : 50,
+                                      width: isSelected ? 42 : 40,
+                                      height: isSelected ? 42 : 40,
                                       decoration: BoxDecoration(
                                         color: Colors.white,
                                         shape: BoxShape.circle,
@@ -1128,7 +1065,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                                       child: Center(
                                         child: LaneIconWidget(
                                           lane: key,
-                                          size: 35,
+                                          size: 28,
                                         ),
                                       ),
                                     ),
@@ -2440,7 +2377,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
         );
         
         // 토너먼트 정보와 참가 신청 정보를 다시 로드
-        await _loadTournament();
+        await _loadTournamentDetails();
       } else if (appState.errorMessage != null) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -2545,7 +2482,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
       );
       
       // 토너먼트 정보 다시 로드
-      _loadTournament();
+      _loadTournamentDetails();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('심판 추가 실패: $e')),
@@ -2574,7 +2511,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
       );
       
       // 토너먼트 정보 다시 로드
-      _loadTournament();
+      _loadTournamentDetails();
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('심판 제거 실패: $e')),

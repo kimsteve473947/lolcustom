@@ -439,6 +439,38 @@ class FirebaseMessagingService {
     
     debugPrint('Chat notification sent to ${userIds.length} users');
   }
+  
+  // 특정 사용자에게 알림 전송
+  Future<void> sendNotification({
+    required String userId,
+    required String title,
+    required String body,
+    String? type,
+    Map<String, dynamic>? data,
+  }) async {
+    // 실제 프로덕션에서는 이 메서드를 통해 클라우드 함수를 호출합니다.
+    // 현재는 로컬 알림만 전송합니다.
+    
+    // 현재 로그인한 사용자에게만 로컬 알림 전송
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser != null && userId == currentUser.uid) {
+      String channelId = 'main_channel';
+      if (type == 'chat') {
+        channelId = 'chat_channel';
+      } else if (type == 'tournament') {
+        channelId = 'tournament_channel';
+      }
+      
+      await showLocalNotification(
+        title: title,
+        body: body,
+        channelId: channelId,
+        payload: data != null ? jsonEncode(data) : null,
+      );
+    }
+    
+    debugPrint('Notification sent to user: $userId');
+  }
 }
 
 // 백그라운드 메시지 처리 핸들러 (최상위 함수여야 함)

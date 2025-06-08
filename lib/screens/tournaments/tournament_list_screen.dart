@@ -320,34 +320,35 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
       length: 2,
       child: Scaffold(
         appBar: AppBar(
-          title: const Text('내전'),
+          title: const Text('내전 목록'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
           actions: [
             IconButton(
-              icon: const Icon(Icons.notifications_none),
-              onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('알림 기능은 준비 중입니다')),
-                );
-              },
+              icon: const Icon(Icons.filter_list),
+              onPressed: () => _showFilterDialog(context),
             ),
             IconButton(
-              icon: const Icon(Icons.search),
+              icon: const Icon(Icons.refresh),
               onPressed: () {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('검색 기능은 준비 중입니다')),
-                );
+                setState(() => _isLoading = true);
+                _loadFreeTournaments();
+                _loadPaidTournaments();
               },
+            ),
+            // 테스트용 버튼 추가
+            IconButton(
+              icon: const Icon(Icons.add_circle, color: Colors.orange),
+              onPressed: _createTestTournament,
+              tooltip: '테스트 토너먼트 생성',
             ),
           ],
           bottom: TabBar(
             controller: _tabController,
             tabs: const [
-              Tab(text: '무료 내전'),
-              Tab(text: '참가비 내전'),
+              Tab(text: '무료'),
+              Tab(text: '유료'),
             ],
-            indicatorColor: AppColors.primary,
-            labelColor: AppColors.primary,
-            unselectedLabelColor: Colors.grey,
           ),
         ),
         body: Column(
@@ -656,5 +657,87 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
         );
       },
     );
+  }
+
+  // 테스트 토너먼트 생성 메서드
+  Future<void> _createTestTournament() async {
+    final appState = Provider.of<AppStateProvider>(context, listen: false);
+    if (appState.currentUser == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('로그인이 필요합니다')),
+      );
+      return;
+    }
+    
+    try {
+      final now = DateTime.now();
+      final startTime = now.add(const Duration(hours: 2)); // 2시간 후 시작
+      
+      // 토너먼트 모델 생성
+      final tournament = TournamentModel(
+        id: '',
+        title: '테스트 토너먼트 ${DateTime.now().millisecondsSinceEpoch}',
+        description: '이것은 테스트를 위한 토너먼트입니다.',
+        hostId: appState.currentUser!.uid,
+        hostName: appState.currentUser!.nickname,
+        hostProfileImageUrl: appState.currentUser!.profileImageUrl,
+        gameMode: GameMode.howlingAbyss,
+        gameTitle: '리그 오브 레전드',
+        startsAt: Timestamp.fromDate(startTime),
+        status: TournamentStatus.open,
+        totalSlots: 10,
+        slotsByRole: {
+          'top': 2,
+          'jungle': 2,
+          'mid': 2,
+          'adc': 2,
+          'support': 2,
+        },
+        filledSlots: {'total': 0},
+        filledSlotsByRole: {
+          'top': 0,
+          'jungle': 0,
+          'mid': 0,
+          'adc': 0,
+          'support': 0,
+        },
+        participants: [],
+        participantsByRole: {},
+        ovrLimit: 1000, // 제한 없음
+        isPaid: false,
+        entryFee: 0,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+        tournamentType: TournamentType.casual,
+        rules: '참가자들은 예의를 지켜주세요.',
+        premiumBadge: false,
+        tags: ['test', 'tutorial'],
+      );
+      
+      // 토너먼트 생성
+      final tournamentId = await _tournamentService.createTournament(tournament);
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('테스트 토너먼트가 생성되었습니다. ID: $tournamentId'),
+          backgroundColor: Colors.green,
+        ),
+      );
+      
+      // 토너먼트 목록 새로고침
+      setState(() {
+        _isLoading = true;
+      });
+      _loadFreeTournaments();
+      _loadPaidTournaments();
+    } catch (e) {
+      debugPrint('토너먼트 생성 오류: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('토너먼트 생성 실패: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
   }
 } 
