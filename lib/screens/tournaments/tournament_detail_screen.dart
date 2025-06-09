@@ -2789,30 +2789,78 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
 
   /// 토너먼트 참가 시 역할 선택용 버튼 그룹 위젯
   Widget _buildRoleButtons() {
-    // TournamentModel 에 정의된 rolesBySlot 같은 Map<String,int> 를 기반으로 버튼 생성
-    final roles = _tournament!.slotsByRole.keys.toList(); // 예: ['top','jungle',...]
-    return Row(
-      children: roles.map((role) {
-        final isSelected = _selectedRole == role;
-        return Expanded(
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 4.0),
-            child: ElevatedButton(
-              onPressed: () => setState(() { _selectedRole = role; }),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: isSelected ? AppColors.primary : AppColors.lightGrey,
-                minimumSize: const Size(double.infinity, 48),
-              ),
-              child: Text(
-                role.toUpperCase(),
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.black54,
+    // 역할 순서를 한국어 표준 순서로 정의 (탑, 정글, 미드, 원딜, 서폿)
+    final orderedRoles = ['top', 'jungle', 'mid', 'adc', 'support'];
+    
+    // 필터링: 토너먼트에 존재하는 역할만 사용
+    final availableRoles = orderedRoles.where((role) => 
+      _tournament!.slotsByRole.containsKey(role)).toList();
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 10),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: availableRoles.map((role) {
+          final isSelected = _selectedRole == role;
+          
+          // 역할별 색상 정의
+          Color getRoleColor(String role) {
+            switch (role) {
+              case 'top': return const Color(0xFFE74C3C);
+              case 'jungle': return const Color(0xFF27AE60);
+              case 'mid': return const Color(0xFF3498DB);
+              case 'adc': return const Color(0xFFF39C12);
+              case 'support': return const Color(0xFF9B59B6);
+              default: return AppColors.primary;
+            }
+          }
+          
+          // 역할 한글 이름
+          String getRoleNameKorean(String role) {
+            switch (role) {
+              case 'top': return '탑';
+              case 'jungle': return '정글';
+              case 'mid': return '미드';
+              case 'adc': return '원딜';
+              case 'support': return '서폿';
+              default: return role.toUpperCase();
+            }
+          }
+          
+          final roleColor = getRoleColor(role);
+          
+          return Expanded(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 4.0),
+              child: ElevatedButton(
+                onPressed: () => setState(() { _selectedRole = role; }),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isSelected ? roleColor : Colors.white,
+                  foregroundColor: isSelected ? Colors.white : Colors.black87,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  minimumSize: const Size(0, 48),
+                  elevation: isSelected ? 3 : 1,
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    side: BorderSide(
+                      color: isSelected ? roleColor : Colors.grey.shade300,
+                      width: isSelected ? 2 : 1,
+                    ),
+                  ),
+                ),
+                child: Text(
+                  getRoleNameKorean(role),
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: isSelected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  textAlign: TextAlign.center,
                 ),
               ),
             ),
-          ),
-        );
-      }).toList(),
+          );
+        }).toList(),
+      ),
     );
   }
   
