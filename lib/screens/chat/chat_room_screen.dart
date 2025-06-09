@@ -279,7 +279,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
   // 뒤로 가기 애니메이션과 함께 이동
   void _navigateBack() {
     _animationController.reverse().then((_) {
-      context.go('/chat');
+      if (mounted) {
+        context.go('/chat');
+      }
     });
   }
 
@@ -292,9 +294,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
       builder: (context) {
-        return Consumer<ChatProvider>(
-          builder: (context, chatProvider, child) {
-            final members = chatProvider.getChatRoomMembers(widget.chatRoomId);
+        return FutureBuilder<List<Map<String, dynamic>>>(
+          future: _getTournamentMembersWithRoles(),
+          builder: (context, snapshot) {
+            final members = snapshot.data ?? [];
+            final isLoading = !snapshot.hasData;
             
             return Container(
               height: MediaQuery.of(context).size.height * 0.7,
@@ -341,99 +345,109 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                     ),
                   ),
                   const Divider(),
-                  chatProvider.isLoading
+                  isLoading
                       ? const Expanded(
                           child: Center(child: CircularProgressIndicator()),
                         )
-                      : Expanded(
-                          child: ListView.builder(
-                            itemCount: members.length,
-                            itemBuilder: (context, index) {
-                              final member = members[index];
-                              final isHost = _tournament != null && 
-                                           _tournament!.hostId == member['userId'];
-                              
-                              return ListTile(
-                                leading: Stack(
-                                  children: [
-                                    CircleAvatar(
-                                      radius: 20,
-                                      backgroundImage: member['profileImageUrl'] != null
-                                          ? NetworkImage(member['profileImageUrl'])
-                                          : null,
-                                      backgroundColor: member['profileImageUrl'] == null
-                                          ? Colors.grey.shade200
-                                          : null,
-                                      child: member['profileImageUrl'] == null
-                                          ? const Icon(Icons.person, color: Colors.grey)
-                                          : null,
-                                    ),
-                                    if (isHost)
-                                      Positioned(
-                                        right: 0,
-                                        bottom: 0,
-                                        child: Container(
-                                          padding: const EdgeInsets.all(2),
-                                          decoration: BoxDecoration(
-                                            color: AppColors.primary,
-                                            shape: BoxShape.circle,
-                                            border: Border.all(color: Colors.white, width: 1.5),
-                                          ),
-                                          child: const Icon(
-                                            Icons.star,
-                                            size: 10,
-                                            color: Colors.white,
-                                          ),
-                                        ),
-                                      ),
-                                  ],
+                      : members.isEmpty
+                          ? const Expanded(
+                              child: Center(
+                                child: Text(
+                                  '참가자가 없습니다',
+                                  style: TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 16,
+                                  ),
                                 ),
-                                title: Row(
-                                  children: [
-                                    Text(
-                                      member['nickname'] ?? 'Unknown',
-                                      style: const TextStyle(
-                                        fontWeight: FontWeight.bold,
-                                      ),
+                              ),
+                            )
+                          : Expanded(
+                              child: ListView.builder(
+                                itemCount: members.length,
+                                itemBuilder: (context, index) {
+                                  final member = members[index];
+                                  final isHost = _tournament != null && 
+                                               _tournament!.hostId == member['userId'];
+                                  
+                                  return ListTile(
+                                    leading: Stack(
+                                      children: [
+                                        CircleAvatar(
+                                          radius: 20,
+                                          backgroundImage: member['profileImageUrl'] != null
+                                              ? NetworkImage(member['profileImageUrl'])
+                                              : null,
+                                          backgroundColor: member['profileImageUrl'] == null
+                                              ? Colors.grey.shade200
+                                              : null,
+                                          child: member['profileImageUrl'] == null
+                                              ? const Icon(Icons.person, color: Colors.grey)
+                                              : null,
+                                        ),
+                                        if (isHost)
+                                          Positioned(
+                                            right: 0,
+                                            bottom: 0,
+                                            child: Container(
+                                              padding: const EdgeInsets.all(2),
+                                              decoration: BoxDecoration(
+                                                color: AppColors.primary,
+                                                shape: BoxShape.circle,
+                                                border: Border.all(color: Colors.white, width: 1.5),
+                                              ),
+                                              child: const Icon(
+                                                Icons.star,
+                                                size: 10,
+                                                color: Colors.white,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
                                     ),
-                                    if (isHost)
-                                      Container(
-                                        margin: const EdgeInsets.only(left: 8),
-                                        padding: const EdgeInsets.symmetric(
-                                          horizontal: 8,
-                                          vertical: 2,
-                                        ),
-                                        decoration: BoxDecoration(
-                                          color: AppColors.primary.withOpacity(0.1),
-                                          borderRadius: BorderRadius.circular(4),
-                                        ),
-                                        child: Text(
-                                          '주최자',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: AppColors.primary,
+                                    title: Row(
+                                      children: [
+                                        Text(
+                                          member['nickname'] ?? 'Unknown',
+                                          style: const TextStyle(
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
+                                        if (isHost)
+                                          Container(
+                                            margin: const EdgeInsets.only(left: 8),
+                                            padding: const EdgeInsets.symmetric(
+                                              horizontal: 8,
+                                              vertical: 2,
+                                            ),
+                                            decoration: BoxDecoration(
+                                              color: AppColors.primary.withOpacity(0.1),
+                                              borderRadius: BorderRadius.circular(4),
+                                            ),
+                                            child: Text(
+                                              '주최자',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: AppColors.primary,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                      ],
+                                    ),
+                                    subtitle: Text(
+                                      '${_getRoleNameKorean(member['role'] ?? '')}',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey.shade600,
                                       ),
-                                  ],
-                                ),
-                                subtitle: member['createdAt'] != null
-                                    ? Text(
-                                        '참여일: ${DateFormat('yyyy.MM.dd').format((member['createdAt'] as Timestamp).toDate())}',
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: Colors.grey.shade600,
-                                        ),
-                                      )
-                                    : null,
-                                trailing: member['role'] != null
-                                    ? _buildRoleChip(member['role'])
-                                    : null,
-                              );
-                            },
-                          ),
-                        ),
+                                    ),
+                                    trailing: member['role'] != null
+                                        ? _buildRoleChip(member['role'])
+                                        : null,
+                                  );
+                                },
+                              ),
+                            ),
                 ],
               ),
             );
@@ -443,35 +457,115 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
     );
   }
 
+  // 토너먼트 멤버 정보를 역할과 함께 가져오는 메서드
+  Future<List<Map<String, dynamic>>> _getTournamentMembersWithRoles() async {
+    if (_chatRoom == null) return [];
+    
+    try {
+      List<Map<String, dynamic>> result = [];
+      
+      // 토너먼트 채팅방인 경우 토너먼트 참가자 정보 가져오기
+      if (_chatRoom!.tournamentId != null && _tournament != null) {
+        // 토너먼트의 참가자 ID 목록과 역할 정보 가져오기
+        final participants = _tournament!.participants;
+        final participantsByRole = _tournament!.participantsByRole;
+        
+        // 각 참가자의 정보 가져오기
+        for (String userId in participants) {
+          // 사용자 정보 가져오기
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .get();
+          
+          if (userDoc.exists) {
+            // 사용자의 역할 찾기
+            String? role;
+            for (var entry in participantsByRole.entries) {
+              if (entry.value.contains(userId)) {
+                role = entry.key;
+                break;
+              }
+            }
+            
+            final userData = userDoc.data() as Map<String, dynamic>;
+            result.add({
+              'userId': userId,
+              'nickname': userData['nickname'] ?? 'Unknown',
+              'profileImageUrl': userData['profileImageUrl'],
+              'role': role,
+              'createdAt': Timestamp.now(),
+            });
+          }
+        }
+      } else {
+        // 일반 채팅방인 경우 채팅방 참가자 정보 가져오기
+        for (String userId in _chatRoom!.participantIds) {
+          final userDoc = await FirebaseFirestore.instance
+              .collection('users')
+              .doc(userId)
+              .get();
+          
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            result.add({
+              'userId': userId,
+              'nickname': userData['nickname'] ?? 'Unknown',
+              'profileImageUrl': userData['profileImageUrl'],
+              'createdAt': Timestamp.now(),
+            });
+          }
+        }
+      }
+      
+      return result;
+    } catch (e) {
+      debugPrint('멤버 정보 가져오기 오류: $e');
+      return [];
+    }
+  }
+
+  // 역할 이름을 한글로 변환
+  String _getRoleNameKorean(String role) {
+    switch (role.toLowerCase()) {
+      case 'top':
+        return '탑';
+      case 'jungle':
+        return '정글';
+      case 'mid':
+        return '미드';
+      case 'adc':
+        return '원딜';
+      case 'support':
+        return '서폿';
+      default:
+        return role;
+    }
+  }
+
   // 역할 칩 위젯
   Widget _buildRoleChip(String role) {
     Color chipColor;
-    String roleName;
+    String roleName = _getRoleNameKorean(role);
     
     switch (role.toLowerCase()) {
       case 'top':
         chipColor = Colors.red.shade200;
-        roleName = '탑';
         break;
       case 'jungle':
         chipColor = Colors.green.shade200;
-        roleName = '정글';
         break;
       case 'mid':
         chipColor = Colors.blue.shade200;
-        roleName = '미드';
         break;
       case 'adc':
         chipColor = Colors.amber.shade200;
-        roleName = '원딜';
         break;
       case 'support':
         chipColor = Colors.purple.shade200;
-        roleName = '서포터';
         break;
       default:
         chipColor = Colors.grey.shade200;
-        roleName = role;
     }
     
     return Chip(
@@ -505,7 +599,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
       },
       child: SlideTransition(
         position: _slideAnimation,
-      child: Scaffold(
+        child: Scaffold(
           appBar: AppBar(
             leading: IconButton(
               icon: const Icon(Icons.arrow_back_ios_new),
@@ -569,9 +663,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                           colors: [
                             Colors.grey.shade50,
                             Colors.grey.shade100,
-                    ],
-                  ),
-      ),
+                          ],
+                        ),
+                      ),
                       child: Column(
                         children: [
                           // 메시지 목록
@@ -619,7 +713,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                             ),
                             child: SafeArea(
                               child: Row(
-        children: [
+                                children: [
                                   // 메시지 입력 필드
                                   Expanded(
                                     child: Container(
@@ -646,7 +740,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                                     ),
                                   ),
                                   
-            const SizedBox(width: 8),
+                                  const SizedBox(width: 8),
                                   
                                   // 전송 버튼
                                   Material(
@@ -674,10 +768,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                                                 color: Colors.white,
                                               ),
                                       ),
-            ),
-          ),
-        ],
-      ),
+                                    ),
+                                  ),
+                                ],
+                              ),
                             ),
                           ),
                         ],
@@ -706,18 +800,32 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
               color: Colors.black.withOpacity(0.6),
               borderRadius: BorderRadius.circular(16.0),
             ),
-        child: Text(
+            child: Text(
               message.text,
               style: const TextStyle(
                 fontSize: 12,
                 color: Colors.white,
               ),
-          textAlign: TextAlign.center,
+              textAlign: TextAlign.center,
             ),
           ),
         ),
       );
     }
+    
+    // 메시지 발신자의 역할 정보 가져오기
+    String? senderRole;
+    if (_tournament != null) {
+      for (var entry in _tournament!.participantsByRole.entries) {
+        if (entry.value.contains(message.senderId)) {
+          senderRole = entry.key;
+          break;
+        }
+      }
+    }
+    
+    // 호스트 여부 확인
+    final isHost = _tournament != null && message.senderId == _tournament!.hostId;
     
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6.0),
@@ -728,38 +836,91 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
         children: [
           // 발신자 프로필 이미지 (자신의 메시지는 표시 안함)
           if (!isCurrentUser)
-            Container(
-              margin: const EdgeInsets.only(top: 4),
-              child: CircleAvatar(
-              radius: 16,
-                backgroundColor: Colors.grey.shade200,
-                backgroundImage: message.senderProfileImageUrl != null
-                  ? NetworkImage(message.senderProfileImageUrl!)
-                  : null,
-                child: message.senderProfileImageUrl == null
-                    ? const Icon(Icons.person, size: 16, color: Colors.grey)
-                  : null,
-              ),
+            Stack(
+              children: [
+                Container(
+                  margin: const EdgeInsets.only(top: 4),
+                  child: CircleAvatar(
+                    radius: 16,
+                    backgroundColor: Colors.grey.shade200,
+                    backgroundImage: message.senderProfileImageUrl != null
+                        ? NetworkImage(message.senderProfileImageUrl!)
+                        : null,
+                    child: message.senderProfileImageUrl == null
+                        ? const Icon(Icons.person, size: 16, color: Colors.grey)
+                        : null,
+                  ),
+                ),
+                if (isHost)
+                  Positioned(
+                    right: 0,
+                    bottom: 0,
+                    child: Container(
+                      width: 12,
+                      height: 12,
+                      decoration: BoxDecoration(
+                        color: AppColors.primary,
+                        shape: BoxShape.circle,
+                        border: Border.all(color: Colors.white, width: 1),
+                      ),
+                      child: const Icon(
+                        Icons.star,
+                        size: 8,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ),
+              ],
             ),
-            
+          
           const SizedBox(width: 8),
           
           // 메시지 내용 영역
-            Column(
+          Column(
             crossAxisAlignment:
                 isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
-              children: [
+            children: [
               // 발신자 이름 (자신의 메시지는 표시 안함)
               if (!isCurrentUser)
                 Padding(
                   padding: const EdgeInsets.only(left: 4.0, bottom: 2.0),
-                  child: Text(
-                  message.senderName,
-                    style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                      color: AppColors.textSecondary,
-                    ),
+                  child: Row(
+                    children: [
+                      Text(
+                        message.senderName,
+                        style: TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                      if (senderRole != null)
+                        Container(
+                          margin: const EdgeInsets.only(left: 4),
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: _getRoleColor(senderRole).withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            '(${_getRoleNameKorean(senderRole)})',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: _getRoleColor(senderRole),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      if (isHost)
+                        Container(
+                          margin: const EdgeInsets.only(left: 4),
+                          child: Icon(
+                            Icons.star,
+                            size: 12,
+                            color: AppColors.primary,
+                          ),
+                        ),
+                    ],
                   ),
                 ),
               
@@ -774,22 +935,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                       child: Text(
                         timestamp,
                         style: TextStyle(
-              fontSize: 10,
-              color: AppColors.textSecondary,
-            ),
-          ),
-      ),
-
+                          fontSize: 10,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  
                   // 메시지 말풍선
                   Container(
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.7,
-      ),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                    ),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16.0,
                       vertical: 10.0,
                     ),
-      decoration: BoxDecoration(
+                    decoration: BoxDecoration(
                       color: isCurrentUser
                           ? AppColors.primary
                           : Colors.white,
@@ -803,14 +964,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                             ? const Radius.circular(4)
                             : const Radius.circular(16),
                       ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
                           blurRadius: 3,
                           offset: const Offset(0, 1),
-          ),
-        ],
-      ),
+                        ),
+                      ],
+                    ),
                     child: Text(
                       message.text,
                       style: TextStyle(
@@ -828,9 +989,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                         style: TextStyle(
                           fontSize: 10,
                           color: AppColors.textSecondary,
-          ),
-        ),
-      ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ],
@@ -838,5 +999,23 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
         ],
       ),
     );
+  }
+  
+  // 역할에 따른 색상 반환
+  Color _getRoleColor(String role) {
+    switch (role.toLowerCase()) {
+      case 'top':
+        return Colors.red;
+      case 'jungle':
+        return Colors.green;
+      case 'mid':
+        return Colors.blue;
+      case 'adc':
+        return Colors.amber.shade800;
+      case 'support':
+        return Colors.purple;
+      default:
+        return Colors.grey;
+    }
   }
 } 
