@@ -589,10 +589,27 @@ class TournamentService {
   }
 
   // 토너먼트 삭제
-  Future<void> deleteTournament(String id) async {
+  Future<void> deleteTournament(String id, {bool deleteChatRoom = true}) async {
     try {
-      // 채팅방 먼저 삭제
-      await _deleteTournamentChatRoom(id);
+      // 채팅방 삭제 옵션이 true인 경우에만 채팅방 삭제
+      if (deleteChatRoom) {
+        await _deleteTournamentChatRoom(id);
+      } else {
+        // 채팅방을 삭제하지 않는 경우, 토너먼트 ID 연결만 제거
+        final chatRoomId = await _firebaseService.findChatRoomByTournamentId(id);
+        if (chatRoomId != null) {
+          await _firestore.collection('chatRooms').doc(chatRoomId).update({
+            'tournamentId': FieldValue.delete(),
+            'type': ChatRoomType.direct.index, // 일반 그룹 채팅방으로 변경
+          });
+          
+          // 시스템 메시지 전송
+          await _sendSystemMessage(
+            chatRoomId,
+            '주최자가 내전을 취소했습니다. 채팅방은 유지됩니다.',
+          );
+        }
+      }
       
       // 토너먼트 삭제
       await _tournamentsRef.doc(id).delete();

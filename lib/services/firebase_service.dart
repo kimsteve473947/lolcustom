@@ -987,7 +987,7 @@ class FirebaseService {
   }
 
   // 단일 토너먼트 삭제
-  Future<void> deleteTournament(String tournamentId) async {
+  Future<void> deleteTournament(String tournamentId, {bool deleteChatRoom = true}) async {
     try {
       // 권한 문제 해결을 위해 트랜잭션 대신 일반 삭제 방식 사용
       // 토너먼트 문서 삭제
@@ -1004,7 +1004,10 @@ class FirebaseService {
         await _firestore.collection('applications').doc(doc.id).delete();
       }
       
-      debugPrint('Tournament $tournamentId successfully deleted');
+      // TournamentService에서 채팅방 관련 처리를 수행함
+      // 여기서는 토너먼트 및 관련 신청서만 삭제
+      
+      debugPrint('Tournament $tournamentId successfully deleted (deleteChatRoom: $deleteChatRoom)');
     } catch (e) {
       debugPrint('Error deleting tournament: $e');
       rethrow;

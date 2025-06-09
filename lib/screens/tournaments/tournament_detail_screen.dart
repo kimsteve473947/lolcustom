@@ -44,6 +44,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
   late AnimationController _animationController;
   late Animation<double> _fadeAnimation;
   
+  // 스크롤 컨트롤러 추가
+  final ScrollController _scrollController = ScrollController();
+  
   @override
   void initState() {
     super.initState();
@@ -58,7 +61,21 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
   @override
   void dispose() {
     _animationController.dispose();
+    _scrollController.dispose();
     super.dispose();
+  }
+  
+  // 스크롤을 아래로 이동하는 메서드
+  void _scrollToBottom() {
+    Future.delayed(const Duration(milliseconds: 300), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: const Duration(milliseconds: 500),
+          curve: Curves.easeOut,
+        );
+      }
+    });
   }
   
   Future<void> _loadTournamentDetails() async {
@@ -338,6 +355,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
     return FadeTransition(
       opacity: _fadeAnimation,
       child: CustomScrollView(
+        controller: _scrollController,
         physics: const BouncingScrollPhysics(),
         slivers: [
           // App Bar
@@ -788,65 +806,79 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       // 헤더 - 포지션 정보와 참가 현황
-                      Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        decoration: BoxDecoration(
-                          color: roleColor.withOpacity(0.1),
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(12),
-                            topRight: Radius.circular(12),
+                      GestureDetector(
+                        onTap: () {
+                          // 모집이 마감되지 않았고 호스트가 아닐 때만 선택 가능
+                          if (filled < total && !_isUserHost() && _tournament!.status == TournamentStatus.open) {
+                            setState(() {
+                              _selectedRole = key;
+                            });
+                            // 선택 후 아래로 스크롤하여 신청 버튼이 보이게 함
+                            _scrollToBottom();
+                          }
+                        },
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                          decoration: BoxDecoration(
+                            color: _selectedRole == key 
+                                ? roleColor.withOpacity(0.2) 
+                                : roleColor.withOpacity(0.1),
+                            borderRadius: const BorderRadius.only(
+                              topLeft: Radius.circular(12),
+                              topRight: Radius.circular(12),
+                            ),
                           ),
-                        ),
-                        child: Row(
-                          children: [
-                            // 포지션 아이콘
-                            Container(
-                              width: 36,
-                              height: 36,
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                shape: BoxShape.circle,
-                                border: Border.all(
-                                  color: roleColor,
-                                  width: 1,
+                          child: Row(
+                            children: [
+                              // 포지션 아이콘
+                              Container(
+                                width: 36,
+                                height: 36,
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: roleColor,
+                                    width: _selectedRole == key ? 2 : 1,
+                                  ),
+                                ),
+                                child: Center(
+                                  child: LaneIconWidget(
+                                    lane: key,
+                                    size: 24,
+                                  ),
                                 ),
                               ),
-                              child: Center(
-                                child: LaneIconWidget(
-                                  lane: key,
-                                  size: 24,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            // 포지션 이름
-                            Text(
-                              role['name'] as String,
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: roleColor,
-                              ),
-                            ),
-                            const Spacer(),
-                            // 참가 인원
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(12),
-                                border: Border.all(color: roleColor),
-                              ),
-                              child: Text(
-                                '$filled/$total',
+                              const SizedBox(width: 12),
+                              // 포지션 이름
+                              Text(
+                                role['name'] as String,
                                 style: TextStyle(
-                                  fontSize: 14,
+                                  fontSize: 16,
                                   fontWeight: FontWeight.bold,
                                   color: roleColor,
                                 ),
                               ),
-                            ),
-                          ],
+                              const Spacer(),
+                              // 참가 인원
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: Colors.white,
+                                  borderRadius: BorderRadius.circular(12),
+                                  border: Border.all(color: roleColor),
+                                ),
+                                child: Text(
+                                  '$filled/$total',
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.bold,
+                                    color: roleColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                       
@@ -2243,7 +2275,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                   width: 40,
                   height: 40,
                   decoration: BoxDecoration(
-                    color: _getRoleColor(_selectedRole).withOpacity(0.1),
+                    color: Colors.white,
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: _getRoleColor(_selectedRole),
@@ -2692,35 +2724,77 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
   // 정보 행 (아이콘 + 텍스트)
   Widget _buildInfoRow({
     required IconData icon,
-    required String text,
+    String? text,
+    String? title,
+    String? value,
     Color color = AppColors.primary,
     bool isBold = false,
   }) {
-    return Row(
-      children: [
-        Container(
-          padding: const EdgeInsets.all(10),
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            size: 20,
-            color: color,
-          ),
+    if (title != null && value != null) {
+      // 새로운 스타일 (title/value 형식)
+      return Padding(
+        padding: const EdgeInsets.only(bottom: 12),
+        child: Row(
+          children: [
+            Icon(
+              icon,
+              color: AppColors.textSecondary,
+              size: 20,
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 14,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    value,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
         ),
-        const SizedBox(width: 12),
-        Text(
-          text,
-          style: TextStyle(
-            fontSize: 16,
-            fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
-            color: color == AppColors.primary ? Colors.black87 : color,
+      );
+    } else {
+      // 기존 스타일 (text 형식)
+      return Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 20,
+              color: color,
+            ),
           ),
-        ),
-      ],
-    );
+          const SizedBox(width: 12),
+          Text(
+            text ?? '',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: isBold ? FontWeight.bold : FontWeight.w500,
+              color: color == AppColors.primary ? Colors.black87 : color,
+            ),
+          ),
+        ],
+      );
+    }
   }
 
   // 채팅방으로 이동
@@ -2867,5 +2941,263 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
   /// 토너먼트 참가 신청 처리
   Future<void> _registerForTournament() async {
     await _applyToTournament();
+  }
+
+  Widget _buildParticipantCountSummary() {
+    if (_tournament == null) return const SizedBox.shrink();
+    
+    // 실제 참가자 수 계산 (토너먼트 데이터에서 가져옴)
+    final totalParticipants = _tournament!.participants.length;
+    final totalSlots = _tournament!.totalSlots;
+    
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.center,
+      children: [
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          decoration: BoxDecoration(
+            color: Colors.grey.shade100,
+            borderRadius: BorderRadius.circular(20),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.people,
+                size: 20,
+                color: AppColors.primary,
+              ),
+              const SizedBox(width: 8),
+              Text(
+                '총 참가 인원: $totalParticipants/$totalSlots명',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 토너먼트 헤더 위젯
+  Widget _buildTournamentHeader() {
+    if (_tournament == null) return const SizedBox.shrink();
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _tournament!.title,
+                      style: const TextStyle(
+                        fontSize: 22,
+                        fontWeight: FontWeight.bold,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    const SizedBox(height: 4),
+                    Row(
+                      children: [
+                        _buildStatusBadge(),
+                        const SizedBox(width: 8),
+                        Text(
+                          TournamentUIUtils.getFormattedDate(_tournament!.startsAt),
+                          style: const TextStyle(
+                            fontSize: 15,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+              if (_tournament!.tournamentType == TournamentType.competitive)
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(
+                        Icons.star,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      SizedBox(width: 4),
+                      Text(
+                        '경쟁전',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          Row(
+            children: [
+              CircleAvatar(
+                radius: 20,
+                backgroundImage: _tournament!.hostProfileImageUrl != null && 
+                                _tournament!.hostProfileImageUrl!.isNotEmpty
+                    ? NetworkImage(_tournament!.hostProfileImageUrl!)
+                    : null,
+                backgroundColor: _tournament!.hostProfileImageUrl == null || 
+                                _tournament!.hostProfileImageUrl!.isEmpty
+                    ? Colors.grey.shade300
+                    : null,
+                child: _tournament!.hostProfileImageUrl == null || 
+                      _tournament!.hostProfileImageUrl!.isEmpty
+                    ? const Icon(Icons.person, color: Colors.grey)
+                    : null,
+              ),
+              const SizedBox(width: 12),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(
+                        '주최자: ${_tournament!.hostNickname}',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(
+                        Icons.verified,
+                        color: AppColors.primary,
+                        size: 16,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    '서버: ${_tournament!.location}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.grey.shade700,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          _buildParticipantCountSummary(),
+          const SizedBox(height: 16),
+          Text(
+            _tournament!.description,
+            style: const TextStyle(
+              fontSize: 16,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 토너먼트 정보 표시 위젯
+  Widget _buildTournamentDetails() {
+    if (_tournament == null) return const SizedBox.shrink();
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.grey.withOpacity(0.1),
+            spreadRadius: 1,
+            blurRadius: 4,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '대회 정보',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow(
+            icon: Icons.calendar_today,
+            title: '경기 일시',
+            value: TournamentUIUtils.getFullFormattedDate(_tournament!.startsAt),
+          ),
+          _buildInfoRow(
+            icon: Icons.location_on,
+            title: '경기 서버',
+            value: _tournament!.location,
+          ),
+          _buildInfoRow(
+            icon: Icons.people,
+            title: '참가 현황',
+            value: '${_tournament!.participants.length}/${_tournament!.totalSlots}명',
+          ),
+          _buildInfoRow(
+            icon: Icons.format_list_numbered,
+            title: '경기 방식',
+            value: TournamentUIUtils.getGameFormatText(_tournament!.gameFormat),
+          ),
+          if (_tournament!.tournamentType == TournamentType.competitive)
+            _buildInfoRow(
+              icon: Icons.attach_money,
+              title: '참가 비용',
+              value: '${_tournament!.creditCost ?? 20} 크레딧',
+            ),
+          if (_tournament!.tierLimit != null)
+            _buildInfoRow(
+              icon: Icons.military_tech,
+              title: '티어 제한',
+              value: UserModel.tierToString(_tournament!.tierLimit!),
+            ),
+        ],
+      ),
+    );
+  }
+
+  // 토너먼트 상태 뱃지 위젯
+  Widget _buildStatusBadge() {
+    if (_tournament == null) return const SizedBox.shrink();
+    return TournamentUIUtils.buildTournamentStatusChip(_tournament!.status);
   }
 } 

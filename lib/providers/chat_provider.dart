@@ -8,6 +8,8 @@ import 'package:lol_custom_game_manager/services/chat_service.dart';
 import 'package:lol_custom_game_manager/services/firebase_service.dart';
 import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 
 class ChatProvider extends ChangeNotifier {
   final ChatService _chatService;
@@ -317,12 +319,19 @@ class ChatProvider extends ChangeNotifier {
         }
       }
       
-      // 확인 다이얼로그 표시
+      // 사용자가 주최자인지 확인
+      final isHost = tournament.hostId == user.uid;
+      
+      // 확인 다이얼로그 표시 (주최자와 일반 참가자용 메시지 분리)
       final confirmed = await showDialog<bool>(
         context: context,
         builder: (context) => AlertDialog(
           title: const Text('채팅방 나가기'),
-          content: const Text('나가면 토너먼트 신청이 취소됩니다. 계속하시겠습니까?'),
+          content: Text(
+            isHost 
+                ? '주최자가 채팅방을 나가면 주최한 내전이 삭제됩니다. 계속하시겠습니까?\n(참여자들의 채팅방은 유지됩니다)'
+                : '나가면 토너먼트 신청이 취소됩니다. 계속하시겠습니까?'
+          ),
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(false),
@@ -342,18 +351,53 @@ class ChatProvider extends ChangeNotifier {
         return false;
       }
       
-      // 채팅방 나가기 처리
-      await _chatService.leaveTournamentChatRoom(
-        chatRoomId,
-        chatRoom.tournamentId!,
-        user,
-        userRole,
-      );
-      
-      // 채팅방 목록 다시 로드
-      await loadUserChatRooms(user.uid);
-      
-      return true;
+      // 주최자인 경우 내전 삭제 처리
+      if (isHost) {
+        // 내전 삭제 (채팅방은 유지)
+        final appStateProvider = Provider.of<AppStateProvider>(context, listen: false);
+        await appStateProvider.deleteTournament(chatRoom.tournamentId!, deleteChatRoom: false);
+        
+        // 주최자도 채팅방에서 제거 - 이 부분이 누락되어 있었음
+        await FirebaseFirestore.instance.collection('chatRooms').doc(chatRoomId).update({
+          'participantIds': FieldValue.arrayRemove([user.uid]),
+          'participantNames.${user.uid}': FieldValue.delete(),
+          'participantProfileImages.${user.uid}': FieldValue.delete(),
+          'unreadCount.${user.uid}': FieldValue.delete(),
+        });
+        
+        // 시스템 메시지 전송
+        final message = MessageModel(
+          id: '',
+          chatRoomId: chatRoomId,
+          senderId: 'system',
+          senderName: '시스템',
+          text: '${user.nickname}님(주최자)이 채팅방을 나갔습니다.',
+          readStatus: {},
+          timestamp: Timestamp.now(),
+          metadata: {'isSystem': true},
+        );
+        
+        await _firebaseService.sendMessage(message);
+        
+        // 채팅방 목록 다시 로드
+        await loadUserChatRooms(user.uid);
+        
+        return true;
+      } else {
+        // 일반 참가자는 기존 로직대로 처리
+        // 채팅방 나가기 처리
+        await _chatService.leaveTournamentChatRoom(
+          chatRoomId,
+          chatRoom.tournamentId!,
+          user,
+          userRole,
+        );
+        
+        // 채팅방 목록 다시 로드
+        await loadUserChatRooms(user.uid);
+        
+        return true;
+      }
     } catch (e) {
       debugPrint('Error leaving chat room: $e');
       _error = '채팅방을 나가는 중 오류가 발생했습니다: $e';
