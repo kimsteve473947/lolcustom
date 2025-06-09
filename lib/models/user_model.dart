@@ -150,6 +150,23 @@ class UserModel extends Equatable {
     }
   }
 
+  // tier enum -> 문자열 변환 헬퍼
+  static String tierToString(PlayerTier tier) {
+    switch (tier) {
+      case PlayerTier.iron: return '아이언';
+      case PlayerTier.bronze: return '브론즈';
+      case PlayerTier.silver: return '실버';
+      case PlayerTier.gold: return '골드';
+      case PlayerTier.platinum: return '플래티넘';
+      case PlayerTier.emerald: return '에메랄드';
+      case PlayerTier.diamond: return '다이아몬드';
+      case PlayerTier.master: return '마스터';
+      case PlayerTier.grandmaster: return '그랜드마스터';
+      case PlayerTier.challenger: return '챌린저';
+      default: return '언랭크';
+    }
+  }
+
   // Check if user has enough credits
   bool hasEnoughCredits(int requiredCredits) {
     return credits >= requiredCredits;

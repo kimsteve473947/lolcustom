@@ -1,4 +1,6 @@
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/constants/lol_constants.dart';
 import 'package:lol_custom_game_manager/models/models.dart';
@@ -6,6 +8,18 @@ import 'package:lol_custom_game_manager/models/models.dart';
 /// 토너먼트 관련 UI 유틸리티 클래스
 /// 여러 화면에서 공통으로 사용할 수 있는 UI 헬퍼 함수들을 제공합니다.
 class TournamentUIUtils {
+  // 날짜 형식 반환 (MM.dd HH:mm)
+  static String getFormattedDate(Timestamp timestamp) {
+    final date = timestamp.toDate();
+    return DateFormat('MM.dd HH:mm').format(date);
+  }
+  
+  // 전체 날짜 형식 반환 (yyyy년 MM월 dd일 HH:mm)
+  static String getFullFormattedDate(Timestamp timestamp) {
+    final date = timestamp.toDate();
+    return DateFormat('yyyy년 MM월 dd일 HH:mm').format(date);
+  }
+  
   // 역할 이름 반환
   static String getRoleName(String role) {
     switch (role) {
@@ -59,6 +73,16 @@ class TournamentUIUtils {
       case 'adc': return Icons.gps_fixed;
       case 'support': return Icons.shield;
       default: return Icons.sports_esports;
+    }
+  }
+  
+  // 게임 포맷 텍스트 반환
+  static String getGameFormatText(GameFormat format) {
+    switch (format) {
+      case GameFormat.single: return '단판 경기';
+      case GameFormat.bestOfThree: return '3판 2선승';
+      case GameFormat.bestOfFive: return '5판 3선승';
+      default: return '단판 경기';
     }
   }
   

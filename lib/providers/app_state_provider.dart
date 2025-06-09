@@ -1,15 +1,22 @@
+import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:lol_custom_game_manager/models/models.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
-import 'package:lol_custom_game_manager/services/firebase_service.dart';
 import 'package:lol_custom_game_manager/services/cloud_functions_service.dart';
+import 'package:lol_custom_game_manager/services/firebase_service.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-class AppStateProvider extends ChangeNotifier {
+// 앱 상태 관리 프로바이더
+class AppStateProvider with ChangeNotifier {
+  // 서비스 주입
   final AuthService _authService;
   final FirebaseService _firebaseService;
   final CloudFunctionsService _cloudFunctionsService;
   
+  // 앱 상태
   UserModel? _currentUser;
   bool _isLoading = false;
   String? _errorMessage;
@@ -550,8 +557,63 @@ class AppStateProvider extends ChangeNotifier {
         return false;
       }
       
+      // 토너먼트 관련 채팅방 찾기
+      final chatRoomId = await _firebaseService.findChatRoomByTournamentId(tournamentId);
+      
       // 참가 취소 처리
       await _firebaseService.leaveTournamentByRole(tournamentId, role);
+      
+      // 채팅방에서도 나가기 처리
+      if (chatRoomId != null) {
+        // 채팅방 정보 가져오기
+        final chatRoomDoc = await FirebaseFirestore.instance
+            .collection('chatRooms')
+            .doc(chatRoomId)
+            .get();
+        
+        if (chatRoomDoc.exists) {
+          // 채팅방에서 사용자 제거
+          await FirebaseFirestore.instance.collection('chatRooms').doc(chatRoomId).update({
+            'participantIds': FieldValue.arrayRemove([_currentUser!.uid]),
+            'participantNames.${_currentUser!.uid}': FieldValue.delete(),
+            'participantProfileImages.${_currentUser!.uid}': FieldValue.delete(),
+            'unreadCount.${_currentUser!.uid}': FieldValue.delete(),
+          });
+          
+          // 참가자 수 필드 업데이트
+          final chatRoomData = chatRoomDoc.data() as Map<String, dynamic>;
+          final participantIds = (chatRoomData['participantIds'] as List<dynamic>?)?.cast<String>() ?? [];
+          
+          if (participantIds.contains(_currentUser!.uid)) {
+            final newParticipantCount = participantIds.length - 1;
+            
+            // 채팅방 제목 업데이트 (참가자 수 반영)
+            final startDateTime = tournament.startsAt.toDate();
+            final formattedDate = DateFormat('MM.dd HH:mm').format(startDateTime);
+            final chatRoomTitle = 
+                "${tournament.title} – $formattedDate ($newParticipantCount/${tournament.totalSlots})";
+            
+            await FirebaseFirestore.instance.collection('chatRooms').doc(chatRoomId).update({
+              'title': chatRoomTitle,
+              'participantCount': newParticipantCount,
+            });
+            
+            // 시스템 메시지 전송 (참가자 퇴장 알림)
+            final message = MessageModel(
+              id: '',
+              chatRoomId: chatRoomId,
+              senderId: 'system',
+              senderName: '시스템',
+              text: "${_currentUser!.nickname}[${_getRoleDisplayName(role)}]님이 방을 나갔습니다. ($newParticipantCount/${tournament.totalSlots})",
+              readStatus: {},
+              timestamp: Timestamp.now(),
+              metadata: {'isSystem': true},
+            );
+            
+            await _firebaseService.sendMessage(message);
+          }
+        }
+      }
       
       // 경쟁전인 경우 크레딧 환불 알림 (UI 업데이트)
       if (tournament.tournamentType == TournamentType.competitive) {
@@ -566,6 +628,18 @@ class AppStateProvider extends ChangeNotifier {
       return false;
     } finally {
       _setLoading(false);
+    }
+  }
+  
+  // 역할명 표시용 문자열로 변환
+  String _getRoleDisplayName(String role) {
+    switch (role.toLowerCase()) {
+      case 'top': return '탑';
+      case 'jungle': return '정글';
+      case 'mid': return '미드';
+      case 'adc': return '원딜';
+      case 'support': return '서포터';
+      default: return role;
     }
   }
   
@@ -764,7 +838,7 @@ class AppStateProvider extends ChangeNotifier {
   }
   
   // 토너먼트 삭제 (주최자만 가능)
-  Future<bool> deleteTournament(String tournamentId) async {
+  Future<bool> deleteTournament(String tournamentId, {bool deleteChatRoom = true}) async {
     _setLoading(true);
     _clearError();
     
@@ -783,7 +857,7 @@ class AppStateProvider extends ChangeNotifier {
       }
       
       // 토너먼트 삭제
-      await _firebaseService.deleteTournament(tournamentId);
+      await _firebaseService.deleteTournament(tournamentId, deleteChatRoom: deleteChatRoom);
       
       // 삭제 성공
       return true;

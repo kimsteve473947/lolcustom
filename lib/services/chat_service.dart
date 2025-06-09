@@ -54,7 +54,7 @@ class ChatService {
     final formattedDate = DateFormat('MM.dd HH:mm').format(startDateTime);
     final participantCount = tournament.participants.length;
     final chatRoomTitle = 
-        "${tournament.title} – $formattedDate ($participantCount/10)";
+        "${tournament.title} – $formattedDate ($participantCount/${tournament.totalSlots})";
 
     // 참가자 초기화 (주최자 및 현재 참가자 포함)
     final participantIds = List<String>.from(tournament.participants);
@@ -145,7 +145,7 @@ class ChatService {
     final participantCount = chatRoom.participantIds.length + 1;
     await _sendSystemMessage(
       chatRoomId,
-      "${user.nickname}님이 입장했습니다. ($participantCount/10)",
+      "${user.nickname}님이 입장했습니다. ($participantCount/${tournament.totalSlots})",
     );
     
     // 채팅방 제목 업데이트 (참가자 수 반영)
@@ -196,7 +196,7 @@ class ChatService {
       // 4. 시스템 메시지 전송 (참가자 퇴장 알림)
       await _sendSystemMessage(
         chatRoomId,
-        "${user.nickname}[${_getRoleDisplayName(userRole)}]님이 방을 나갔습니다. ($newParticipantCount/10)",
+        "${user.nickname}[${_getRoleDisplayName(userRole)}]님이 방을 나갔습니다. ($newParticipantCount/${tournament.totalSlots})",
       );
       
       // 5. 채팅방 제목 업데이트 (참가자 수 반영)
@@ -212,6 +212,9 @@ class ChatService {
       for (final doc in applicationsSnapshot.docs) {
         await doc.reference.delete();
       }
+
+      // 7. 토너먼트에서도 참가자 제거 (가장 중요한 수정사항)
+      await _firebaseService.leaveTournamentByRole(tournamentId, userRole);
       
     } catch (e) {
       debugPrint('Error in leaveTournamentChatRoom: $e');
@@ -228,10 +231,11 @@ class ChatService {
     final startDateTime = tournament.startsAt.toDate();
     final formattedDate = DateFormat('MM.dd HH:mm').format(startDateTime);
     final chatRoomTitle = 
-        "${tournament.title} – $formattedDate ($participantCount/10)";
+        "${tournament.title} – $formattedDate ($participantCount/${tournament.totalSlots})";
     
     await _firestore.collection('chatRooms').doc(chatRoomId).update({
       'title': chatRoomTitle,
+      'participantCount': participantCount,
     });
   }
 

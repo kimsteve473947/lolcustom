@@ -79,6 +79,11 @@ class TournamentModel extends Equatable {
   
   int? get price => tournamentType == TournamentType.competitive ? 20 : null;
   
+  // 총 슬롯 수 계산 (모든 역할의 슬롯 합계)
+  int get totalSlots {
+    return slotsByRole.values.fold(0, (sum, slots) => sum + slots);
+  }
+  
   // 호스트 포지션 게터 추가
   String? get hostPosition {
     // 실제 호스트 포지션 값 반환
@@ -718,10 +723,6 @@ class TournamentModel extends Equatable {
   }
   
   // 누락된 게터 추가
-  int get totalSlots {
-    return slots.values.fold(0, (sum, count) => sum + count);
-  }
-  
   int get totalFilledSlots {
     return filledSlots.values.fold(0, (sum, count) => sum + count);
   }
