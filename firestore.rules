@@ -22,8 +22,35 @@ service cloud.firestore {
     
     // 토너먼트 호스트인지 확인하는 함수
     function isTournamentHost(tournamentId) {
-      let tournament = get(/databases/$(database)/documents/tournaments/$(tournamentId));
-      return isAuthenticated() && request.auth.uid == tournament.data.hostId;
+      return isAuthenticated() 
+        && exists(/databases/$(database)/documents/tournaments/$(tournamentId))
+        && request.auth.uid == get(/databases/$(database)/documents/tournaments/$(tournamentId)).data.hostId;
+    }
+    
+    // 채팅방 참가자인지 확인하는 함수
+    function isChatRoomParticipant(chatRoomId) {
+      return isAuthenticated()
+        && exists(/databases/$(database)/documents/chatRooms/$(chatRoomId))
+        && request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(chatRoomId)).data.participantIds;
+    }
+    
+    // participantIds 배열 변경 시 본인 UID만 조작하는지 확인하는 함수
+    function isModifyingOnlyOwnParticipation() {
+      let currentParticipantIds = resource.data.participantIds;
+      let newParticipantIds = request.resource.data.participantIds;
+      
+      // arrayUnion 케이스 - 본인 UID만 추가
+      let added = newParticipantIds.removeAll(currentParticipantIds);
+      
+      // arrayRemove 케이스 - 본인 UID만 제거
+      let removed = currentParticipantIds.removeAll(newParticipantIds);
+      
+      return (
+        // 추가된 항목이 없거나 본인 UID만 추가
+        (added.size() == 0 || (added.size() == 1 && added.hasOnly([request.auth.uid]))) &&
+        // 제거된 항목이 없거나 본인 UID만 제거
+        (removed.size() == 0 || (removed.size() == 1 && removed.hasOnly([request.auth.uid])))
+      );
     }
     
     // 모든 문서에 대한 기본 규칙
@@ -125,37 +152,82 @@ service cloud.firestore {
       );
     }
     
+    // 채팅방 필드 유효성 검증 함수
+    function hasValidChatRoomFields() {
+      return request.resource.data.keys().hasOnly([
+        'title',
+        'participantIds',
+        'participantNames',
+        'participantProfileImages',
+        'participantCount',
+        'unreadCount',
+        'lastMessageText',
+        'lastMessageTime',
+        'type',
+        'tournamentId',
+        'createdAt'
+      ]);
+    }
+    
     // 채팅방 컬렉션 규칙
     match /chatRooms/{chatRoomId} {
-      // 임시로 인증된 모든 사용자에게 읽기 권한 부여
-      allow read: if isAuthenticated();
+      // 채팅방 참가자나 관리자만 채팅방 정보 읽기 가능
+      allow read: if isChatRoomParticipant(chatRoomId) || isAdmin();
       
       // 인증된 사용자는 채팅방 생성 가능
       allow create: if isAuthenticated();
       
-      // 채팅방 업데이트는 참가자 또는 관리자만 가능
-      allow update: if isAuthenticated() && (
-        request.auth.uid in resource.data.participantIds || isAdmin()
+      // 채팅방 업데이트 규칙
+      allow update: if hasValidChatRoomFields() && isAuthenticated() && (
+        // 관리자는 모든 필드 업데이트 가능
+        isAdmin() ||
+        
+        // 참가자는 제한된 필드만 업데이트 가능
+        (request.auth.uid in resource.data.participantIds && (
+          // 제목 변경 - 토너먼트 연결된 채팅방에서 참가자 수 변경 시
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['title'])) ||
+          
+          // 본인의 읽지 않은 메시지 수만 업데이트
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['unreadCount']) &&
+           request.resource.data.unreadCount.diff(resource.data.unreadCount).affectedKeys().hasOnly([request.auth.uid])) ||
+          
+          // 마지막 메시지 정보 업데이트 (채팅 전송 시)
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['lastMessageText', 'lastMessageTime'])) ||
+          
+          // 참가자 목록 변경 - 본인만 추가/제거
+          (request.resource.data.diff(resource.data).affectedKeys().hasAny(['participantIds', 'participantNames', 'participantProfileImages']) &&
+           isModifyingOnlyOwnParticipation()) ||
+           
+          // participantCount 필드만 업데이트 (increment 연산)
+          (request.resource.data.diff(resource.data).affectedKeys().hasOnly(['participantCount']))
+        ))
       );
       
       // 삭제는 관리자만 가능
       allow delete: if isAdmin();
     }
     
-    // 채팅방 전체 컬렉션 리스트 쿼리 허용
+    // 채팅방 전체 컬렉션 리스트 쿼리 허용 - 본인이 참가한 채팅방만 쿼리 가능
     match /chatRooms {
-      allow list: if isAuthenticated();
+      allow list: if isAuthenticated() && 
+        request.query.where('participantIds', 'array-contains', request.auth.uid);
     }
     
     // 메시지 컬렉션 규칙
     match /messages/{messageId} {
-      // 인증된 사용자는 모든 메시지 읽기 가능 (임시)
+      // 인증된 사용자는 모든 메시지 읽기 가능
       allow read: if isAuthenticated();
       
-      // 인증된 사용자는 메시지 생성 가능 (시스템 메시지 포함)
+      // 인증된 사용자는 메시지 생성 가능
       allow create: if isAuthenticated() && (
+        // 본인 메시지 생성
         request.resource.data.senderId == request.auth.uid ||
-        request.resource.data.senderId == 'system'
+        // 시스템 메시지 생성 (채팅방 참가자만 가능)
+        (
+          request.resource.data.senderId == 'system' &&
+          exists(/databases/$(database)/documents/chatRooms/$(request.resource.data.chatRoomId)) &&
+          request.auth.uid in get(/databases/$(database)/documents/chatRooms/$(request.resource.data.chatRoomId)).data.participantIds
+        )
       );
       
       // 메시지 수정/삭제는 작성자 또는 관리자만 가능

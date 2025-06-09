@@ -19,6 +19,7 @@ import 'package:intl/date_symbol_data_local.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lol_custom_game_manager/services/background_service.dart';
+import 'package:lol_custom_game_manager/providers/chat_provider.dart';
 
 // Firebase background message handler
 @pragma('vm:entry-point')
@@ -198,6 +199,7 @@ class MyApp extends StatelessWidget {
         Provider<CloudFunctionsService>(create: (_) => cloudFunctionsService),
         Provider<TournamentService>(create: (_) => tournamentService),
         Provider<FirebaseMessagingService>(create: (_) => messagingService),
+        ChangeNotifierProvider(create: (_) => ChatProvider()),
       ],
       child: Builder(
         builder: (context) {

@@ -4,6 +4,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/models/models.dart';
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
+import 'package:lol_custom_game_manager/providers/chat_provider.dart';
 import 'package:lol_custom_game_manager/services/firebase_service.dart';
 import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
@@ -2111,41 +2112,88 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
               ),
             ),
             const SizedBox(height: 16),
-            ElevatedButton(
-              onPressed: _isLoading ? null : () => _cancelRegistration(application.role),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.red.shade100,
-                foregroundColor: Colors.red.shade700,
-                minimumSize: const Size(double.infinity, 56),
-                disabledBackgroundColor: Colors.grey.shade400,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                elevation: 0,
-              ),
-              child: _isLoading 
-                  ? const SizedBox(
-                      height: 24,
-                      width: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            Row(
+              children: [
+                // 채팅방 이동 버튼
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : _goToChatRoom,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.primary,
+                      foregroundColor: Colors.white,
+                      minimumSize: const Size(double.infinity, 56),
+                      disabledBackgroundColor: Colors.grey.shade400,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                    )
-                  : const Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.cancel_outlined),
-                        SizedBox(width: 8),
-                        Text(
-                          '참가 취소하기',
-                          style: TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ],
+                      elevation: 0,
                     ),
+                    child: _isLoading 
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.chat_outlined),
+                              SizedBox(width: 8),
+                              Text(
+                                '채팅방으로 이동',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                // 참가 취소 버튼
+                Expanded(
+                  child: ElevatedButton(
+                    onPressed: _isLoading ? null : () => _cancelRegistration(application.role),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.red.shade100,
+                      foregroundColor: Colors.red.shade700,
+                      minimumSize: const Size(double.infinity, 56),
+                      disabledBackgroundColor: Colors.grey.shade400,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      elevation: 0,
+                    ),
+                    child: _isLoading 
+                        ? const SizedBox(
+                            height: 24,
+                            width: 24,
+                            child: CircularProgressIndicator(
+                              strokeWidth: 2,
+                              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                            ),
+                          )
+                        : const Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(Icons.cancel_outlined),
+                              SizedBox(width: 8),
+                              Text(
+                                '참가 취소',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                  ),
+                ),
+              ],
             ),
           ],
         ),
@@ -2205,7 +2253,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                   child: Center(
                     child: LaneIconWidget(
                       lane: _selectedRole, 
-                      size: 30,
+                      size: 26,
                     ),
                   ),
                 ),
@@ -2221,70 +2269,24 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
               ],
             ),
           ),
-          if (_tournament!.tournamentType == TournamentType.competitive && appState.currentUser != null) ...[
           const SizedBox(height: 16),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-              decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.grey.shade300,
-                  width: 1,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.grey.shade100,
-                    offset: const Offset(0, 2),
-                    blurRadius: 4,
-                  ),
-                ],
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(
-                    Icons.monetization_on,
-                    size: 24,
-                    color: Colors.black87,
-                  ),
-                  const SizedBox(width: 12),
-                  Text(
-                    '필요 크레딧: ${_tournament!.creditCost ?? 20} / 보유 크레딧: ${appState.currentUser!.credits}',
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
-          const SizedBox(height: 20),
+          // 역할 선택 버튼 그룹
+          _buildRoleButtons(),
+          const SizedBox(height: 16),
+          // 참가 신청 버튼
           ElevatedButton(
-            onPressed: _isLoading ? null : _applyToTournament,
+            onPressed: _isLoading ? null : _registerForTournament,
             style: ElevatedButton.styleFrom(
-              // 역할별 색상으로 변경
-              backgroundColor: () {
-                switch (_selectedRole.toLowerCase()) {
-                  case 'top': return const Color(0xFFE74C3C);
-                  case 'jungle': return const Color(0xFF27AE60);
-                  case 'mid': return const Color(0xFF3498DB);
-                  case 'adc': return const Color(0xFFF39C12);
-                  case 'support': return const Color(0xFF9B59B6);
-                  default: return AppColors.primary;
-                }
-              }(),
+              backgroundColor: AppColors.primary,
               foregroundColor: Colors.white,
               minimumSize: const Size(double.infinity, 56),
-              disabledBackgroundColor: Colors.grey.shade400,
+              disabledBackgroundColor: Colors.grey.shade300,
               shape: RoundedRectangleBorder(
                 borderRadius: BorderRadius.circular(16),
               ),
-              elevation: 2,
+              elevation: 0,
             ),
-            child: _isLoading
+            child: _isLoading 
                 ? const SizedBox(
                     height: 24,
                     width: 24,
@@ -2293,21 +2295,16 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
                       valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                     ),
                   )
-                : Row(
+                : const Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      LaneIconWidget(
-                        lane: _selectedRole, 
-                        size: 28,
-                        useRoleColor: false,
-                      ),
-                      const SizedBox(width: 12),
+                      Icon(Icons.sports_esports),
+                      SizedBox(width: 8),
                       Text(
-                        '${_getRoleName(_selectedRole)} 역할로 신청하기',
-                        style: const TextStyle(
+                        '내전 참가 신청하기',
+                        style: TextStyle(
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
-                          color: Colors.white,
                         ),
                       ),
                     ],
@@ -2724,5 +2721,103 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
         ),
       ],
     );
+  }
+
+  // 채팅방으로 이동
+  Future<void> _goToChatRoom() async {
+    setState(() {
+      _isLoading = true;
+    });
+    
+    try {
+      final appState = Provider.of<AppStateProvider>(context, listen: false);
+      final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+      
+      if (_tournament == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('내전 정보가 없습니다'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+      
+      // 현재 사용자 확인
+      if (appState.currentUser == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('로그인이 필요합니다'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+      
+      // ChatProvider를 통해 채팅방 생성 또는 조회
+      final chatRoomId = await chatProvider.getOrCreateTournamentChatRoom(
+        _tournament!,
+        appState.currentUser!,
+      );
+      
+      if (chatRoomId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(chatProvider.error ?? '채팅방 연결 실패'),
+            backgroundColor: AppColors.error,
+          ),
+        );
+        return;
+      }
+      
+      // 채팅방으로 이동 - 채팅 탭 화면으로 이동
+      context.go('/chat/$chatRoomId');
+      
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('오류가 발생했습니다: $e'),
+          backgroundColor: AppColors.error,
+        ),
+      );
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  /// 토너먼트 참가 시 역할 선택용 버튼 그룹 위젯
+  Widget _buildRoleButtons() {
+    // TournamentModel 에 정의된 rolesBySlot 같은 Map<String,int> 를 기반으로 버튼 생성
+    final roles = _tournament!.slotsByRole.keys.toList(); // 예: ['top','jungle',...]
+    return Row(
+      children: roles.map((role) {
+        final isSelected = _selectedRole == role;
+        return Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 4.0),
+            child: ElevatedButton(
+              onPressed: () => setState(() { _selectedRole = role; }),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: isSelected ? AppColors.primary : AppColors.lightGrey,
+                minimumSize: const Size(double.infinity, 48),
+              ),
+              child: Text(
+                role.toUpperCase(),
+                style: TextStyle(
+                  color: isSelected ? Colors.white : Colors.black54,
+                ),
+              ),
+            ),
+          ),
+        );
+      }).toList(),
+    );
+  }
+  
+  /// 토너먼트 참가 신청 처리
+  Future<void> _registerForTournament() async {
+    await _applyToTournament();
   }
 } 

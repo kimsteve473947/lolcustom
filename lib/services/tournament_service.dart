@@ -437,7 +437,7 @@ class TournamentService {
 
       // 채팅방 모델 생성
       final chatRoom = ChatRoomModel(
-        id: '', // Firestore에서 자동 생성될 ID
+        id: tournamentId, // 토너먼트 ID를 채팅방 ID로 사용
         title: '${tournament.title} (${_formatDate(tournament.startsAt.toDate())}) (0/${tournament.totalSlots}명)',
         participantIds: participantIds,
         participantNames: participantNames,
@@ -451,24 +451,33 @@ class TournamentService {
       
       debugPrint('채팅방 모델 생성 완료: ${chatRoom.title}');
 
-      // 채팅방 생성
-      final chatRoomId = await _firebaseService.createChatRoom(chatRoom);
-      debugPrint('채팅방 생성 성공! ID: $chatRoomId');
-
-      // 채팅방과 토너먼트 연결 - 이 부분이 중요함
-      await _firebaseService.linkChatRoomToTournament(chatRoomId, tournamentId);
-      debugPrint('채팅방과 토너먼트 연결 완료: 채팅방 ID = $chatRoomId, 토너먼트 ID = $tournamentId');
-
+      // 채팅방 생성 - 토너먼트 ID와 동일한 ID로 직접 생성
+      debugPrint('Firestore에 채팅방 문서 생성 시작 (ID: $tournamentId)...');
+      
+      // 채팅방 문서를 tournamentId로 직접 생성
+      await FirebaseFirestore.instance.collection('chatRooms').doc(tournamentId).set(chatRoom.toFirestore());
+      debugPrint('채팅방 문서 생성 완료, ID: $tournamentId');
+      
       // 시스템 메시지 전송
       await _sendSystemMessage(
-        chatRoomId,
+        tournamentId,
         '내전 채팅방이 생성되었습니다. 참가자가 모이면 알림이 전송됩니다.',
       );
       debugPrint('시스템 메시지 전송 완료');
       
+      // 생성 확인
+      final verifyDoc = await FirebaseFirestore.instance.collection('chatRooms').doc(tournamentId).get();
+      if (verifyDoc.exists) {
+        final data = verifyDoc.data() as Map<String, dynamic>;
+        debugPrint('채팅방 생성 확인: ${data['title']} - 토너먼트 ID: ${data['tournamentId']}');
+      } else {
+        debugPrint('!!! 경고: 채팅방이 생성되지 않았거나 확인할 수 없음 !!!');
+      }
+      
       debugPrint('=== 채팅방 생성 완료 ===');
     } catch (e) {
       debugPrint('!!! 채팅방 생성 중 오류 발생: $e !!!');
+      debugPrint('스택 트레이스: ${StackTrace.current}');
     }
   }
 
@@ -538,26 +547,34 @@ class TournamentService {
   }
 
   // 시스템 메시지 전송
-  Future<void> _sendSystemMessage(String chatRoomId, String text) async {
+  Future<void> _sendSystemMessage(String chatRoomId, String content) async {
     try {
-      // 시스템 메시지용 모델 생성
-      final message = MessageModel(
-        id: '', // Firestore에서 자동 생성
-        chatRoomId: chatRoomId,
-        senderId: 'system',
-        senderName: '시스템',
-        text: text,
-        readStatus: {}, // 시스템 메시지는 읽음 상태 추적 불필요
-        timestamp: Timestamp.now(),
-        metadata: {'isSystem': true},
-      );
-
-      // 메시지 전송
-      await _firebaseService.sendMessage(message);
-
-      debugPrint('Sent system message to chat room $chatRoomId: $text');
+      debugPrint('시스템 메시지 전송 시작: $content');
+      
+      // 메시지 모델 생성
+      final message = {
+        'chatRoomId': chatRoomId,
+        'senderId': 'system',
+        'senderName': '시스템',
+        'text': content,
+        'readStatus': <String, bool>{},
+        'timestamp': Timestamp.now(),
+        'metadata': {'isSystem': true},
+      };
+      
+      // 메시지 직접 저장
+      final docRef = await FirebaseFirestore.instance.collection('messages').add(message);
+      debugPrint('시스템 메시지 저장 완료, ID: ${docRef.id}');
+      
+      // 채팅방 마지막 메시지 정보 업데이트
+      await FirebaseFirestore.instance.collection('chatRooms').doc(chatRoomId).update({
+        'lastMessageText': content,
+        'lastMessageTime': Timestamp.now(),
+      });
+      debugPrint('채팅방 마지막 메시지 정보 업데이트 완료');
+      
     } catch (e) {
-      debugPrint('Error sending system message: $e');
+      debugPrint('!!! 시스템 메시지 전송 중 오류 발생: $e !!!');
     }
   }
 
