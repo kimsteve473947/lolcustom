@@ -10,6 +10,7 @@ import 'package:lol_custom_game_manager/widgets/tier_selector.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lol_custom_game_manager/constants/lol_constants.dart';
+import 'package:lol_custom_game_manager/providers/chat_provider.dart';
 
 class CreateTournamentScreen extends StatefulWidget {
   const CreateTournamentScreen({Key? key}) : super(key: key);
@@ -533,12 +534,20 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
       );
       
       if (tournamentId != null && mounted) {
+        // 채팅방 목록 새로고침을 위해 ChatProvider 가져오기
+        final chatProvider = Provider.of<ChatProvider>(context, listen: false);
+        
+        // 토너먼트 생성 성공 알림
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('내전이 생성되었습니다'),
             backgroundColor: AppColors.success,
           ),
         );
+        
+        // 채팅방 목록 새로고침 - 토너먼트ID로 호출하여 해당 ID의 채팅방을 찾도록 함
+        await chatProvider.refreshChatRoomsAfterTournamentCreation(tournamentId);
+        debugPrint('토너먼트 채팅방 목록 새로고침 완료: ID=$tournamentId');
         
         // Navigate to the tournament home screen instead of detail page
         context.go('/tournaments');

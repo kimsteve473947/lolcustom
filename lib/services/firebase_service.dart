@@ -121,8 +121,85 @@ class FirebaseService {
 
   Future<String> createTournament(TournamentModel tournament) async {
     try {
+      debugPrint('=== 토너먼트 생성 시작 ===');
       DocumentReference ref =
           await _firestore.collection('tournaments').add(tournament.toFirestore());
+      debugPrint('토너먼트 생성 완료, ID: ${ref.id}');
+      
+      // Create chat room with the same ID as the tournament
+      try {
+        debugPrint('동일한 ID로 채팅방 직접 생성 시도: ${ref.id}');
+        
+        // Get host information
+        final hostUser = await getUserById(tournament.hostId);
+        if (hostUser == null) {
+          debugPrint('!!! 오류: 호스트 사용자를 찾을 수 없음 (${tournament.hostId}) !!!');
+          return ref.id;
+        }
+        
+        // Initialize chat room participants (host only initially)
+        final participantIds = [tournament.hostId];
+        final participantNames = {tournament.hostId: hostUser.nickname};
+        final participantProfileImages = {
+          tournament.hostId: hostUser.profileImageUrl
+        };
+        final unreadCount = {tournament.hostId: 0};
+        
+        // Format tournament start time
+        final startsAtDateTime = tournament.startsAt.toDate();
+        final formattedDate = '${startsAtDateTime.month}/${startsAtDateTime.day} ${startsAtDateTime.hour}:${startsAtDateTime.minute.toString().padLeft(2, '0')}';
+        
+        // Create chat room model - initialize with 1 participant (the host)
+        final chatRoom = ChatRoomModel(
+          id: ref.id,  // Use tournament ID as chat room ID
+          title: '${tournament.title} (${formattedDate}) (1/${tournament.totalSlots}명)',
+          participantIds: participantIds,
+          participantNames: participantNames,
+          participantProfileImages: participantProfileImages,
+          participantCount: 1, // Initialize with host count
+          unreadCount: unreadCount,
+          type: ChatRoomType.tournamentRecruitment,
+          tournamentId: ref.id,
+          createdAt: Timestamp.now(),
+          lastMessageTime: Timestamp.now(),
+        );
+        
+        // Create chat room document with tournament ID
+        await _firestore.collection('chatRooms').doc(ref.id).set(chatRoom.toFirestore());
+        debugPrint('채팅방 생성 완료 (ID: ${ref.id}) - 참가자 수: 1명 (호스트)');
+        
+        // Send system message
+        final message = MessageModel(
+          id: '',
+          chatRoomId: ref.id,
+          senderId: 'system',
+          senderName: '시스템',
+          senderProfileImageUrl: null,
+          text: '내전 채팅방이 생성되었습니다. 참가자가 모이면 알림이 전송됩니다.',
+          readStatus: {},
+          timestamp: Timestamp.now(),
+        );
+        
+        await _firestore.collection('messages').add(message.toFirestore());
+        debugPrint('시스템 메시지 전송 완료');
+        
+        // Update chat room with last message
+        await _firestore.collection('chatRooms').doc(ref.id).update({
+          'lastMessageText': message.text,
+          'lastMessageTime': message.timestamp,
+        });
+        
+        // Verify chat room creation
+        final verifyDoc = await _firestore.collection('chatRooms').doc(ref.id).get();
+        if (verifyDoc.exists) {
+          debugPrint('채팅방 생성 확인 완료 (ID: ${ref.id})');
+        } else {
+          debugPrint('!!! 경고: 채팅방 생성 확인 실패 (ID: ${ref.id}) !!!');
+        }
+      } catch (e) {
+        debugPrint('!!! 채팅방 생성 중 오류: $e !!!');
+      }
+      
       return ref.id;
     } catch (e) {
       debugPrint('Error creating tournament: $e');
@@ -824,15 +901,60 @@ class FirebaseService {
       final updatedParticipantProfileImages = Map<String, String?>.from(chatRoom.participantProfileImages)..addAll({userId: userProfileImageUrl});
       final updatedUnreadCount = Map<String, int>.from(chatRoom.unreadCount)..addAll({userId: 0});
       
+      // Calculate new participant count
+      final newParticipantCount = chatRoom.participantCount + 1;
+      
+      // Update title with new participant count if it's a tournament chat room
+      String updatedTitle = chatRoom.title;
+      if (chatRoom.type == ChatRoomType.tournamentRecruitment && chatRoom.tournamentId != null) {
+        // Get tournament info to know the total slots
+        final tournamentDoc = await _firestore.collection('tournaments').doc(chatRoom.tournamentId!).get();
+        if (tournamentDoc.exists) {
+          final tournament = TournamentModel.fromFirestore(tournamentDoc);
+          
+          // Extract the base title (everything before the participant count)
+          final titleParts = chatRoom.title.split(' (');
+          if (titleParts.length >= 3) {
+            final baseTitle = titleParts.sublist(0, titleParts.length - 1).join(' (');
+            // Create new title with updated participant count
+            updatedTitle = '$baseTitle (${newParticipantCount}/${tournament.totalSlots}명)';
+          }
+        }
+      }
+      
       // 채팅방 업데이트
       await _firestore.collection('chatRooms').doc(chatRoomId).update({
         'participantIds': updatedParticipantIds,
         'participantNames': updatedParticipantNames,
         'participantProfileImages': updatedParticipantProfileImages,
         'unreadCount': updatedUnreadCount,
+        'participantCount': newParticipantCount,
+        'title': updatedTitle,
       });
       
-      debugPrint('Added user $userId to chat room $chatRoomId');
+      debugPrint('Added user $userId to chat room $chatRoomId, new participant count: $newParticipantCount');
+      
+      // Send system message about new participant
+      final message = MessageModel(
+        id: '',
+        chatRoomId: chatRoomId,
+        senderId: 'system',
+        senderName: '시스템',
+        senderProfileImageUrl: null,
+        text: '$userName님이 채팅방에 참가했습니다.',
+        readStatus: {},
+        timestamp: Timestamp.now(),
+      );
+      
+      final messageRef = await _firestore.collection('messages').add(message.toFirestore());
+      
+      // Update chat room with last message
+      await _firestore.collection('chatRooms').doc(chatRoomId).update({
+        'lastMessageText': message.text,
+        'lastMessageTime': message.timestamp,
+      });
+      
+      debugPrint('Sent system message about new participant: ${messageRef.id}');
     } catch (e) {
       debugPrint('Error adding participant to chat room: $e');
       throw e;

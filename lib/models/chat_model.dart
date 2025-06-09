@@ -18,6 +18,7 @@ class ChatRoomModel {
   final ChatRoomType type;
   final String? tournamentId;
   final Timestamp createdAt;
+  final int participantCount; // Number of participants
 
   ChatRoomModel({
     required this.id,
@@ -31,6 +32,7 @@ class ChatRoomModel {
     required this.type,
     this.tournamentId,
     required this.createdAt,
+    this.participantCount = 0, // Default to 0 if not provided
   });
 
   factory ChatRoomModel.fromFirestore(DocumentSnapshot doc) {
@@ -83,6 +85,7 @@ class ChatRoomModel {
       type: ChatRoomType.values[data['type'] ?? 0],
       tournamentId: data['tournamentId'],
       createdAt: data['createdAt'] ?? Timestamp.now(),
+      participantCount: data['participantCount'] ?? participantIds.length, // Use length as fallback
     );
   }
 
@@ -98,6 +101,7 @@ class ChatRoomModel {
       'type': type.index,
       'tournamentId': tournamentId,
       'createdAt': createdAt,
+      'participantCount': participantCount,
     };
   }
 
@@ -113,6 +117,7 @@ class ChatRoomModel {
     ChatRoomType? type,
     String? tournamentId,
     Timestamp? createdAt,
+    int? participantCount,
   }) {
     return ChatRoomModel(
       id: id ?? this.id,
@@ -126,6 +131,7 @@ class ChatRoomModel {
       type: type ?? this.type,
       tournamentId: tournamentId ?? this.tournamentId,
       createdAt: createdAt ?? this.createdAt,
+      participantCount: participantCount ?? this.participantCount,
     );
   }
 }
