@@ -160,14 +160,8 @@ class AppRouter {
         parentNavigatorKey: _rootNavigatorKey,
         pageBuilder: (context, state) {
           final chatId = state.pathParameters['id']!;
-          return CustomTransitionPage(
+          return NoTransitionPage(
             child: ChatRoomScreen(chatRoomId: chatId),
-            transitionsBuilder: (context, animation, secondaryAnimation, child) {
-              return FadeTransition(
-                opacity: animation,
-                child: child,
-              );
-            },
           );
         },
       ),

@@ -16,14 +16,31 @@ import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:lol_custom_game_manager/widgets/tournament_card_simplified.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_screen.dart';
 import 'package:lol_custom_game_manager/widgets/lane_icon_widget.dart';
+import 'dart:async';
 
 class MatchListTab extends StatefulWidget {
   final DateTime? selectedDate;
+  final TabController? externalTabController; // 외부에서 전달된 TabController
   
   const MatchListTab({
     Key? key,
     this.selectedDate,
+    this.externalTabController,
   }) : super(key: key);
+  
+  // 탭바 위젯을 반환하는 정적 메서드 (외부에서 사용 가능)
+  static Widget buildTabBar(TabController controller) {
+    return TabBar(
+      controller: controller,
+      labelColor: AppColors.primary,
+      unselectedLabelColor: Colors.grey,
+      indicatorColor: AppColors.primary,
+      tabs: const [
+        Tab(text: '일반전'),
+        Tab(text: '경쟁전'),
+      ],
+    );
+  }
 
   @override
   State<MatchListTab> createState() => _MatchListTabState();
@@ -42,10 +59,31 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
   // Scroll controllers for pagination
   final ScrollController _scrollController = ScrollController();
 
+  // 필터 설정
+  final Map<String, dynamic> _filters = {
+    'tournamentType': TournamentType.casual.index,  // 명확한 기본값 설정
+    'showOnlyFuture': true, // 현재 시간 이후의 토너먼트만 표시
+  };
+  
+  // 디바운싱을 위한 타이머 추가
+  Timer? _debounceTimer;
+  DateTime? _lastLoadDate;
+  
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    // 외부에서 TabController가 전달되지 않은 경우에만 내부에서 생성
+    if (widget.externalTabController == null) {
+      _tabController = TabController(length: 2, vsync: this);
+      
+      // 탭 변경 리스너
+      _tabController.addListener(_handleTabChange);
+    } else {
+      _tabController = widget.externalTabController!;
+      
+      // 탭 변경 리스너
+      _tabController.addListener(_handleTabChange);
+    }
     
     // Set up scroll listeners for pagination
     _scrollController.addListener(() {
@@ -56,43 +94,67 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
       }
     });
     
-    // 탭 변경 리스너
-    _tabController.addListener(() {
-      setState(() {
-        // 필터 업데이트 - 명확한 TournamentType 사용
-        _filters['tournamentType'] = _tabController.index == 0 
-            ? TournamentType.casual.index 
-            : TournamentType.competitive.index;
-      });
-      
-      // 초기 데이터 로드
-      _loadTournaments();
-    });
-    
     // 초기 필터 설정
-    _filters['tournamentType'] = TournamentType.casual.index;
+    _filters['tournamentType'] = _tabController.index == 0 
+        ? TournamentType.casual.index 
+        : TournamentType.competitive.index;
     
     // 초기 데이터 로드
     _loadTournaments();
   }
   
   @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    
+    // 스크롤 리스너 설정 - ListView가 primary일 때는 PrimaryScrollController를 사용
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final primaryScrollController = PrimaryScrollController.of(context);
+      if (primaryScrollController != null) {
+        primaryScrollController.addListener(() {
+          if (primaryScrollController.position.pixels >= 
+              primaryScrollController.position.maxScrollExtent * 0.8 &&
+              !_isLoading &&
+              _tournaments.isNotEmpty) {
+            _loadMoreTournaments();
+          }
+        });
+      }
+    });
+  }
+  
+  @override
   void didUpdateWidget(MatchListTab oldWidget) {
     super.didUpdateWidget(oldWidget);
     
-    // 날짜가 변경되었으면 대회 목록 다시 로드
+    // 날짜가 변경되었으면 대회 목록 다시 로드 (디바운싱 적용)
     if (widget.selectedDate != oldWidget.selectedDate) {
-      _loadTournaments();
+      // 이전 타이머가 있으면 취소
+      _debounceTimer?.cancel();
+      
+      // 새 타이머 설정 (300ms 지연)
+      _debounceTimer = Timer(const Duration(milliseconds: 300), () {
+        _loadTournaments();
+      });
     }
   }
 
-  // 필터 설정
-  final Map<String, dynamic> _filters = {
-    'tournamentType': TournamentType.casual.index,  // 명확한 기본값 설정
-    'showOnlyFuture': true, // 현재 시간 이후의 토너먼트만 표시
-  };
-  
   Future<void> _loadTournaments() async {
+    // 이미 같은 날짜로 로드 중이면 중복 로드 방지
+    if (_isLoading) return;
+    
+    // 선택한 날짜가 마지막으로 로드한 날짜와 같으면 중복 로드 방지
+    final selectedDate = widget.selectedDate ?? DateTime.now();
+    if (_lastLoadDate != null && 
+        _lastLoadDate!.year == selectedDate.year && 
+        _lastLoadDate!.month == selectedDate.month && 
+        _lastLoadDate!.day == selectedDate.day) {
+      return;
+    }
+    
+    // 마지막 로드 날짜 갱신
+    _lastLoadDate = selectedDate;
+    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
@@ -102,7 +164,7 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
       final tournamentService = Provider.of<TournamentService>(context, listen: false);
       
       // 날짜 필터 적용 - selectedDate가 없으면 오늘 날짜 사용
-      final DateTime filterDate = widget.selectedDate ?? DateTime.now();
+      final DateTime filterDate = selectedDate;
       final startDate = DateTime(filterDate.year, filterDate.month, filterDate.day);
       final endDate = DateTime(filterDate.year, filterDate.month, filterDate.day, 23, 59, 59);
       
@@ -113,22 +175,31 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
         filters: _filters,
       );
       
-      setState(() {
-        _tournaments = tournaments;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _tournaments = tournaments;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-        _errorMessage = '내전 목록을 불러오는 중 오류가 발생했습니다: $e';
-      });
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = '내전 목록을 불러오는 중 오류가 발생했습니다: $e';
+        });
+      }
     }
   }
   
   @override
   void dispose() {
     _scrollController.dispose();
-    _tabController.dispose();
+    // 내부에서 생성한 TabController만 dispose
+    if (widget.externalTabController == null) {
+      _tabController.removeListener(_handleTabChange);
+      _tabController.dispose();
+    }
+    _debounceTimer?.cancel();
     super.dispose();
   }
 
@@ -170,33 +241,11 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: Column(
-        children: [
-          _buildTabBar(),
-          Expanded(
-            child: TabBarView(
-              controller: _tabController,
-              children: [
-                _buildTournamentsList(),
-                _buildTournamentsList(),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildTabBar() {
-    return TabBar(
+    return TabBarView(
       controller: _tabController,
-      labelColor: AppColors.primary,
-      unselectedLabelColor: Colors.grey,
-      indicatorColor: AppColors.primary,
-      tabs: const [
-        Tab(text: '일반전'),
-        Tab(text: '경쟁전'),
+      children: [
+        _buildTournamentsList(),
+        _buildTournamentsList(),
       ],
     );
   }
@@ -220,7 +269,7 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     return RefreshIndicator(
       onRefresh: _loadTournaments,
       child: ListView.builder(
-        controller: _scrollController,
+        primary: true,
         itemCount: _tournaments.length + (_isLoading ? 1 : 0),
         padding: const EdgeInsets.all(16),
         itemBuilder: (context, index) {
@@ -538,6 +587,21 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
         return AppColors.textSecondary;
       case TournamentStatus.cancelled:
         return AppColors.error;
+    }
+  }
+
+  // 탭 변경 리스너 처리 메서드
+  void _handleTabChange() {
+    if (_tabController.indexIsChanging) {
+      setState(() {
+        // 필터 업데이트 - 명확한 TournamentType 사용
+        _filters['tournamentType'] = _tabController.index == 0 
+            ? TournamentType.casual.index 
+            : TournamentType.competitive.index;
+      });
+      
+      // 데이터 로드
+      _loadTournaments();
     }
   }
 } 

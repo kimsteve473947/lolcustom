@@ -56,6 +56,7 @@ class TournamentMainScreen extends StatefulWidget {
 
 class _TournamentMainScreenState extends State<TournamentMainScreen> with TickerProviderStateMixin {
   late TabController _mainTabController;
+  late TabController _matchTypeTabController; // 일반전/경쟁전 탭 컨트롤러 추가
   final PageController _pageController = PageController(initialPage: 0, viewportFraction: 0.95);
   Timer? _autoSlideTimer;
   int _currentCarouselIndex = 0;
@@ -92,6 +93,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
   void initState() {
     super.initState();
     _mainTabController = TabController(length: 3, vsync: this);
+    _matchTypeTabController = TabController(length: 2, vsync: this); // 일반전/경쟁전 탭 컨트롤러 초기화
     _mainTabController.addListener(_handleTabChange);
     _setupDates();
     _startAutoSlide();
@@ -115,6 +117,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
   void dispose() {
     _mainTabController.removeListener(_handleTabChange);
     _mainTabController.dispose();
+    _matchTypeTabController.dispose(); // 일반전/경쟁전 탭 컨트롤러 해제
     _pageController.dispose();
     _autoSlideTimer?.cancel();
     super.dispose();
@@ -211,59 +214,81 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
       body: NestedScrollView(
         headerSliverBuilder: (context, innerBoxIsScrolled) {
           return [
-            SliverToBoxAdapter(
-              child: Column(
-                children: [
-                  // 메인 탭 바 (개인전/클랜전/용병 찾기)
-                  Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      border: Border(
-                        bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1),
-                      ),
-                    ),
-                    child: TabBar(
-                      controller: _mainTabController,
-                      indicatorColor: AppColors.primary,
-                      indicatorWeight: 3,
-                      labelColor: AppColors.primary,
-                      unselectedLabelColor: Colors.grey,
-                      tabs: const [
-                        Tab(text: '개인전'),
-                        Tab(text: '클랜전'),
-                        Tab(text: '용병 찾기'),
-                      ],
+            // 메인 탭 바 (개인전/클랜전/용병 찾기) - 스크롤 시 사라짐
+            SliverAppBar(
+              pinned: false, // 스크롤 시 사라짐
+              floating: true,
+              automaticallyImplyLeading: false,
+              backgroundColor: Colors.white,
+              elevation: 0,
+              toolbarHeight: 0,
+              bottom: PreferredSize(
+                preferredSize: const Size.fromHeight(kToolbarHeight),
+                child: Container(
+                  decoration: const BoxDecoration(
+                    color: Colors.white,
+                    border: Border(
+                      bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1),
                     ),
                   ),
-                  
-                  // 프로모션 카드 영역 (Carousel)
-                  _buildPromotionCarousel(),
-                  
-                  // 날짜 선택기 (Date Selector) - 용병 찾기 탭에서는 표시하지 않음
-                  if (_currentTabIndex != 2)
-                    _buildDateSelector(),
-                ],
+                  child: TabBar(
+                    controller: _mainTabController,
+                    indicatorColor: AppColors.primary,
+                    indicatorWeight: 3,
+                    labelColor: AppColors.primary,
+                    unselectedLabelColor: Colors.grey,
+                    tabs: const [
+                      Tab(text: '개인전'),
+                      Tab(text: '클랜전'),
+                      Tab(text: '용병 찾기'),
+                    ],
+                  ),
+                ),
               ),
             ),
+            
+            // 프로모션 카드 영역 (Carousel) - 스크롤 시 사라짐
+            SliverToBoxAdapter(
+              child: _buildPromotionCarousel(),
+            ),
+            
+            // 날짜 선택기 - 용병 찾기 탭에서는 표시하지 않음 (고정)
+            if (_currentTabIndex != 2)
+              SliverPersistentHeader(
+                delegate: _SliverAppBarDelegate(
+                  minHeight: 80,
+                  maxHeight: 80,
+                  child: _buildDateSelector(),
+                ),
+                pinned: true,
+              ),
+            
+            // 일반전/경쟁전 탭바 (날짜 선택기 아래에 고정)
+            if (_currentTabIndex != 2)
+              SliverPersistentHeader(
+                delegate: _SliverAppBarDelegate(
+                  minHeight: 48,
+                  maxHeight: 48,
+                  child: Container(
+                    color: Colors.white,
+                    child: _buildMatchTypeTabBar(),
+                  ),
+                ),
+                pinned: true,
+              ),
           ];
         },
-        body: Column(
+        body: TabBarView(
+          controller: _mainTabController,
           children: [
-            Expanded(
-              child: TabBarView(
-                controller: _mainTabController,
-                children: [
-                  // 개인전 탭
-                  MatchListTab(selectedDate: _selectedDate),
-                  
-                  // 클랜전 탭
-                  const ClanBattlesTab(),
-                  
-                  // 용병 찾기 탭
-                  const MercenarySearchTab(),
-                ],
-              ),
-            ),
+            // 개인전 탭
+            _buildMatchListContent(),
+            
+            // 클랜전 탭
+            const ClanBattlesTab(),
+            
+            // 용병 찾기 탭
+            const MercenarySearchTab(),
           ],
         ),
       ),
@@ -276,6 +301,19 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add),
       ) : null,
+    );
+  }
+  
+  // 일반전/경쟁전 탭바를 생성하는 메서드
+  Widget _buildMatchTypeTabBar() {
+    return MatchListTab.buildTabBar(_matchTypeTabController);
+  }
+  
+  // 매치 리스트 내용을 표시하는 새로운 메서드
+  Widget _buildMatchListContent() {
+    return MatchListTab(
+      selectedDate: _selectedDate,
+      externalTabController: _matchTypeTabController,
     );
   }
   
@@ -453,5 +491,36 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
     return date.year == now.year && 
            date.month == now.month && 
            date.day == now.day;
+  }
+}
+
+// SliverPersistentHeader를 위한 Delegate 클래스 추가
+class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
+  final double minHeight;
+  final double maxHeight;
+  final Widget child;
+
+  _SliverAppBarDelegate({
+    required this.minHeight,
+    required this.maxHeight,
+    required this.child,
+  });
+
+  @override
+  double get minExtent => minHeight;
+
+  @override
+  double get maxExtent => maxHeight;
+
+  @override
+  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
+    return SizedBox.expand(child: child);
+  }
+
+  @override
+  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
+    return maxHeight != oldDelegate.maxHeight ||
+        minHeight != oldDelegate.minHeight ||
+        child != oldDelegate.child;
   }
 }

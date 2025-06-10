@@ -41,22 +41,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
   void initState() {
     super.initState();
     
-    // Initialize animation controller
+    // Initialize animation controller (간소화된 애니메이션 설정)
     _animationController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 200),
     );
     
     _slideAnimation = Tween<Offset>(
-      begin: const Offset(1.0, 0.0),
+      begin: Offset.zero,
       end: Offset.zero,
     ).animate(CurvedAnimation(
       parent: _animationController,
       curve: Curves.easeOut,
     ));
     
-    // Start entry animation
-    _animationController.forward();
+    // 애니메이션 즉시 완료
+    _animationController.value = 1.0;
     
     _loadChatRoom();
     
@@ -276,13 +276,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
     }
   }
   
-  // 뒤로 가기 애니메이션과 함께 이동
+  // 뒤로 가기 - 애니메이션 없이 즉시 이동
   void _navigateBack() {
-    _animationController.reverse().then((_) {
-      if (mounted) {
-        context.go('/chat');
-      }
-    });
+    if (mounted) {
+      context.go('/chat');
+    }
   }
 
   // 채팅방 멤버 목록 모달 표시
@@ -597,187 +595,184 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
         _navigateBack();
         return false;
       },
-      child: SlideTransition(
-        position: _slideAnimation,
-        child: Scaffold(
-          appBar: AppBar(
-            leading: IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new),
-              onPressed: _navigateBack,
-            ),
-            title: _chatRoom != null
-                ? Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        _chatRoom!.title,
-                        style: const TextStyle(fontSize: 16),
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                      if (_chatRoom!.tournamentId != null)
-                        Text(
-                          '참가자: ${_getParticipantCountDisplay()}',
-                          style: const TextStyle(fontSize: 12),
-                        ),
-                    ],
-                  )
-                : const Text('채팅방'),
-            backgroundColor: AppColors.primary,
-            foregroundColor: Colors.white,
-            elevation: 0,
-            actions: [
-              // 멤버 보기 버튼
-              IconButton(
-                icon: const Icon(Icons.people),
-                onPressed: _showMembersModal,
-                tooltip: '멤버 보기',
-              ),
-              // 토너먼트 정보 버튼 (토너먼트 채팅방인 경우)
-              if (_chatRoom?.tournamentId != null)
-                IconButton(
-                  icon: const Icon(Icons.sports_esports),
-                  onPressed: () => _viewTournament(_chatRoom!.tournamentId!),
-                  tooltip: '토너먼트 보기',
-                ),
-              // 채팅방 나가기 버튼
-              IconButton(
-                icon: const Icon(Icons.exit_to_app),
-                onPressed: _leaveChatRoom,
-                tooltip: '채팅방 나가기',
-              ),
-            ],
+      child: Scaffold(
+        appBar: AppBar(
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back_ios_new),
+            onPressed: _navigateBack,
           ),
-          body: _isLoading
-              ? const LoadingIndicator()
-              : _errorMessage != null
-                  ? ErrorView(
-                      errorMessage: _errorMessage!,
-                      onRetry: _loadChatRoom,
-                    )
-                  : Container(
-                      decoration: BoxDecoration(
-                        color: Colors.grey.shade100,
-                        gradient: LinearGradient(
-                          begin: Alignment.topCenter,
-                          end: Alignment.bottomCenter,
-                          colors: [
-                            Colors.grey.shade50,
-                            Colors.grey.shade100,
-                          ],
-                        ),
+          title: _chatRoom != null
+              ? Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _chatRoom!.title,
+                      style: const TextStyle(fontSize: 16),
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    if (_chatRoom!.tournamentId != null)
+                      Text(
+                        '참가자: ${_getParticipantCountDisplay()}',
+                        style: const TextStyle(fontSize: 12),
                       ),
-                      child: Column(
-                        children: [
-                          // 메시지 목록
-                          Expanded(
-                            child: Consumer<ChatProvider>(
-                              builder: (context, chatProvider, child) {
-                                final messages = chatProvider.messages[widget.chatRoomId] ?? _messages;
-                                
-                                return ListView.builder(
-                                  controller: _scrollController,
-                                  reverse: true,
-                                  padding: const EdgeInsets.all(12),
-                                  itemCount: messages.length,
-                                  itemBuilder: (context, index) {
-                                    final message = messages[index];
-                                    final isCurrentUser = message.senderId ==
-                                        Provider.of<AppStateProvider>(context, listen: false)
-                                            .currentUser
-                                            ?.uid;
-                                    final isSystemMessage = message.senderId == 'system';
-                                    
-                                    return _buildMessageItem(
-                                      message,
-                                      isCurrentUser,
-                                      isSystemMessage,
-                                    );
-                                  },
-                                );
-                              },
-                            ),
-                          ),
-                          
-                          // 메시지 입력 영역
-                          Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              boxShadow: [
-                                BoxShadow(
-                                  offset: const Offset(0, -1),
-                                  blurRadius: 3,
-                                  color: Colors.black.withOpacity(0.1),
-                                ),
-                              ],
-                            ),
-                            child: SafeArea(
-                              child: Row(
-                                children: [
-                                  // 메시지 입력 필드
-                                  Expanded(
-                                    child: Container(
-                                      decoration: BoxDecoration(
-                                        color: Colors.grey.shade100,
-                                        borderRadius: BorderRadius.circular(24),
-                                      ),
-                                      child: TextField(
-                                        controller: _messageController,
-                                        decoration: InputDecoration(
-                                          hintText: '메시지 입력...',
-                                          hintStyle: TextStyle(color: Colors.grey.shade500),
-                                          border: InputBorder.none,
-                                          contentPadding: const EdgeInsets.symmetric(
-                                            horizontal: 16,
-                                            vertical: 10,
-                                          ),
-                                        ),
-                                        minLines: 1,
-                                        maxLines: 5,
-                                        textInputAction: TextInputAction.send,
-                                        onSubmitted: (_) => _sendMessage(),
-                                      ),
-                                    ),
-                                  ),
-                                  
-                                  const SizedBox(width: 8),
-                                  
-                                  // 전송 버튼
-                                  Material(
-                                    color: AppColors.primary,
-                                    borderRadius: BorderRadius.circular(24),
-                                    child: InkWell(
-                                      onTap: _isSending ? null : _sendMessage,
-                                      borderRadius: BorderRadius.circular(24),
-                                      child: Container(
-                                        width: 48,
-                                        height: 48,
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(24),
-                                        ),
-                                        child: _isSending
-                                            ? const Padding(
-                                                padding: EdgeInsets.all(12),
-                                                child: CircularProgressIndicator(
-                                                  strokeWidth: 2,
-                                                  color: Colors.white,
-                                                ),
-                                              )
-                                            : const Icon(
-                                                Icons.send,
-                                                color: Colors.white,
-                                              ),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          ),
+                  ],
+                )
+              : const Text('채팅방'),
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          actions: [
+            // 멤버 보기 버튼
+            IconButton(
+              icon: const Icon(Icons.people),
+              onPressed: _showMembersModal,
+              tooltip: '멤버 보기',
+            ),
+            // 토너먼트 정보 버튼 (토너먼트 채팅방인 경우)
+            if (_chatRoom?.tournamentId != null)
+              IconButton(
+                icon: const Icon(Icons.sports_esports),
+                onPressed: () => _viewTournament(_chatRoom!.tournamentId!),
+                tooltip: '토너먼트 보기',
+              ),
+            // 채팅방 나가기 버튼
+            IconButton(
+              icon: const Icon(Icons.exit_to_app),
+              onPressed: _leaveChatRoom,
+              tooltip: '채팅방 나가기',
+            ),
+          ],
+        ),
+        body: _isLoading
+            ? const LoadingIndicator()
+            : _errorMessage != null
+                ? ErrorView(
+                    errorMessage: _errorMessage!,
+                    onRetry: _loadChatRoom,
+                  )
+                : Container(
+                    decoration: BoxDecoration(
+                      color: Colors.grey.shade100,
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.grey.shade50,
+                          Colors.grey.shade100,
                         ],
                       ),
                     ),
-        ),
+                    child: Column(
+                      children: [
+                        // 메시지 목록
+                        Expanded(
+                          child: Consumer<ChatProvider>(
+                            builder: (context, chatProvider, child) {
+                              final messages = chatProvider.messages[widget.chatRoomId] ?? _messages;
+                              
+                              return ListView.builder(
+                                controller: _scrollController,
+                                reverse: true,
+                                padding: const EdgeInsets.all(12),
+                                itemCount: messages.length,
+                                itemBuilder: (context, index) {
+                                  final message = messages[index];
+                                  final isCurrentUser = message.senderId ==
+                                      Provider.of<AppStateProvider>(context, listen: false)
+                                          .currentUser
+                                          ?.uid;
+                                  final isSystemMessage = message.senderId == 'system';
+                                  
+                                  return _buildMessageItem(
+                                    message,
+                                    isCurrentUser,
+                                    isSystemMessage,
+                                  );
+                                },
+                              );
+                            },
+                          ),
+                        ),
+                        
+                        // 메시지 입력 영역
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8.0, vertical: 8.0),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            boxShadow: [
+                              BoxShadow(
+                                offset: const Offset(0, -1),
+                                blurRadius: 3,
+                                color: Colors.black.withOpacity(0.1),
+                              ),
+                            ],
+                          ),
+                          child: SafeArea(
+                            child: Row(
+                              children: [
+                                // 메시지 입력 필드
+                                Expanded(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      color: Colors.grey.shade100,
+                                      borderRadius: BorderRadius.circular(24),
+                                    ),
+                                    child: TextField(
+                                      controller: _messageController,
+                                      decoration: InputDecoration(
+                                        hintText: '메시지 입력...',
+                                        hintStyle: TextStyle(color: Colors.grey.shade500),
+                                        border: InputBorder.none,
+                                        contentPadding: const EdgeInsets.symmetric(
+                                          horizontal: 16,
+                                          vertical: 10,
+                                        ),
+                                      ),
+                                      minLines: 1,
+                                      maxLines: 5,
+                                      textInputAction: TextInputAction.send,
+                                      onSubmitted: (_) => _sendMessage(),
+                                    ),
+                                  ),
+                                ),
+                                
+                                const SizedBox(width: 8),
+                                
+                                // 전송 버튼
+                                Material(
+                                  color: AppColors.primary,
+                                  borderRadius: BorderRadius.circular(24),
+                                  child: InkWell(
+                                    onTap: _isSending ? null : _sendMessage,
+                                    borderRadius: BorderRadius.circular(24),
+                                    child: Container(
+                                      width: 48,
+                                      height: 48,
+                                      decoration: BoxDecoration(
+                                        borderRadius: BorderRadius.circular(24),
+                                      ),
+                                      child: _isSending
+                                          ? const Padding(
+                                              padding: EdgeInsets.all(12),
+                                              child: CircularProgressIndicator(
+                                                strokeWidth: 2,
+                                                color: Colors.white,
+                                              ),
+                                            )
+                                          : const Icon(
+                                              Icons.send,
+                                              color: Colors.white,
+                                            ),
+                                    ),
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
       ),
     );
   }
@@ -791,6 +786,58 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
     
     // 시스템 메시지
     if (isSystemMessage) {
+      debugPrint('System message: ${message.text}');
+      debugPrint('System message metadata: ${message.metadata}');
+      
+      // 원본 메시지 텍스트
+      String displayText = message.text;
+      
+      try {
+        // 참가 메시지 처리
+        if (displayText.contains('님이 채팅방에 참가했습니다')) {
+          // 1. 메타데이터에서 역할 정보 확인
+          String? role;
+          int? currentCount;
+          int? totalSlots;
+          
+          if (message.metadata != null) {
+            role = message.metadata!['role'] as String?;
+            currentCount = message.metadata!['currentCount'] as int?;
+            totalSlots = message.metadata!['totalSlots'] as int?;
+            debugPrint('Found metadata - role: $role, currentCount: $currentCount, totalSlots: $totalSlots');
+          }
+          
+          // 2. 닉네임 추출
+          final nicknameEndIndex = displayText.indexOf('님이 채팅방에 참가했습니다');
+          if (nicknameEndIndex > 0) {
+            final nickname = displayText.substring(0, nicknameEndIndex);
+            
+            // 3. 역할 정보 추가
+            if (role != null && role != 'unknown') {
+              final roleDisplayName = _getRoleNameKorean(role);
+              displayText = "$nickname[$roleDisplayName]님이 채팅방에 참가했습니다";
+              debugPrint('Added role to message: $displayText');
+            }
+            
+            // 4. 인원수 추가
+            // 메타데이터의 인원수 사용
+            if (currentCount != null && totalSlots != null) {
+              displayText = "$displayText ($currentCount/$totalSlots)";
+              debugPrint('Added count from metadata: $displayText');
+            } 
+            // 토너먼트 정보에서 인원수 가져오기
+            else if (_tournament != null) {
+              final tCurrentCount = _tournament!.participants.length;
+              final tTotalSlots = _tournament!.totalSlots;
+              displayText = "$displayText ($tCurrentCount/$tTotalSlots)";
+              debugPrint('Added count from tournament: $displayText');
+            }
+          }
+        }
+      } catch (e) {
+        debugPrint('Error processing system message: $e');
+      }
+      
       return Container(
         margin: const EdgeInsets.symmetric(vertical: 16.0),
         child: Center(
@@ -801,7 +848,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
               borderRadius: BorderRadius.circular(16.0),
             ),
             child: Text(
-              message.text,
+              displayText,
               style: const TextStyle(
                 fontSize: 12,
                 color: Colors.white,
