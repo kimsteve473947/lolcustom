@@ -152,6 +152,58 @@ class ChatService {
     await _updateChatRoomTitle(chatRoomId, tournament, participantCount);
   }
 
+  /// 사용자가 토너먼트 채팅방에 참가할 때 처리합니다.
+  Future<void> joinTournamentChatRoom(
+    String chatRoomId,
+    String tournamentId,
+    UserModel user,
+    String userRole, // 사용자 역할 (top, jungle, mid, adc, support)
+  ) async {
+    // 채팅방 정보 가져오기
+    final chatRoomDoc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
+    if (!chatRoomDoc.exists) {
+      throw Exception('채팅방을 찾을 수 없습니다.');
+    }
+    
+    final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
+    
+    // 토너먼트 정보 가져오기
+    final tournamentDoc = await _firestore.collection('tournaments').doc(tournamentId).get();
+    if (!tournamentDoc.exists) {
+      throw Exception('토너먼트 정보를 찾을 수 없습니다.');
+    }
+    
+    final tournament = TournamentModel.fromFirestore(tournamentDoc);
+    
+    // 이미 참가자인 경우 추가 작업 불필요
+    if (chatRoom.participantIds.contains(user.uid)) return;
+    
+    // 참가자 정보 업데이트
+    await _firestore.collection('chatRooms').doc(chatRoomId).update({
+      'participantIds': FieldValue.arrayUnion([user.uid]),
+      'participantNames.${user.uid}': user.nickname,
+      'participantProfileImages.${user.uid}': user.profileImageUrl,
+      'unreadCount.${user.uid}': 0,
+    });
+    
+    // 시스템 메시지 전송 (참가자 입장 알림)
+    final participantCount = chatRoom.participantIds.length + 1;
+    await _sendSystemMessage(
+      chatRoomId,
+      "${user.nickname}[${_getRoleDisplayName(userRole)}]님이 채팅방에 참가했습니다. ($participantCount/${tournament.totalSlots})",
+      metadata: {
+        'isSystem': true,
+        'action': 'join',
+        'role': userRole,
+        'currentCount': participantCount,
+        'totalSlots': tournament.totalSlots,
+      },
+    );
+    
+    // 채팅방 제목 업데이트 (참가자 수 반영)
+    await _updateChatRoomTitle(chatRoomId, tournament, participantCount);
+  }
+
   /// 사용자가 채팅방을 나갈 때 처리합니다.
   Future<void> leaveTournamentChatRoom(
     String chatRoomId,
@@ -191,12 +243,19 @@ class ChatService {
       }
       
       final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
-      final newParticipantCount = chatRoom.participantIds.length - 1;
+      final newParticipantCount = chatRoom.participantIds.length;
       
       // 4. 시스템 메시지 전송 (참가자 퇴장 알림)
       await _sendSystemMessage(
         chatRoomId,
         "${user.nickname}[${_getRoleDisplayName(userRole)}]님이 방을 나갔습니다. ($newParticipantCount/${tournament.totalSlots})",
+        metadata: {
+          'isSystem': true,
+          'action': 'leave',
+          'role': userRole,
+          'currentCount': newParticipantCount,
+          'totalSlots': tournament.totalSlots,
+        },
       );
       
       // 5. 채팅방 제목 업데이트 (참가자 수 반영)
@@ -240,7 +299,16 @@ class ChatService {
   }
 
   /// 시스템 메시지를 전송합니다.
-  Future<void> _sendSystemMessage(String chatRoomId, String content) async {
+  Future<void> _sendSystemMessage(
+    String chatRoomId, 
+    String content, 
+    {Map<String, dynamic>? metadata}
+  ) async {
+    final defaultMetadata = {'isSystem': true};
+    final finalMetadata = metadata != null 
+        ? {...defaultMetadata, ...metadata} 
+        : defaultMetadata;
+    
     final message = MessageModel(
       id: '',
       chatRoomId: chatRoomId,
@@ -249,7 +317,7 @@ class ChatService {
       text: content,
       readStatus: {},
       timestamp: Timestamp.now(),
-      metadata: {'isSystem': true},
+      metadata: finalMetadata,
     );
     
     await _firebaseService.sendMessage(message);

@@ -10,6 +10,7 @@ import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:provider/provider.dart';
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
+import 'package:intl/intl.dart';
 
 class ChatProvider extends ChangeNotifier {
   final ChatService _chatService;
@@ -371,13 +372,31 @@ class ChatProvider extends ChangeNotifier {
           chatRoomId: chatRoomId,
           senderId: 'system',
           senderName: '시스템',
-          text: '${user.nickname}님(주최자)이 채팅방을 나갔습니다.',
+          text: '${user.nickname}[주최자]님이 방을 나갔습니다. (${chatRoom.participantIds.length - 1}/${tournament.totalSlots})',
           readStatus: {},
           timestamp: Timestamp.now(),
-          metadata: {'isSystem': true},
+          metadata: {
+            'isSystem': true,
+            'action': 'leave',
+            'role': 'host',
+            'currentCount': chatRoom.participantIds.length - 1,
+            'totalSlots': tournament.totalSlots,
+          },
         );
         
         await _firebaseService.sendMessage(message);
+        
+        // 채팅방 제목 업데이트
+        final startDateTime = tournament.startsAt.toDate();
+        final formattedDate = DateFormat('MM.dd HH:mm').format(startDateTime);
+        final newParticipantCount = chatRoom.participantIds.length - 1;
+        final chatRoomTitle = 
+            "${tournament.title} – $formattedDate ($newParticipantCount/${tournament.totalSlots})";
+        
+        await FirebaseFirestore.instance.collection('chatRooms').doc(chatRoomId).update({
+          'title': chatRoomTitle,
+          'participantCount': newParticipantCount,
+        });
         
         // 채팅방 목록 다시 로드
         await loadUserChatRooms(user.uid);

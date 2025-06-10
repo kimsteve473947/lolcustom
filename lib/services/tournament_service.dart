@@ -8,6 +8,7 @@ import 'package:lol_custom_game_manager/services/firebase_service.dart';
 import 'package:lol_custom_game_manager/services/firebase_messaging_service.dart';
 import 'package:uuid/uuid.dart';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 
 class TournamentService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -438,7 +439,7 @@ class TournamentService {
       // 채팅방 모델 생성
       final chatRoom = ChatRoomModel(
         id: tournamentId, // 토너먼트 ID를 채팅방 ID로 사용
-        title: '${tournament.title} (${_formatDate(tournament.startsAt.toDate())}) (0/${tournament.totalSlots}명)',
+        title: '${tournament.title}', // 임시 제목 (나중에 업데이트됨)
         participantIds: participantIds,
         participantNames: participantNames,
         participantProfileImages: participantProfileImages,
@@ -457,6 +458,9 @@ class TournamentService {
       // 채팅방 문서를 tournamentId로 직접 생성
       await FirebaseFirestore.instance.collection('chatRooms').doc(tournamentId).set(chatRoom.toFirestore());
       debugPrint('채팅방 문서 생성 완료, ID: $tournamentId');
+      
+      // 채팅방 제목 업데이트 - 참가자 수 정확히 반영
+      await _updateChatRoomTitle(tournamentId, 0, tournamentId); // 0은 무시되고 실제 참가자 수가 사용됨
       
       // 시스템 메시지 전송
       await _sendSystemMessage(
@@ -487,7 +491,7 @@ class TournamentService {
   }
 
   // 채팅방에 참가자 추가
-  Future<void> _addParticipantToChatRoom(String tournamentId, String userId) async {
+  Future<void> _addParticipantToChatRoom(String tournamentId, String userId, {String? role, bool sendSystemMessage = true}) async {
     try {
       // 사용자 정보 가져오기
       final user = await _firebaseService.getUserById(userId);
@@ -519,12 +523,8 @@ class TournamentService {
       }
       final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
       
-      // 채팅방 제목 업데이트 - 참가자 수 반영
-      final currentParticipants = tournament.participants.length;
-      final title = '${tournament.title} (${_formatDate(tournament.startsAt.toDate())}) (${currentParticipants}/${tournament.totalSlots}명)';
-      await _firestore.collection('chatRooms').doc(chatRoomId).update({
-        'title': title
-      });
+      // 채팅방 제목 업데이트 - 새로 생성한 _updateChatRoomTitle 메서드 사용
+      await _updateChatRoomTitle(chatRoomId, 0, tournamentId); // 0은 무시되고 실제 참가자 수가 사용됨
 
       // 채팅방에 참가자 추가
       await _firebaseService.addParticipantToChatRoom(
@@ -534,47 +534,102 @@ class TournamentService {
         user.profileImageUrl,
       );
 
-      // 시스템 메시지 전송
-      await _sendSystemMessage(
-        chatRoomId,
-        '${user.nickname}님이 채팅방에 참가했습니다. (${currentParticipants}/${tournament.totalSlots}명)',
-      );
+      // 시스템 메시지 전송 옵션이 활성화된 경우에만 메시지 전송
+      if (sendSystemMessage) {
+        // 사용자 역할이 없는 경우 역할 찾기
+        String userRole = role ?? 'unknown';
+        if (userRole == 'unknown') {
+          // 토너먼트에서 사용자의 역할 찾기
+          for (final r in ['top', 'jungle', 'mid', 'adc', 'support']) {
+            final participants = tournament.participantsByRole[r] ?? [];
+            if (participants.contains(userId)) {
+              userRole = r;
+              break;
+            }
+          }
+        }
 
-      debugPrint('Added user $userId to chat room $chatRoomId');
+        // 역할 표시 이름 가져오기
+        final roleDisplayName = _getRoleDisplayName(userRole);
+        final currentParticipants = tournament.participants.length;
+        
+        debugPrint('_addParticipantToChatRoom: 직접 구현 - 시스템 메시지 전송: ${user.nickname}[$roleDisplayName], count: $currentParticipants/${tournament.totalSlots}');
+        
+        // 메시지 모델 직접 생성
+        final message = MessageModel(
+          id: '',
+          chatRoomId: chatRoomId,
+          senderId: 'system',
+          senderName: '시스템',
+          text: "${user.nickname}[$roleDisplayName]님이 채팅방에 참가했습니다. ($currentParticipants/${tournament.totalSlots})",
+          readStatus: {},
+          timestamp: Timestamp.now(),
+          metadata: {
+            'isSystem': true,
+            'action': 'join',
+            'role': userRole,
+            'currentCount': currentParticipants,
+            'totalSlots': tournament.totalSlots,
+          },
+        );
+
+        // 메시지 직접 전송
+        final messageId = await _firebaseService.sendMessage(message);
+        
+        debugPrint('_addParticipantToChatRoom: 직접 구현 - 시스템 메시지가 전송됨. 메시지 ID: $messageId, 메타데이터: ${message.metadata}');
+        
+        // 참가자 수 정보를 로그에 기록
+        debugPrint('Added user $userId to chat room $chatRoomId, new participant count: $currentParticipants');
+      } else {
+        // 시스템 메시지를 보내지 않는 경우에도 로그 기록
+        final participantCount = tournament.participants.length;
+        debugPrint('Added user $userId to chat room $chatRoomId, new participant count: $participantCount');
+      }
     } catch (e) {
       debugPrint('Error adding participant to chat room: $e');
     }
   }
 
   // 시스템 메시지 전송
-  Future<void> _sendSystemMessage(String chatRoomId, String content) async {
-    try {
-      debugPrint('시스템 메시지 전송 시작: $content');
-      
-      // 메시지 모델 생성
-      final message = {
-        'chatRoomId': chatRoomId,
-        'senderId': 'system',
-        'senderName': '시스템',
-        'text': content,
-        'readStatus': <String, bool>{},
-        'timestamp': Timestamp.now(),
-        'metadata': {'isSystem': true},
-      };
-      
-      // 메시지 직접 저장
-      final docRef = await FirebaseFirestore.instance.collection('messages').add(message);
-      debugPrint('시스템 메시지 저장 완료, ID: ${docRef.id}');
-      
-      // 채팅방 마지막 메시지 정보 업데이트
-      await FirebaseFirestore.instance.collection('chatRooms').doc(chatRoomId).update({
-        'lastMessageText': content,
-        'lastMessageTime': Timestamp.now(),
-      });
-      debugPrint('채팅방 마지막 메시지 정보 업데이트 완료');
-      
-    } catch (e) {
-      debugPrint('!!! 시스템 메시지 전송 중 오류 발생: $e !!!');
+  Future<void> _sendSystemMessage(
+    String chatRoomId, 
+    String content,
+    {Map<String, dynamic>? metadata}
+  ) async {
+    debugPrint('_sendSystemMessage: Preparing system message: "$content"');
+    debugPrint('_sendSystemMessage: Original metadata: $metadata');
+    
+    final defaultMetadata = {'isSystem': true};
+    final finalMetadata = metadata != null 
+        ? {...defaultMetadata, ...metadata} 
+        : defaultMetadata;
+    
+    debugPrint('_sendSystemMessage: Final metadata: $finalMetadata');
+    
+    final message = MessageModel(
+      id: '',
+      chatRoomId: chatRoomId,
+      senderId: 'system',
+      senderName: '시스템',
+      text: content,
+      readStatus: {},
+      timestamp: Timestamp.now(),
+      metadata: finalMetadata,
+    );
+    
+    final messageId = await _firebaseService.sendMessage(message);
+    debugPrint('_sendSystemMessage: Message sent with ID: $messageId, content: "$content"');
+  }
+
+  // 역할명을 표시용 문자열로 변환
+  String _getRoleDisplayName(String role) {
+    switch (role.toLowerCase()) {
+      case 'top': return '탑';
+      case 'jungle': return '정글';
+      case 'mid': return '미드';
+      case 'adc': return '원딜';
+      case 'support': return '서포터';
+      default: return role;
     }
   }
 
@@ -656,11 +711,11 @@ class TournamentService {
     }
   }
 
-  // 토너먼트 특정 라인 참가 (라인별 참가 시스템)
-  Future<void> joinTournamentByRole(String tournamentId, String role) async {
+  // 역할별 토너먼트 참가
+  Future<TournamentModel?> joinTournamentByRole(String tournamentId, String role) async {
     final userId = _auth.currentUser?.uid;
     if (userId == null) throw Exception('로그인이 필요합니다.');
-
+    
     try {
       // 트랜잭션을 통한 토너먼트 참가 처리
       bool isTournamentFull = false;
@@ -748,13 +803,54 @@ class TournamentService {
           await _firebaseService.findChatRoomByTournamentId(tournamentId);
 
       // 채팅방에 시스템 메시지 전송
-      if (chatRoomId != null) {
-        await _sendSystemMessage(chatRoomId, '$role 역할로 새로운 참가자가 참여했습니다.');
-
-        // 채팅방에 참가자 추가
-        await _addParticipantToChatRoom(tournamentId, userId);
+      if (chatRoomId != null && updatedTournament != null) {
+        final userDoc = await _firestore.collection('users').doc(userId).get();
+        if (userDoc.exists) {
+          final user = UserModel.fromFirestore(userDoc);
+          final roleDisplayName = _getRoleDisplayName(role);
+          
+          // null이 아님을 명시적으로 표시
+          final tournament = updatedTournament!;
+          final participantCount = tournament.participants.length;
+          final totalSlots = tournament.totalSlots;
+          
+          debugPrint('직접 구현: 새 참가자 시스템 메시지 전송: ${user.nickname}[$roleDisplayName], count: $participantCount/$totalSlots');
+          
+          // 메타데이터를 포함한 메시지 모델 직접 생성
+          final message = MessageModel(
+            id: '',
+            chatRoomId: chatRoomId,
+            senderId: 'system',
+            senderName: '시스템',
+            text: '${user.nickname}님이 채팅방에 참가했습니다.',
+            readStatus: {},
+            timestamp: Timestamp.now(),
+            metadata: {
+              'isSystem': true,
+              'action': 'join',
+              'role': role, // 역할 정보 추가
+              'currentCount': participantCount,
+              'totalSlots': totalSlots,
+            },
+          );
+          
+          // 메시지 직접 전송
+          final messageId = await _firebaseService.sendMessageDirectly(message);
+          debugPrint('Sent system message with role info: $messageId, role: $role');
+          
+          // _addParticipantToChatRoom 호출 시 메시지 중복 전송 방지
+          await _addParticipantToChatRoom(tournamentId, userId, role: role, sendSystemMessage: false);
+          
+          return updatedTournament;
+        }
       }
+      
+      // chatRoomId가 없거나 updatedTournament가 없는 경우
+      await _addParticipantToChatRoom(tournamentId, userId, role: role);
+      
+      return updatedTournament;
     } catch (e) {
+      debugPrint('Error joining tournament by role: $e');
       rethrow;
     }
   }
@@ -888,26 +984,89 @@ class TournamentService {
         'participantNames': updatedParticipantNames,
         'participantProfileImages': updatedParticipantProfileImages,
         'unreadCount': updatedUnreadCount,
+        'participantCount': updatedParticipantIds.length, // 참가자 수 업데이트 추가
       });
+      
+      // 사용자 역할 가져오기
+      String userRole = 'unknown';
+      final tournamentSnap = await _firestore.collection('tournaments').doc(tournamentId).get();
+      TournamentModel? tournament;
+      
+      if (tournamentSnap.exists) {
+        tournament = TournamentModel.fromFirestore(tournamentSnap);
+        for (final role in ['top', 'jungle', 'mid', 'adc', 'support']) {
+          final participants = tournament.participantsByRole[role] ?? [];
+          if (participants.contains(userId)) {
+            userRole = role;
+            break;
+          }
+        }
+      }
       
       // 시스템 메시지 전송
       final userDoc = await _firestore.collection('users').doc(userId).get();
-      if (userDoc.exists) {
+      if (userDoc.exists && tournament != null) {
         final user = UserModel.fromFirestore(userDoc);
+        final roleDisplayName = _getRoleDisplayName(userRole);
+        final remainingParticipantCount = updatedParticipantIds.length;
+        
         await _sendSystemMessage(
           chatRoomId,
-          '${user.nickname}님이 채팅방을 나갔습니다.',
+          "${user.nickname}[$roleDisplayName]님이 방을 나갔습니다. ($remainingParticipantCount/${tournament.totalSlots})",
+          metadata: {
+            'isSystem': true,
+            'action': 'leave',
+            'role': userRole,
+            'currentCount': remainingParticipantCount,
+            'totalSlots': tournament.totalSlots,
+          },
         );
       } else {
         await _sendSystemMessage(
           chatRoomId,
-          '참가자가 채팅방을 나갔습니다.',
+          "참가자가 채팅방을 나갔습니다.",
+          metadata: {
+            'isSystem': true,
+            'action': 'leave',
+          },
         );
       }
+      
+      // 채팅방 제목 업데이트
+      await _updateChatRoomTitle(chatRoomId, updatedParticipantIds.length, tournamentId);
       
       debugPrint('Removed user $userId from chat room $chatRoomId');
     } catch (e) {
       debugPrint('Error removing participant from chat room: $e');
+    }
+  }
+  
+  // 채팅방 제목 업데이트
+  Future<void> _updateChatRoomTitle(String chatRoomId, int participantCount, String tournamentId) async {
+    try {
+      final tournamentDoc = await _firestore.collection('tournaments').doc(tournamentId).get();
+      if (!tournamentDoc.exists) {
+        debugPrint('Tournament $tournamentId does not exist');
+        return;
+      }
+      
+      final tournament = TournamentModel.fromFirestore(tournamentDoc);
+      
+      // 전달받은 participantCount 사용 - 토너먼트 모델의 참가자 수가 아님
+      final startDateTime = tournament.startsAt.toDate();
+      final formattedDate = DateFormat('MM.dd HH:mm').format(startDateTime);
+      final chatRoomTitle = 
+          "${tournament.title} – $formattedDate ($participantCount/${tournament.totalSlots})";
+      
+      debugPrint('Updating chat room title with participant count: $participantCount/${tournament.totalSlots}');
+      debugPrint('New chat room title: $chatRoomTitle');
+      
+      await _firestore.collection('chatRooms').doc(chatRoomId).update({
+        'title': chatRoomTitle,
+        'participantCount': participantCount, // 전달받은 참가자 수 사용
+      });
+    } catch (e) {
+      debugPrint('Error updating chat room title: $e');
     }
   }
 
@@ -981,7 +1140,7 @@ class TournamentService {
           throw Exception('토너먼트를 찾을 수 없습니다.');
         }
 
-        // 토너먼트 모델로 변환
+        // 토너먼트 데이터 파싱
         final tournament = TournamentModel.fromFirestore(docSnapshot);
 
         // 본인이 주최자인지 확인

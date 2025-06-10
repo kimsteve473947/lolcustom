@@ -449,8 +449,21 @@ class FirebaseService {
 
   Future<String> sendMessage(MessageModel message) async {
     try {
+      debugPrint('FirebaseService.sendMessage: Sending message: "${message.text}"');
+      debugPrint('FirebaseService.sendMessage: Message metadata: ${message.metadata}');
+      
+      // 메타데이터 로깅
+      if (message.metadata != null) {
+        final metadata = message.metadata!;
+        debugPrint('FirebaseService.sendMessage: Metadata content: action=${metadata['action']}, role=${metadata['role']}, currentCount=${metadata['currentCount']}, totalSlots=${metadata['totalSlots']}');
+      }
+      
+      // Firestore에 메시지 저장 - 메타데이터를 포함한 전체 데이터 저장
+      final messageData = message.toFirestore();
+      debugPrint('FirebaseService.sendMessage: Full message data being saved: $messageData');
+      
       // Firestore에 메시지 저장
-      final docRef = await _firestore.collection('messages').add(message.toFirestore());
+      final docRef = await _firestore.collection('messages').add(messageData);
       
       // 채팅방 마지막 메시지 정보 업데이트
       await _firestore.collection('chatRooms').doc(message.chatRoomId).update({
@@ -478,7 +491,14 @@ class FirebaseService {
         });
       }
       
-      debugPrint('Message sent successfully with ID: ${docRef.id}');
+      debugPrint('FirebaseService.sendMessage: Message sent successfully with ID: ${docRef.id}');
+      
+      // 저장된 메시지 확인
+      final savedDoc = await _firestore.collection('messages').doc(docRef.id).get();
+      final savedData = savedDoc.data();
+      debugPrint('FirebaseService.sendMessage: Saved message data: $savedData');
+      debugPrint('FirebaseService.sendMessage: Saved metadata: ${savedData?['metadata']}');
+      
       return docRef.id;
     } catch (e) {
       debugPrint('Error sending message: $e');
@@ -874,10 +894,11 @@ class FirebaseService {
   
   // 채팅방에 참가자 추가
   Future<void> addParticipantToChatRoom(
-      String chatRoomId,
-      String userId,
-      String userName,
-      String? userProfileImageUrl) async {
+    String chatRoomId,
+    String userId,
+    String userName,
+    String? userProfileImageUrl,
+  ) async {
     try {
       // 채팅방 정보 가져오기
       final chatRoomDoc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
@@ -901,8 +922,8 @@ class FirebaseService {
       final updatedParticipantProfileImages = Map<String, String?>.from(chatRoom.participantProfileImages)..addAll({userId: userProfileImageUrl});
       final updatedUnreadCount = Map<String, int>.from(chatRoom.unreadCount)..addAll({userId: 0});
       
-      // Calculate new participant count
-      final newParticipantCount = chatRoom.participantCount + 1;
+      // Calculate new participant count - Use participants array length directly
+      final newParticipantCount = updatedParticipantIds.length;
       
       // Update title with new participant count if it's a tournament chat room
       String updatedTitle = chatRoom.title;
@@ -914,10 +935,16 @@ class FirebaseService {
           
           // Extract the base title (everything before the participant count)
           final titleParts = chatRoom.title.split(' (');
-          if (titleParts.length >= 3) {
+          if (titleParts.length >= 2) {
             final baseTitle = titleParts.sublist(0, titleParts.length - 1).join(' (');
-            // Create new title with updated participant count
-            updatedTitle = '$baseTitle (${newParticipantCount}/${tournament.totalSlots}명)';
+            // 제목 형식 맞추기 (마지막 '명' 제거)
+            updatedTitle = '$baseTitle (${newParticipantCount}/${tournament.totalSlots})';
+            
+            // 로그 추가
+            debugPrint('제목 업데이트: $updatedTitle, 참가자 수: $newParticipantCount/${tournament.totalSlots}');
+          } else {
+            // 제목 형식이 예상과 다를 경우 디버그 로그
+            debugPrint('제목 형식 불일치: ${chatRoom.title}, 분리된 부분: ${titleParts.length}개');
           }
         }
       }
@@ -944,6 +971,16 @@ class FirebaseService {
         text: '$userName님이 채팅방에 참가했습니다.',
         readStatus: {},
         timestamp: Timestamp.now(),
+        metadata: {
+          'isSystem': true,
+          'action': 'join',
+          'currentCount': newParticipantCount,
+          // 토너먼트 정보가 있으면 역할과 총 인원수도 포함
+          if (chatRoom.tournamentId != null) ...{
+            'totalSlots': await _getTournamentTotalSlots(chatRoom.tournamentId!),
+            'role': await _getUserRoleInTournament(chatRoom.tournamentId!, userId),
+          }
+        },
       );
       
       final messageRef = await _firestore.collection('messages').add(message.toFirestore());
@@ -955,6 +992,7 @@ class FirebaseService {
       });
       
       debugPrint('Sent system message about new participant: ${messageRef.id}');
+      debugPrint('System message metadata: ${message.metadata}');
     } catch (e) {
       debugPrint('Error adding participant to chat room: $e');
       throw e;
@@ -1033,6 +1071,75 @@ class FirebaseService {
     } catch (e) {
       debugPrint('Error deleting all tournaments: $e');
       rethrow;
+    }
+  }
+
+  // 토너먼트의 총 슬롯 수를 가져오는 메서드
+  Future<int> _getTournamentTotalSlots(String tournamentId) async {
+    try {
+      final tournamentDoc = await _firestore.collection('tournaments').doc(tournamentId).get();
+      if (tournamentDoc.exists) {
+        final tournament = TournamentModel.fromFirestore(tournamentDoc);
+        return tournament.totalSlots;
+      }
+      return 10; // 기본값 반환
+    } catch (e) {
+      debugPrint('Error getting tournament total slots: $e');
+      return 10; // 오류 시 기본값 반환
+    }
+  }
+
+  // 메시지 직접 전송 (MessageModel 객체 사용)
+  Future<String> sendMessageDirectly(MessageModel message) async {
+    try {
+      debugPrint('FirebaseService.sendMessageDirectly: Sending message: "${message.text}"');
+      debugPrint('FirebaseService.sendMessageDirectly: Message metadata: ${message.metadata}');
+      
+      // Firestore에 메시지 저장
+      final docRef = await _firestore.collection('messages').add(message.toFirestore());
+      
+      // 채팅방 최근 메시지 및 타임스탬프 업데이트
+      await _firestore.collection('chat_rooms').doc(message.chatRoomId).update({
+        'lastMessage': message.text,
+        'lastMessageTimestamp': message.timestamp,
+      });
+      
+      return docRef.id;
+    } catch (e) {
+      debugPrint('Error sending message directly: $e');
+      rethrow;
+    }
+  }
+
+  // 토너먼트에서 사용자의 역할(라인)을 가져오는 메서드
+  Future<String> _getUserRoleInTournament(String tournamentId, String userId) async {
+    try {
+      final tournamentDoc = await _firestore.collection('tournaments').doc(tournamentId).get();
+      if (tournamentDoc.exists) {
+        final tournament = TournamentModel.fromFirestore(tournamentDoc);
+        
+        // 각 역할별로 사용자 확인
+        for (final entry in tournament.participantsByRole.entries) {
+          final role = entry.key;
+          final participants = entry.value;
+          
+          // participants가 List<String>인지 확인
+          if (participants is List) {
+            // 동적 리스트를 String 리스트로 변환
+            final participantList = participants.cast<String>();
+            if (participantList.contains(userId)) {
+              debugPrint('Found user role in tournament: $role for user $userId');
+              return role;
+            }
+          }
+        }
+      }
+      
+      debugPrint('User role not found in tournament, returning "unknown"');
+      return 'unknown'; // 역할을 찾지 못한 경우
+    } catch (e) {
+      debugPrint('Error getting user role in tournament: $e');
+      return 'unknown'; // 오류 발생 시 기본값 반환
     }
   }
 }
