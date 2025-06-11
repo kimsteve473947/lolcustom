@@ -68,13 +68,13 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
   // 디바운싱을 위한 타이머 추가
   Timer? _debounceTimer;
   DateTime? _lastLoadDate;
-  
+
   @override
   void initState() {
     super.initState();
     // 외부에서 TabController가 전달되지 않은 경우에만 내부에서 생성
     if (widget.externalTabController == null) {
-      _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 2, vsync: this);
       
       // 탭 변경 리스너
       _tabController.addListener(_handleTabChange);
@@ -95,9 +95,9 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     });
     
     // 초기 필터 설정
-    _filters['tournamentType'] = _tabController.index == 0 
-        ? TournamentType.casual.index 
-        : TournamentType.competitive.index;
+        _filters['tournamentType'] = _tabController.index == 0 
+            ? TournamentType.casual.index 
+            : TournamentType.competitive.index;
     
     // 초기 데이터 로드
     _loadTournaments();
@@ -107,20 +107,8 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
   void didChangeDependencies() {
     super.didChangeDependencies();
     
-    // 스크롤 리스너 설정 - ListView가 primary일 때는 PrimaryScrollController를 사용
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final primaryScrollController = PrimaryScrollController.of(context);
-      if (primaryScrollController != null) {
-        primaryScrollController.addListener(() {
-          if (primaryScrollController.position.pixels >= 
-              primaryScrollController.position.maxScrollExtent * 0.8 &&
-              !_isLoading &&
-              _tournaments.isNotEmpty) {
-            _loadMoreTournaments();
-          }
-        });
-      }
-    });
+    // 스크롤 리스너 설정 - 여러 스크롤 컨트롤러 충돌 제거
+    // primary ScrollController 사용 제거
   }
   
   @override
@@ -134,11 +122,11 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
       
       // 새 타이머 설정 (300ms 지연)
       _debounceTimer = Timer(const Duration(milliseconds: 300), () {
-        _loadTournaments();
+      _loadTournaments();
       });
     }
   }
-
+  
   Future<void> _loadTournaments() async {
     // 이미 같은 날짜로 로드 중이면 중복 로드 방지
     if (_isLoading) return;
@@ -154,6 +142,8 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     
     // 마지막 로드 날짜 갱신
     _lastLoadDate = selectedDate;
+    
+    if (!mounted) return;
     
     setState(() {
       _isLoading = true;
@@ -175,19 +165,19 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
         filters: _filters,
       );
       
-      if (mounted) {
-        setState(() {
-          _tournaments = tournaments;
-          _isLoading = false;
-        });
-      }
+      if (!mounted) return;
+      
+      setState(() {
+        _tournaments = tournaments;
+        _isLoading = false;
+      });
     } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _errorMessage = '내전 목록을 불러오는 중 오류가 발생했습니다: $e';
-        });
-      }
+      if (!mounted) return;
+      
+      setState(() {
+        _isLoading = false;
+        _errorMessage = '내전 목록을 불러오는 중 오류가 발생했습니다: $e';
+      });
     }
   }
   
@@ -197,7 +187,7 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     // 내부에서 생성한 TabController만 dispose
     if (widget.externalTabController == null) {
       _tabController.removeListener(_handleTabChange);
-      _tabController.dispose();
+    _tabController.dispose();
     }
     _debounceTimer?.cancel();
     super.dispose();
@@ -206,6 +196,8 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
   // 더 많은 대회 로드 (페이지네이션)
   Future<void> _loadMoreTournaments() async {
     if (_isLoading || _tournaments.isEmpty) return;
+    
+    if (!mounted) return;
     
     setState(() {
       _isLoading = true;
@@ -223,6 +215,8 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
         limit: 10,
       );
       
+      if (!mounted) return;
+      
       setState(() {
         // 중복 제거 후 추가
         for (final tournament in tournaments) {
@@ -233,6 +227,8 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
         _isLoading = false;
       });
     } catch (e) {
+      if (!mounted) return;
+      
       setState(() {
         _isLoading = false;
       });
@@ -242,10 +238,10 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
   @override
   Widget build(BuildContext context) {
     return TabBarView(
-      controller: _tabController,
-      children: [
-        _buildTournamentsList(),
-        _buildTournamentsList(),
+              controller: _tabController,
+              children: [
+                _buildTournamentsList(),
+                _buildTournamentsList(),
       ],
     );
   }
@@ -269,7 +265,8 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
     return RefreshIndicator(
       onRefresh: _loadTournaments,
       child: ListView.builder(
-        primary: true,
+        controller: _scrollController, // 직접 스크롤 컨트롤러 지정
+        primary: false, // primary 설정 제거
         itemCount: _tournaments.length + (_isLoading ? 1 : 0),
         padding: const EdgeInsets.all(16),
         itemBuilder: (context, index) {
@@ -296,26 +293,49 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Icon(
-            Icons.event_busy,
-            size: 64,
+          Container(
+            padding: const EdgeInsets.all(24),
+            decoration: BoxDecoration(
+              color: Colors.grey.shade100,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.event_busy_rounded,
+              size: 72,
             color: Colors.grey.shade400,
+            ),
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 24),
           Text(
             message,
             style: TextStyle(
               fontSize: 18,
+              fontWeight: FontWeight.bold,
               color: Colors.grey.shade700,
             ),
+            textAlign: TextAlign.center,
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
             onPressed: () {
               context.push('/tournaments/create');
             },
-            icon: const Icon(Icons.add),
-            label: const Text('내전 만들기'),
+            icon: const Icon(Icons.add, size: 18),
+            label: const Text(
+              '내전 만들기',
+              style: TextStyle(
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: AppColors.primary,
+              foregroundColor: Colors.white,
+              padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(24),
+              ),
+              elevation: 0,
+            ),
           ),
         ],
       ),
@@ -593,6 +613,8 @@ class _MatchListTabState extends State<MatchListTab> with SingleTickerProviderSt
   // 탭 변경 리스너 처리 메서드
   void _handleTabChange() {
     if (_tabController.indexIsChanging) {
+      if (!mounted) return;
+      
       setState(() {
         // 필터 업데이트 - 명확한 TournamentType 사용
         _filters['tournamentType'] = _tabController.index == 0 

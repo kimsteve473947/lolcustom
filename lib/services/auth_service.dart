@@ -167,6 +167,9 @@ class AuthService {
       // 사용자에게 이메일 인증 메일 보내기
       await credential.user?.sendEmailVerification();
       
+      // 디버깅 정보 로깅
+      debugPrint('회원가입 - nickname: $nickname, displayName: ${credential.user?.displayName}');
+      
       // Firestore에 사용자 정보 저장
       await _firestore.collection('users').doc(credential.user!.uid).set({
         'uid': credential.user!.uid,

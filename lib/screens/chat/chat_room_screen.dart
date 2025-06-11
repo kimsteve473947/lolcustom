@@ -663,7 +663,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                       ),
                     ),
                     child: Column(
-                      children: [
+                    children: [
                         // 메시지 목록
                         Expanded(
                           child: Consumer<ChatProvider>(
@@ -750,7 +750,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                                       height: 48,
                                       decoration: BoxDecoration(
                                         borderRadius: BorderRadius.circular(24),
-                                      ),
+                      ),
                                       child: _isSending
                                           ? const Padding(
                                               padding: EdgeInsets.all(12),
@@ -766,7 +766,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                                     ),
                                   ),
                                 ),
-                              ],
+                    ],
                             ),
                           ),
                         ),
@@ -805,19 +805,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
             currentCount = message.metadata!['currentCount'] as int?;
             totalSlots = message.metadata!['totalSlots'] as int?;
             debugPrint('Found metadata - role: $role, currentCount: $currentCount, totalSlots: $totalSlots');
-          }
-          
+    }
+    
           // 2. 닉네임 추출
           final nicknameEndIndex = displayText.indexOf('님이 채팅방에 참가했습니다');
           if (nicknameEndIndex > 0) {
             final nickname = displayText.substring(0, nicknameEndIndex);
-            
+    
             // 3. 역할 정보 추가
             if (role != null && role != 'unknown') {
               final roleDisplayName = _getRoleNameKorean(role);
               displayText = "$nickname[$roleDisplayName]님이 채팅방에 참가했습니다";
               debugPrint('Added role to message: $displayText');
-            }
+      }
             
             // 4. 인원수 추가
             // 메타데이터의 인원수 사용
@@ -852,8 +852,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
               style: const TextStyle(
                 fontSize: 12,
                 color: Colors.white,
-              ),
-              textAlign: TextAlign.center,
+          ),
+          textAlign: TextAlign.center,
             ),
           ),
         ),
@@ -888,14 +888,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                 Container(
                   margin: const EdgeInsets.only(top: 4),
                   child: CircleAvatar(
-                    radius: 16,
+              radius: 16,
                     backgroundColor: Colors.grey.shade200,
                     backgroundImage: message.senderProfileImageUrl != null
-                        ? NetworkImage(message.senderProfileImageUrl!)
-                        : null,
+                  ? NetworkImage(message.senderProfileImageUrl!)
+                  : null,
                     child: message.senderProfileImageUrl == null
                         ? const Icon(Icons.person, size: 16, color: Colors.grey)
-                        : null,
+                  : null,
                   ),
                 ),
                 if (isHost)
@@ -919,11 +919,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                   ),
               ],
             ),
-          
+            
           const SizedBox(width: 8),
           
           // 메시지 내용 영역
-          Column(
+            Column(
             crossAxisAlignment:
                 isCurrentUser ? CrossAxisAlignment.end : CrossAxisAlignment.start,
             children: [
@@ -932,15 +932,15 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                 Padding(
                   padding: const EdgeInsets.only(left: 4.0, bottom: 2.0),
                   child: Row(
-                    children: [
-                      Text(
-                        message.senderName,
+              children: [
+                Text(
+                  message.senderName,
                         style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
                           color: AppColors.textSecondary,
-                        ),
-                      ),
+                  ),
+                ),
                       if (senderRole != null)
                         Container(
                           margin: const EdgeInsets.only(left: 4),
@@ -982,22 +982,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                       child: Text(
                         timestamp,
                         style: TextStyle(
-                          fontSize: 10,
-                          color: AppColors.textSecondary,
-                        ),
-                      ),
-                    ),
-                  
+              fontSize: 10,
+              color: AppColors.textSecondary,
+            ),
+          ),
+      ),
+
                   // 메시지 말풍선
                   Container(
-                    constraints: BoxConstraints(
-                      maxWidth: MediaQuery.of(context).size.width * 0.7,
-                    ),
+      constraints: BoxConstraints(
+        maxWidth: MediaQuery.of(context).size.width * 0.7,
+      ),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16.0,
                       vertical: 10.0,
                     ),
-                    decoration: BoxDecoration(
+      decoration: BoxDecoration(
                       color: isCurrentUser
                           ? AppColors.primary
                           : Colors.white,
@@ -1011,14 +1011,14 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                             ? const Radius.circular(4)
                             : const Radius.circular(16),
                       ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.05),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
                           blurRadius: 3,
                           offset: const Offset(0, 1),
-                        ),
-                      ],
-                    ),
+          ),
+        ],
+      ),
                     child: Text(
                       message.text,
                       style: TextStyle(
@@ -1036,7 +1036,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                         style: TextStyle(
                           fontSize: 10,
                           color: AppColors.textSecondary,
-                        ),
+                    ),
                       ),
                     ),
                 ],
@@ -1047,7 +1047,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
       ),
     );
   }
-  
+
   // 역할에 따른 색상 반환
   Color _getRoleColor(String role) {
     switch (role.toLowerCase()) {

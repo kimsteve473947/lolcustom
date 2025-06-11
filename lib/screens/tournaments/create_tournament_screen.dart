@@ -32,7 +32,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   // 리그 오브 레전드 특화 필드
   GameFormat _gameFormat = GameFormat.single;
   
-  // 티어 제한
+  // 티어 제한ㅁ
   PlayerTier _selectedTierLimit = PlayerTier.unranked;
   
   // 주최자 선택 포지션

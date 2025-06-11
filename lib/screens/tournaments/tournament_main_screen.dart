@@ -225,35 +225,35 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
               bottom: PreferredSize(
                 preferredSize: const Size.fromHeight(kToolbarHeight),
                 child: Container(
-                  decoration: const BoxDecoration(
-                    color: Colors.white,
-                    border: Border(
-                      bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1),
+                    decoration: const BoxDecoration(
+                      color: Colors.white,
+                      border: Border(
+                        bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1),
+                      ),
+                    ),
+                    child: TabBar(
+                      controller: _mainTabController,
+                      indicatorColor: AppColors.primary,
+                      indicatorWeight: 3,
+                      labelColor: AppColors.primary,
+                      unselectedLabelColor: Colors.grey,
+                      tabs: const [
+                        Tab(text: '개인전'),
+                        Tab(text: '클랜전'),
+                        Tab(text: '용병 찾기'),
+                      ],
                     ),
                   ),
-                  child: TabBar(
-                    controller: _mainTabController,
-                    indicatorColor: AppColors.primary,
-                    indicatorWeight: 3,
-                    labelColor: AppColors.primary,
-                    unselectedLabelColor: Colors.grey,
-                    tabs: const [
-                      Tab(text: '개인전'),
-                      Tab(text: '클랜전'),
-                      Tab(text: '용병 찾기'),
-                    ],
-                  ),
-                ),
               ),
             ),
-            
+                  
             // 프로모션 카드 영역 (Carousel) - 스크롤 시 사라짐
             SliverToBoxAdapter(
               child: _buildPromotionCarousel(),
             ),
-            
+                  
             // 날짜 선택기 - 용병 찾기 탭에서는 표시하지 않음 (고정)
-            if (_currentTabIndex != 2)
+                  if (_currentTabIndex != 2)
               SliverPersistentHeader(
                 delegate: _SliverAppBarDelegate(
                   minHeight: 80,
@@ -275,20 +275,20 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
                   ),
                 ),
                 pinned: true,
-              ),
+            ),
           ];
         },
         body: TabBarView(
-          controller: _mainTabController,
-          children: [
-            // 개인전 탭
+                controller: _mainTabController,
+                children: [
+                  // 개인전 탭
             _buildMatchListContent(),
-            
-            // 클랜전 탭
-            const ClanBattlesTab(),
-            
-            // 용병 찾기 탭
-            const MercenarySearchTab(),
+                  
+                  // 클랜전 탭
+                  const ClanBattlesTab(),
+                  
+                  // 용병 찾기 탭
+                  const MercenarySearchTab(),
           ],
         ),
       ),

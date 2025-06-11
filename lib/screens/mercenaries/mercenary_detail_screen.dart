@@ -26,11 +26,12 @@ class MercenaryDetailScreen extends StatefulWidget {
 class _MercenaryDetailScreenState extends State<MercenaryDetailScreen> {
   final FirebaseService _firebaseService = FirebaseService();
   
-  bool _isLoading = false;
+  bool _isLoading = true;
   String? _errorMessage;
   MercenaryModel? _mercenary;
   UserModel? _user;
   List<RatingModel> _ratings = [];
+  bool _isSendingMessage = false;
   
   // PlayerTier enum을 한글 티어 문자열로 변환하는 헬퍼 메소드
   String _tierToString(PlayerTier tier) {
@@ -355,7 +356,19 @@ class _MercenaryDetailScreenState extends State<MercenaryDetailScreen> {
                   ),
                 ],
                 const Spacer(),
-                if (!isCurrentUser)
+                          if (isCurrentUser)
+            OutlinedButton.icon(
+              onPressed: () {
+                context.push('/mercenaries/${_mercenary!.id}/edit');
+              },
+              icon: const Icon(Icons.edit),
+              label: const Text('프로필 수정'),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: AppColors.primary,
+                side: const BorderSide(color: AppColors.primary),
+              ),
+            )
+          else
                   OutlinedButton.icon(
                     onPressed: _startChat,
                     icon: const Icon(Icons.chat_bubble_outline),
