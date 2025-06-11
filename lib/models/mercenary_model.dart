@@ -2,6 +2,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:equatable/equatable.dart';
 import 'package:lol_custom_game_manager/models/user_model.dart';
 
+// Constants for availability time slots
+const List<String> kDaysOfWeek = ['월', '화', '수', '목', '금', '토', '일'];
+const List<String> kTimeSlots = ['오전', '오후', '저녁'];
+
 class MercenaryModel extends Equatable {
   final String id;
   final String userUid;
@@ -18,6 +22,8 @@ class MercenaryModel extends Equatable {
   final PlayerTier tier;
   final bool isAvailable;
   final Timestamp lastActiveAt;
+  final Map<String, List<String>> availabilityTimeSlots;
+  final String? demographicInfo;
 
   const MercenaryModel({
     required this.id,
@@ -33,49 +39,40 @@ class MercenaryModel extends Equatable {
     required this.nickname,
     this.profileImageUrl,
     required this.tier,
-    this.isAvailable = true,
+    required this.isAvailable,
     required this.lastActiveAt,
+    this.availabilityTimeSlots = const {},
+    this.demographicInfo,
   });
 
   factory MercenaryModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
-    
-    final roleStats = Map<String, int>.from(data['roleStats'] ?? {});
-    
-    final skillStats = data['skillStats'] != null 
-        ? Map<String, int>.from(data['skillStats']) 
-        : null;
-    
-    final preferredPositions = List<String>.from(data['preferredPositions'] ?? []);
-    
-    double averageRoleStat = 0;
-    if (roleStats.isNotEmpty) {
-      final sum = roleStats.values.fold(0, (sum, stat) => sum + stat);
-      averageRoleStat = sum / roleStats.length;
-    }
-    
-    // profileImageUrl 처리 - 빈 문자열이나 유효하지 않은 URL 처리
-    String? profileImageUrl = data['profileImageUrl'];
-    if (profileImageUrl != null && (profileImageUrl.isEmpty || !profileImageUrl.startsWith('http'))) {
-      profileImageUrl = null;
-    }
-    
     return MercenaryModel(
       id: doc.id,
       userUid: data['userUid'] ?? '',
       createdAt: data['createdAt'] ?? Timestamp.now(),
       description: data['description'],
-      preferredPositions: preferredPositions,
-      roleStats: roleStats,
-      skillStats: skillStats,
+      preferredPositions: List<String>.from(data['preferredPositions'] ?? []),
+      roleStats: Map<String, int>.from(data['roleStats'] ?? {}),
+      skillStats: data['skillStats'] != null
+          ? Map<String, int>.from(data['skillStats'])
+          : null,
       averageRating: (data['averageRating'] ?? 0.0).toDouble(),
       totalRatings: data['totalRatings'] ?? 0,
-      averageRoleStat: averageRoleStat,
+      averageRoleStat: (data['averageRoleStat'] ?? 0.0).toDouble(),
       nickname: data['nickname'] ?? '',
-      profileImageUrl: profileImageUrl,
-      tier: UserModel.tierFromString(data['tier']),
+      profileImageUrl: data['profileImageUrl'],
+      tier: PlayerTier.values[data['tier'] ?? PlayerTier.unranked.index],
       isAvailable: data['isAvailable'] ?? true,
       lastActiveAt: data['lastActiveAt'] ?? Timestamp.now(),
+      availabilityTimeSlots: data['availabilityTimeSlots'] != null
+          ? Map<String, List<String>>.from(
+              data['availabilityTimeSlots'].map(
+                (key, value) => MapEntry(key, List<String>.from(value)),
+              ),
+            )
+          : {},
+      demographicInfo: data['demographicInfo'],
     );
   }
 
@@ -89,15 +86,19 @@ class MercenaryModel extends Equatable {
       'skillStats': skillStats,
       'averageRating': averageRating,
       'totalRatings': totalRatings,
+      'averageRoleStat': averageRoleStat,
       'nickname': nickname,
       'profileImageUrl': profileImageUrl,
-      'tier': tier.toString().split('.').last,
+      'tier': tier.index,
       'isAvailable': isAvailable,
       'lastActiveAt': lastActiveAt,
+      'availabilityTimeSlots': availabilityTimeSlots,
+      'demographicInfo': demographicInfo,
     };
   }
 
   MercenaryModel copyWith({
+    String? id,
     String? userUid,
     Timestamp? createdAt,
     String? description,
@@ -112,9 +113,11 @@ class MercenaryModel extends Equatable {
     PlayerTier? tier,
     bool? isAvailable,
     Timestamp? lastActiveAt,
+    Map<String, List<String>>? availabilityTimeSlots,
+    String? demographicInfo,
   }) {
     return MercenaryModel(
-      id: id,
+      id: id ?? this.id,
       userUid: userUid ?? this.userUid,
       createdAt: createdAt ?? this.createdAt,
       description: description ?? this.description,
@@ -129,6 +132,8 @@ class MercenaryModel extends Equatable {
       tier: tier ?? this.tier,
       isAvailable: isAvailable ?? this.isAvailable,
       lastActiveAt: lastActiveAt ?? this.lastActiveAt,
+      availabilityTimeSlots: availabilityTimeSlots ?? this.availabilityTimeSlots,
+      demographicInfo: demographicInfo ?? this.demographicInfo,
     );
   }
 
@@ -136,6 +141,86 @@ class MercenaryModel extends Equatable {
   List<Object?> get props => [
     id, userUid, createdAt, description, preferredPositions, 
     roleStats, skillStats, averageRating, totalRatings, averageRoleStat,
-    nickname, profileImageUrl, tier, isAvailable, lastActiveAt
+    nickname, profileImageUrl, tier, isAvailable, lastActiveAt,
+    availabilityTimeSlots, demographicInfo
   ];
+  
+  // Helper method to get the top role (highest stat)
+  String get topRole {
+    if (roleStats.isEmpty) return 'N/A';
+    
+    String topRole = roleStats.keys.first;
+    int topStat = roleStats.values.first;
+    
+    roleStats.forEach((role, stat) {
+      if (stat > topStat) {
+        topRole = role;
+        topStat = stat;
+      }
+    });
+    
+    return topRole;
+  }
+  
+  // Helper method to get the top role stat value
+  int get topRoleStat {
+    if (roleStats.isEmpty) return 0;
+    
+    return roleStats.values.reduce((max, stat) => stat > max ? stat : max);
+  }
+  
+  // Helper method to get availability summary
+  String get availabilitySummary {
+    if (availabilityTimeSlots.isEmpty) return '시간대 미설정';
+    
+    // Count days with morning, afternoon, evening
+    final Map<String, int> timeCounts = {
+      '오전': 0,
+      '오후': 0,
+      '저녁': 0,
+      '주말': 0,
+      '평일': 0,
+    };
+    
+    final weekends = ['토', '일'];
+    final weekdays = ['월', '화', '수', '목', '금'];
+    
+    availabilityTimeSlots.forEach((day, slots) {
+      for (final slot in slots) {
+        timeCounts[slot] = (timeCounts[slot] ?? 0) + 1;
+      }
+      
+      if (weekends.contains(day) && slots.isNotEmpty) {
+        timeCounts['주말'] = (timeCounts['주말'] ?? 0) + 1;
+      }
+      
+      if (weekdays.contains(day) && slots.isNotEmpty) {
+        timeCounts['평일'] = (timeCounts['평일'] ?? 0) + 1;
+      }
+    });
+    
+    // Create summary
+    final List<String> summary = [];
+    
+    // Weekend/Weekday
+    if (timeCounts['주말']! > 0 && timeCounts['평일']! > 0) {
+      summary.add('전체');
+    } else if (timeCounts['주말']! > 0) {
+      summary.add('주말');
+    } else if (timeCounts['평일']! > 0) {
+      summary.add('평일');
+    }
+    
+    // Time of day
+    final List<String> timeSlots = [];
+    if (timeCounts['오전']! >= 3) timeSlots.add('오전');
+    if (timeCounts['오후']! >= 3) timeSlots.add('오후');
+    if (timeCounts['저녁']! >= 3) timeSlots.add('저녁');
+    
+    if (timeSlots.isNotEmpty) {
+      summary.add(timeSlots.join('/'));
+    }
+    
+    return summary.join(' ');
+  }
 } 

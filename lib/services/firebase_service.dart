@@ -263,17 +263,15 @@ class FirebaseService {
     int? limit,
     DocumentSnapshot? startAfter,
     List<String>? positions,
+    List<PlayerTier>? tiers,
+    List<String>? activityTimes,
     int? minOvr,
   }) async {
     try {
+      // 인덱스 오류를 방지하기 위해 기본 쿼리만 사용하고 필터링은 클라이언트에서 수행
       Query query = _firestore
           .collection('mercenaries')
-          .where('isAvailable', isEqualTo: true)
           .orderBy('lastActiveAt', descending: true);
-
-      if (positions != null && positions.isNotEmpty) {
-        query = query.where('preferredPositions', arrayContainsAny: positions);
-      }
 
       if (limit != null) {
         query = query.limit(limit);
@@ -288,7 +286,54 @@ class FirebaseService {
           .map((doc) => MercenaryModel.fromFirestore(doc))
           .toList();
 
-      // Filter by minOvr if provided (this can't be done in the query)
+      // isAvailable 필터링
+      mercenaries = mercenaries.where((m) => m.isAvailable).toList();
+          
+      // 포지션 필터링
+      if (positions != null && positions.isNotEmpty) {
+        mercenaries = mercenaries.where((mercenary) {
+          return positions.any((position) => 
+              mercenary.preferredPositions.contains(position));
+        }).toList();
+      }
+      
+      // 티어 필터링
+      if (tiers != null && tiers.isNotEmpty) {
+        mercenaries = mercenaries.where((mercenary) => 
+          mercenary.tier != null && tiers.contains(mercenary.tier)
+        ).toList();
+      }
+      
+      // 활동 시간 필터링
+      if (activityTimes != null && activityTimes.isNotEmpty) {
+        mercenaries = mercenaries.where((mercenary) {
+          if (mercenary.availabilityTimeSlots.isEmpty) {
+            return false;
+          }
+          
+          bool hasWeekdayMorning = activityTimes.contains('평일 오전') && 
+            ['월', '화', '수', '목', '금'].any((day) => 
+              mercenary.availabilityTimeSlots[day]?.contains('오전') ?? false);
+              
+          bool hasWeekdayAfternoon = activityTimes.contains('평일 오후') && 
+            ['월', '화', '수', '목', '금'].any((day) => 
+              (mercenary.availabilityTimeSlots[day]?.contains('오후') ?? false) || 
+              (mercenary.availabilityTimeSlots[day]?.contains('저녁') ?? false));
+              
+          bool hasWeekendMorning = activityTimes.contains('주말 오전') && 
+            ['토', '일'].any((day) => 
+              mercenary.availabilityTimeSlots[day]?.contains('오전') ?? false);
+              
+          bool hasWeekendAfternoon = activityTimes.contains('주말 오후') && 
+            ['토', '일'].any((day) => 
+              (mercenary.availabilityTimeSlots[day]?.contains('오후') ?? false) || 
+              (mercenary.availabilityTimeSlots[day]?.contains('저녁') ?? false));
+          
+          return hasWeekdayMorning || hasWeekdayAfternoon || hasWeekendMorning || hasWeekendAfternoon;
+        }).toList();
+      }
+
+      // OVR 필터링 (사용하지 않음)
       if (minOvr != null) {
         mercenaries =
             mercenaries.where((m) => m.averageRoleStat >= minOvr).toList();
@@ -894,9 +939,9 @@ class FirebaseService {
   
   // 채팅방에 참가자 추가
   Future<void> addParticipantToChatRoom(
-    String chatRoomId,
-    String userId,
-    String userName,
+      String chatRoomId,
+      String userId,
+      String userName,
     String? userProfileImageUrl,
   ) async {
     try {

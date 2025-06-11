@@ -29,26 +29,63 @@ class FirebaseService {
         return null;
       }
       
-      debugPrint('getCurrentUser: Getting user document for uid: ${user.uid}, email: ${user.email}');
+      debugPrint('getCurrentUser: Getting user document for uid: ${user.uid}, email: ${user.email}, displayName: ${user.displayName}');
       DocumentSnapshot doc = await _firestore.collection('users').doc(user.uid).get();
       
       if (!doc.exists) {
         debugPrint('getCurrentUser: User document does not exist for uid: ${user.uid}');
         
-        // Create a new user document if it doesn't exist
+        // Get display name from Firebase Auth if available
+        String nickname = user.displayName ?? '';
+        
+        // If display name is empty, use email as a fallback
+        if (nickname.isEmpty) {
+          if (user.email != null && user.email!.isNotEmpty) {
+            // Extract name from email (before @)
+            nickname = user.email!.split('@')[0];
+            // Capitalize first letter
+            if (nickname.isNotEmpty) {
+              nickname = nickname[0].toUpperCase() + nickname.substring(1);
+            }
+          } else {
+            // Last resort - use a generic name with partial UID
+            nickname = '사용자${user.uid.substring(0, 4)}';
+          }
+        }
+        
+        debugPrint('getCurrentUser: Creating new user document with nickname: $nickname');
+        
+        // Create a new user document with the determined nickname
         final newUser = UserModel(
           uid: user.uid,
           email: user.email ?? '',
-          nickname: user.displayName ?? 'User${user.uid.substring(0, 4)}',
+          nickname: nickname,
           joinedAt: Timestamp.now(),
         );
         
-        debugPrint('getCurrentUser: Creating new user document with nickname: ${newUser.nickname}');
         await _firestore.collection('users').doc(user.uid).set(newUser.toFirestore());
         return newUser;
       }
       
+      // Create UserModel from the Firestore document
       UserModel userModel = UserModel.fromFirestore(doc);
+      
+      // If the nickname is empty or looks like a system-generated ID, try to update it
+      if (userModel.nickname.isEmpty || 
+          userModel.nickname.startsWith('User') || 
+          userModel.nickname.startsWith('n') && userModel.nickname.length > 20) {
+        
+        // Get better nickname from Firebase Auth if available
+        String updatedNickname = user.displayName ?? '';
+        
+        if (updatedNickname.isNotEmpty) {
+          // Update the user model with the better nickname
+          userModel = userModel.copyWith(nickname: updatedNickname);
+          await _firestore.collection('users').doc(user.uid).update({'nickname': updatedNickname});
+          debugPrint('getCurrentUser: Updated nickname from Firebase Auth: $updatedNickname');
+        }
+      }
+      
       debugPrint('getCurrentUser: Retrieved user: ${userModel.nickname} with ID: ${userModel.uid}');
       return userModel;
     } catch (e) {

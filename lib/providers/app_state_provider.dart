@@ -145,12 +145,30 @@ class AppStateProvider with ChangeNotifier {
     _clearError();
     
     try {
+      debugPrint('AppStateProvider - register: 회원가입 시작 (email: $email, nickname: $nickname)');
+      
+      // 회원가입 요청
       await _authService.signUpWithEmailAndPassword(
         email: email,
         password: password,
         nickname: nickname,
       );
-      await _loadCurrentUser();
+      
+      // 현재 사용자 정보 새로고침 (강제로 새로 불러옴)
+      await _loadCurrentUser(forceRefresh: true);
+      
+      // 닉네임 확인 및 수정
+      if (_currentUser != null && _currentUser!.nickname != nickname) {
+        debugPrint('AppStateProvider - register: 닉네임 불일치 감지, 수정 시도');
+        debugPrint('현재 닉네임: ${_currentUser!.nickname}, 요청 닉네임: $nickname');
+        
+        // 닉네임 업데이트
+        UserModel updatedUser = _currentUser!.copyWith(nickname: nickname);
+        await _firebaseService.updateUserProfile(updatedUser);
+        _currentUser = updatedUser;
+        notifyListeners();
+      }
+      
       return true;
     } catch (e) {
       _setError('Failed to register: $e');
@@ -809,6 +827,7 @@ class AppStateProvider with ChangeNotifier {
         description: description,
         averageRoleStat: averageRoleStat,
         averageRating: _currentUser!.averageRating ?? 0.0,
+        isAvailable: true,  // Set mercenary as available by default
       );
       
       await _firebaseService.createMercenaryProfile(mercenary);

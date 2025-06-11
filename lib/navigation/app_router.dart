@@ -129,6 +129,15 @@ class AppRouter {
         ),
       ),
       GoRoute(
+        path: '/mercenaries/:id/edit',
+        builder: (context, state) {
+          final mercenaryId = state.pathParameters['id']!;
+          return MainScreen(
+            child: MercenaryEditScreen(mercenaryId: mercenaryId),
+          );
+        },
+      ),
+      GoRoute(
         path: '/clans',
         builder: (context, state) => const MainScreen(
           initialTabIndex: 1,
