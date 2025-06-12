@@ -10,6 +10,7 @@ import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lol_custom_game_manager/constants/lol_constants.dart';
 import 'package:lol_custom_game_manager/utils/tournament_ui_utils.dart';
+import 'mercenary_edit_screen.dart';
 
 class MercenaryDetailScreen extends StatefulWidget {
   final String mercenaryId;
@@ -359,7 +360,12 @@ class _MercenaryDetailScreenState extends State<MercenaryDetailScreen> {
                           if (isCurrentUser)
             OutlinedButton.icon(
               onPressed: () {
-                context.push('/mercenaries/${_mercenary!.id}/edit');
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => MercenaryEditScreen(mercenaryId: _mercenary!.id),
+                  ),
+                );
               },
               icon: const Icon(Icons.edit),
               label: const Text('프로필 수정'),

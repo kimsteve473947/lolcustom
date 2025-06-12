@@ -53,18 +53,18 @@ service cloud.firestore {
       );
     }
     
-    // 모든 문서에 대한 기본 규칙
+    // 로그인한 사용자만 접근 가능한 기본 규칙
     match /{document=**} {
-      // 기본적으로 모든 접근 거부
-      allow read, write: if false;
+      allow read, write: if request.auth != null;
     }
     
     // 사용자 컬렉션 규칙
     match /users/{userId} {
-      // 인증된 사용자는 모든 사용자 프로필을 읽을 수 있음
-      allow read: if isAuthenticated();
-      // 자신의 프로필만 수정 가능
-      allow write: if isOwner(userId) || isAdmin();
+      // 자신의 사용자 문서는 읽기/쓰기 가능
+      allow read, write: if request.auth != null && request.auth.uid == userId;
+      
+      // 다른 사용자의 문서는 읽기만 가능
+      allow read: if request.auth != null;
     }
     
     // 토너먼트 컬렉션 규칙
@@ -234,6 +234,24 @@ service cloud.firestore {
       allow update, delete: if isAuthenticated() && (
         resource.data.senderId == request.auth.uid || isAdmin()
       );
+    }
+    
+    // 클랜 컬렉션 규칙
+    match /clans/{clanId} {
+      // 모든 로그인 사용자는 클랜 정보를 읽을 수 있음
+      allow read: if request.auth != null;
+      
+      // 클랜 생성은 로그인한 사용자만 가능
+      allow create: if request.auth != null && 
+                      request.resource.data.ownerId == request.auth.uid;
+      
+      // 클랜 수정은 소유자만 가능
+      allow update: if request.auth != null && 
+                      resource.data.ownerId == request.auth.uid;
+      
+      // 클랜 삭제는 소유자만 가능
+      allow delete: if request.auth != null && 
+                      resource.data.ownerId == request.auth.uid;
     }
   }
 }

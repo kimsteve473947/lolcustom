@@ -711,7 +711,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> with SingleTickerProvid
                             child: Row(
                               children: [
                                 // 메시지 입력 필드
-                                Expanded(
+                      Expanded(
                                   child: Container(
                                     decoration: BoxDecoration(
                                       color: Colors.grey.shade100,

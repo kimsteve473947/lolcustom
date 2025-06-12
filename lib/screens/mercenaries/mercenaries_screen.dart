@@ -100,9 +100,7 @@ class _MercenariesScreenState extends State<MercenariesScreen> {
         ],
       ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () {
-          // TODO: Navigate to create mercenary profile
-        },
+        onPressed: _navigateToMercenaryRegistration,
         backgroundColor: AppColors.primary,
         child: const Icon(Icons.add),
       ),
@@ -127,8 +125,7 @@ class _MercenariesScreenState extends State<MercenariesScreen> {
             selectedColor: AppColors.primary.withOpacity(0.2),
             checkmarkColor: AppColors.primary,
           ),
-          const SizedBox(width: 8),
-          // Additional filters can be added here
+          // 불필요한 필터는 제거했습니다
         ],
       ),
     );
@@ -275,13 +272,40 @@ class _MercenariesScreenState extends State<MercenariesScreen> {
           ),
           const SizedBox(height: 24),
           ElevatedButton(
-            onPressed: () {
-              // TODO: Navigate to create mercenary profile
-            },
+            onPressed: _navigateToMercenaryRegistration,
             child: const Text('용병 등록하기'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _navigateToMercenaryRegistration() async {
+    try {
+      debugPrint('용병 등록 화면으로 이동 시도');
+      final result = await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (context) => MercenaryEditScreen(mercenaryId: null),
+        ),
+      );
+      
+      if (result != null) {
+        debugPrint('용병 등록 성공, 결과: $result');
+        // 용병 목록 새로고침
+        _loadMercenaries();
+        
+        // 성공 메시지 표시
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('용병 등록이 완료되었습니다')),
+        );
+      } else {
+        debugPrint('용병 등록 취소됨');
+      }
+    } catch (e) {
+      debugPrint('!!! 용병 등록 화면 이동 중 오류 발생: $e !!!');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('오류가 발생했습니다: $e')),
+      );
+    }
   }
 } 

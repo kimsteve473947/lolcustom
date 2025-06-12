@@ -77,13 +77,18 @@ class MercenaryModel extends Equatable {
   }
 
   Map<String, dynamic> toFirestore() {
+    // availabilityTimeSlots가 비어 있으면 빈 맵으로 변환
+    final Map<String, List<String>> safeAvailabilityTimeSlots = availabilityTimeSlots.isEmpty 
+        ? {} 
+        : Map<String, List<String>>.from(availabilityTimeSlots);
+    
     return {
       'userUid': userUid,
       'createdAt': createdAt,
-      'description': description,
+      'description': description ?? '',
       'preferredPositions': preferredPositions,
       'roleStats': roleStats,
-      'skillStats': skillStats,
+      'skillStats': skillStats ?? {},
       'averageRating': averageRating,
       'totalRatings': totalRatings,
       'averageRoleStat': averageRoleStat,
@@ -92,8 +97,8 @@ class MercenaryModel extends Equatable {
       'tier': tier.index,
       'isAvailable': isAvailable,
       'lastActiveAt': lastActiveAt,
-      'availabilityTimeSlots': availabilityTimeSlots,
-      'demographicInfo': demographicInfo,
+      'availabilityTimeSlots': safeAvailabilityTimeSlots,
+      'demographicInfo': demographicInfo ?? '',
     };
   }
 

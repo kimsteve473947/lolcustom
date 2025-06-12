@@ -15,7 +15,11 @@ import 'package:provider/provider.dart';
 class MercenaryEditScreen extends StatefulWidget {
   final String? mercenaryId;
   
+  // 단순화된 생성자
   const MercenaryEditScreen({Key? key, this.mercenaryId}) : super(key: key);
+
+  // 새 용병 등록 모드인지 확인하는 메서드
+  bool get isCreatingNew => mercenaryId == null || mercenaryId == '' || mercenaryId == 'edit' || mercenaryId == 'new';
 
   @override
   State<MercenaryEditScreen> createState() => _MercenaryEditScreenState();
@@ -76,7 +80,12 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
   @override
   void initState() {
     super.initState();
-    _loadData();
+    // 화면이 렌더링된 후 데이터 로드를 시작하여 오류 방지
+    Future.microtask(() {
+      if (mounted) {
+        _loadData();
+      }
+    });
   }
 
   @override
@@ -93,8 +102,12 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
     });
     
     try {
+      debugPrint('=== 용병 정보 로드 시작 ===');
+      debugPrint('mercenaryId: ${widget.mercenaryId}');
+      debugPrint('isCreatingNew: ${widget.isCreatingNew}');
+      
       // 현재 로그인한 사용자 정보 가져오기
-    final appState = Provider.of<AppStateProvider>(context, listen: false);
+      final appState = Provider.of<AppStateProvider>(context, listen: false);
       _user = appState.currentUser;
       
       if (_user == null) {
@@ -105,11 +118,21 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
         return;
       }
       
-      // 기존 용병 정보가 있는지 확인
-      if (widget.mercenaryId != null) {
+      debugPrint('현재 로그인 사용자: ${_user!.nickname} (${_user!.uid})');
+      
+      // 새 용병 등록 모드인지 확인
+      if (widget.isCreatingNew) {
+        debugPrint('새 용병 등록 모드 - 기존 용병 정보를 조회하지 않음');
+        // 새 용병 등록 모드에서는 기존 용병 정보를 조회하지 않음
+      } 
+      // 기존 용병 수정 모드이고 유효한 ID가 있는 경우
+      else if (widget.mercenaryId != null && widget.mercenaryId!.isNotEmpty && 
+               widget.mercenaryId != 'edit' && widget.mercenaryId != 'new') {
+        debugPrint('기존 용병 정보 조회 시도...');
         final mercenary = await _firebaseService.getMercenary(widget.mercenaryId!);
         
         if (mercenary != null) {
+          debugPrint('기존 용병 정보 로드 성공');
           setState(() {
             _existingMercenary = mercenary;
             _selectedPositions = List<String>.from(mercenary.preferredPositions);
@@ -120,18 +143,28 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
             _descriptionController.text = mercenary.description ?? '';
             _isAvailable = mercenary.isAvailable;
             _profileImageUrl = mercenary.profileImageUrl;
+            _selectedTier = _tierToString(mercenary.tier);
+          });
+        } else {
+          debugPrint('!!! 해당 ID의 용병 정보를 찾을 수 없음 !!!');
+          setState(() {
+            _errorMessage = '용병 정보를 찾을 수 없습니다';
           });
         }
+      } else {
+        debugPrint('유효하지 않은 mercenaryId, 새 용병 등록 모드로 전환');
       }
       
       // 유저 정보 기반으로 기본 값 설정
       if (_user != null) {
         setState(() {
-          _selectedTier = _tierToString(_user!.tier);
+          _selectedTier ??= _tierToString(_user!.tier);
           _profileImageUrl ??= _user!.profileImageUrl;
         });
+        debugPrint('사용자 기본 정보 설정 완료');
       }
     } catch (e) {
+      debugPrint('!!! 데이터 로드 중 오류 발생: $e !!!');
       setState(() {
         _errorMessage = '데이터를 불러오는 중 오류가 발생했습니다: $e';
       });
@@ -174,13 +207,23 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
     setState(() => _isSaving = true);
     
     try {
+      debugPrint('=== 용병 프로필 저장 시작 ===');
+      debugPrint('isCreatingNew: ${widget.isCreatingNew}');
+      
       final appState = Provider.of<AppStateProvider>(context, listen: false);
-      final currentUser = appState.currentUser!;
+      final currentUser = appState.currentUser;
+      
+      if (currentUser == null) {
+        throw Exception('사용자 정보를 찾을 수 없습니다');
+      }
+      
+      debugPrint('현재 사용자: ${currentUser.nickname} (${currentUser.uid})');
       
       String? profileImageUrl = _profileImageUrl;
       
       // 이미지가 변경되었다면 업로드
       if (_profileImage != null) {
+        debugPrint('프로필 이미지 업로드 시작');
         final bytes = await _profileImage!.readAsBytes();
         final userId = currentUser.uid;
         final path = 'mercenaries/$userId/profile.jpg';
@@ -189,15 +232,25 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
           path, 
           bytes,
         );
+        debugPrint('프로필 이미지 업로드 완료: $profileImageUrl');
       }
       
       // 각 포지션의 평균 능력치 계산
       final int sumRoleStats = _roleStats.values.fold(0, (sum, stat) => sum + stat);
       final double averageRoleStat = _roleStats.isNotEmpty ? sumRoleStats / _roleStats.length : 0;
       
+      // 티어 변환
+      final PlayerTier tier = _stringToTier(_selectedTier ?? '언랭');
+      
+      // availabilityTimeSlots 설정 (Firebase 저장용 형식으로 변환)
+      final Map<String, List<String>> availabilityTimeSlots = {};
+      
+      debugPrint('역할 능력치: $_roleStats');
+      debugPrint('선택한 포지션: $_selectedPositions');
+      
       // 등록 또는 업데이트할 mercenary 객체 생성
       final mercenary = MercenaryModel(
-        id: _existingMercenary?.id ?? '',
+        id: widget.isCreatingNew ? '' : (_existingMercenary?.id ?? ''),
         userUid: currentUser.uid,
         createdAt: _existingMercenary?.createdAt ?? Timestamp.now(),
         description: _descriptionController.text.trim(),
@@ -209,40 +262,54 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
         averageRoleStat: averageRoleStat,
         nickname: currentUser.nickname,
         profileImageUrl: profileImageUrl,
-        tier: _tierFromString(_selectedTier ?? '언랭'),
+        tier: tier,
         isAvailable: _isAvailable,
         lastActiveAt: Timestamp.now(),
+        availabilityTimeSlots: availabilityTimeSlots,
+        demographicInfo: _existingMercenary?.demographicInfo ?? '',
       );
       
-      // 신규 등록 또는 업데이트
-      if (_existingMercenary == null) {
-        final mercenaryId = await _firebaseService.createMercenaryProfile(mercenary);
-        debugPrint('Created new mercenary profile with ID: $mercenaryId');
+      // 새로운 용병 프로필 등록 또는 기존 프로필 업데이트
+      String? mercenaryId;
+      if (widget.isCreatingNew) {
+        debugPrint('새 용병 프로필 생성 시작');
+        mercenaryId = await _firebaseService.createMercenaryProfile(mercenary);
+        debugPrint('새 용병 프로필 생성 완료: $mercenaryId');
+        
+        // 성공 메시지
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('용병 프로필이 등록되었습니다')),
+          );
+        }
       } else {
+        debugPrint('기존 용병 프로필 업데이트 시작: ${_existingMercenary?.id}');
         await _firebaseService.updateMercenaryProfile(mercenary);
-        debugPrint('Updated mercenary profile with ID: ${_existingMercenary!.id}');
+        mercenaryId = mercenary.id;
+        debugPrint('기존 용병 프로필 업데이트 완료');
+        
+        // 성공 메시지
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('용병 프로필이 업데이트되었습니다')),
+          );
+        }
       }
       
+      // 잠시 대기 후 화면 전환 (애니메이션 완료 대기)
+      await Future.delayed(const Duration(milliseconds: 500));
+      
+      // 화면 전환
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('용병 프로필이 저장되었습니다'),
-            backgroundColor: Colors.green,
-          ),
-        );
-        
-        // 뒤로 가기
-        context.pop();
+        debugPrint('화면 전환 - 용병 프로필 화면으로 이동');
+        Navigator.of(context).pop(mercenaryId);
       }
     } catch (e) {
-      debugPrint('Error saving mercenary profile: $e');
+      debugPrint('!!! 용병 프로필 저장 실패: $e !!!');
       if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('용병 프로필 저장 실패: $e'),
-            backgroundColor: Colors.red,
-          ),
-      );
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('오류가 발생했습니다: $e')),
+        );
       }
     } finally {
       if (mounted) {
@@ -277,7 +344,7 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
   }
   
   // 티어 문자열을 PlayerTier enum으로 변환하는 헬퍼 메소드
-  PlayerTier _tierFromString(String tierStr) {
+  PlayerTier _stringToTier(String tierStr) {
     switch (tierStr) {
       case '언랭': return PlayerTier.unranked;
       case '아이언': return PlayerTier.iron;
@@ -487,11 +554,7 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
                       CircleAvatar(
                         radius: 40,
                   backgroundColor: AppColors.primary.withOpacity(0.1),
-                  backgroundImage: _profileImage != null 
-                    ? FileImage(_profileImage!) 
-                          : (_profileImageUrl != null 
-                              ? NetworkImage(_profileImageUrl!) as ImageProvider
-                        : null),
+                        backgroundImage: _getProfileImage(),
                         child: _profileImage == null && _profileImageUrl == null
                     ? const Icon(
                         Icons.person,
@@ -499,7 +562,7 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
                         color: AppColors.primary,
                       )
                     : null,
-                ),
+                      ),
                       Positioned(
                         right: 0,
                         bottom: 0,
@@ -580,6 +643,21 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
         ),
       ),
     );
+  }
+  
+  // 프로필 이미지를 가져오는 헬퍼 메서드
+  ImageProvider? _getProfileImage() {
+    try {
+      if (_profileImage != null) {
+        return FileImage(_profileImage!);
+      } else if (_profileImageUrl != null && _profileImageUrl!.isNotEmpty) {
+        return NetworkImage(_profileImageUrl!);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error loading profile image: $e');
+      return null;
+    }
   }
   
   Widget _buildPositionSelector() {
