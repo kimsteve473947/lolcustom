@@ -6,6 +6,7 @@ import 'package:lol_custom_game_manager/models/models.dart';
 import 'package:lol_custom_game_manager/services/firebase_service.dart';
 import 'package:lol_custom_game_manager/widgets/error_view.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
+import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_edit_screen.dart';
 
 class MercenarySearchTab extends StatefulWidget {
   const MercenarySearchTab({Key? key}) : super(key: key);
@@ -507,7 +508,12 @@ class _MercenarySearchTabState extends State<MercenarySearchTab> {
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () {
-          context.push('/mercenaries/edit');
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => MercenaryEditScreen(mercenaryId: null),
+            ),
+          );
         },
         backgroundColor: AppColors.primary,
         foregroundColor: Colors.white,
@@ -790,7 +796,12 @@ class _MercenarySearchTabState extends State<MercenarySearchTab> {
           const SizedBox(height: 24),
               ElevatedButton.icon(
             onPressed: () {
-              context.push('/mercenaries/edit');
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => MercenaryEditScreen(mercenaryId: null),
+                ),
+              );
             },
                 icon: const Icon(Icons.add, size: 18),
                 label: const Text(

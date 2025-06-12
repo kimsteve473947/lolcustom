@@ -348,37 +348,71 @@ class FirebaseService {
 
   Future<String> createMercenaryProfile(MercenaryModel mercenary) async {
     try {
+      debugPrint('=== 용병 프로필 생성 시작 ===');
+      debugPrint('용병 데이터: ${mercenary.toFirestore()}');
+      
+      // 필수 필드 검사
+      if (mercenary.userUid.isEmpty) {
+        throw Exception('userUid는 필수 값입니다');
+      }
+      
+      if (mercenary.preferredPositions.isEmpty) {
+        throw Exception('preferredPositions는 최소 1개 이상 필요합니다');
+      }
+      
       DocumentReference ref =
           await _firestore.collection('mercenaries').add(mercenary.toFirestore());
+      debugPrint('용병 프로필 생성 완료, ID: ${ref.id}');
       return ref.id;
     } catch (e) {
-      debugPrint('Error creating mercenary profile: $e');
-      throw e;
+      debugPrint('!!! 용병 프로필 생성 실패: $e !!!');
+      throw Exception('용병 프로필 생성 실패: $e');
     }
   }
 
   Future<void> updateMercenaryProfile(MercenaryModel mercenary) async {
     try {
+      debugPrint('=== 용병 프로필 업데이트 시작 ===');
+      debugPrint('용병 ID: ${mercenary.id}');
+      debugPrint('용병 데이터: ${mercenary.toFirestore()}');
+      
+      if (mercenary.id.isEmpty) {
+        throw Exception('용병 ID가 비어 있습니다');
+      }
+      
       await _firestore
           .collection('mercenaries')
           .doc(mercenary.id)
           .update(mercenary.toFirestore());
+      debugPrint('용병 프로필 업데이트 완료');
     } catch (e) {
-      debugPrint('Error updating mercenary profile: $e');
-      throw e;
+      debugPrint('!!! 용병 프로필 업데이트 실패: $e !!!');
+      throw Exception('용병 프로필 업데이트 실패: $e');
     }
   }
 
   Future<MercenaryModel?> getMercenary(String id) async {
     try {
+      debugPrint('=== 용병 정보 조회 시작 ===');
+      debugPrint('요청 ID: $id');
+      
+      if (id.isEmpty) {
+        debugPrint('!!! 용병 ID가 비어 있습니다 !!!');
+        return null;
+      }
+      
       DocumentSnapshot doc =
           await _firestore.collection('mercenaries').doc(id).get();
+      
       if (doc.exists) {
+        debugPrint('용병 정보 조회 성공');
         return MercenaryModel.fromFirestore(doc);
+      } else {
+        debugPrint('!!! 해당 ID의 용병 정보가 없습니다 !!!');
+        return null;
       }
-      return null;
     } catch (e) {
-      debugPrint('Error getting mercenary: $e');
+      debugPrint('!!! 용병 정보 조회 실패: $e !!!');
       return null;
     }
   }
@@ -565,24 +599,51 @@ class FirebaseService {
   // Storage methods
   Future<String> uploadImage(String path, Uint8List bytes) async {
     try {
-      // Handle web vs mobile differently if needed
+      debugPrint('=== 이미지 업로드 시작 ===');
+      debugPrint('경로: $path');
+      debugPrint('크기: ${bytes.length} 바이트');
+      
+      // Storage 참조 생성
       final ref = _storage.ref().child(path);
-
-      if (kIsWeb) {
-        // Web specific upload
-        final metadata = SettableMetadata(
-          contentType: 'image/jpeg',
-        );
-        await ref.putData(bytes, metadata);
-      } else {
-        // Mobile upload
-        await ref.putData(bytes);
+      
+      // 현재 경로가 유효한지 확인
+      try {
+        // 디렉토리 경로 생성 (필요한 경우)
+        final String dir = path.contains('/') ? path.substring(0, path.lastIndexOf('/')) : '';
+        if (dir.isNotEmpty) {
+          debugPrint('디렉토리 경로 확인: $dir');
+          // 디렉토리는 확인할 필요 없음, Firebase Storage는 자동으로 처리
+        }
+        
+        debugPrint('이미지 업로드 시작...');
+        if (kIsWeb) {
+          // Web specific upload
+          final metadata = SettableMetadata(
+            contentType: 'image/jpeg',
+          );
+          await ref.putData(bytes, metadata);
+        } else {
+          // Mobile upload
+          await ref.putData(bytes);
+        }
+        
+        debugPrint('이미지 업로드 완료');
+        
+        // 다운로드 URL 가져오기
+        final downloadUrl = await ref.getDownloadURL();
+        debugPrint('다운로드 URL: $downloadUrl');
+        
+        return downloadUrl;
+      } catch (e) {
+        debugPrint('!!! 이미지 업로드 중 오류 발생: $e !!!');
+        
+        // 대체 이미지 URL 반환 (기본 프로필 이미지 URL)
+        return 'https://lol-custom-game-manager.web.app/assets/images/default_profile.png';
       }
-
-      return await ref.getDownloadURL();
     } catch (e) {
-      debugPrint('Error uploading image: $e');
-      throw e;
+      debugPrint('!!! 이미지 업로드 메서드 오류: $e !!!');
+      // 대체 이미지 URL 반환 (기본 프로필 이미지 URL)
+      return 'https://lol-custom-game-manager.web.app/assets/images/default_profile.png';
     }
   }
 

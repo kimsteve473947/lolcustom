@@ -9,8 +9,12 @@ import 'package:lol_custom_game_manager/screens/auth/signup_screen.dart';
 import 'package:lol_custom_game_manager/screens/chat/chat_list_screen.dart';
 import 'package:lol_custom_game_manager/screens/chat/chat_room_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_detail_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_emblem_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_list_screen.dart';
-import 'package:lol_custom_game_manager/screens/clans/create_clan_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_basic_info_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_activity_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_preferences_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_focus_screen.dart';
 import 'package:lol_custom_game_manager/screens/main_screen.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_detail_screen.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_edit_screen.dart';
@@ -123,21 +127,6 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: '/mercenaries/edit',
-        builder: (context, state) => MainScreen(
-          child: const MercenaryEditScreen(),
-        ),
-      ),
-      GoRoute(
-        path: '/mercenaries/:id/edit',
-        builder: (context, state) {
-          final mercenaryId = state.pathParameters['id']!;
-          return MainScreen(
-            child: MercenaryEditScreen(mercenaryId: mercenaryId),
-          );
-        },
-      ),
-      GoRoute(
         path: '/clans',
         builder: (context, state) => const MainScreen(
           initialTabIndex: 1,
@@ -145,9 +134,23 @@ class AppRouter {
       ),
       GoRoute(
         path: '/clans/create',
-        builder: (context, state) => MainScreen(
-          child: const CreateClanScreen(),
-        ),
+        builder: (context, state) => const ClanBasicInfoScreen(),
+      ),
+      GoRoute(
+        path: '/clans/emblem',
+        builder: (context, state) => const ClanEmblemScreen(),
+      ),
+      GoRoute(
+        path: '/clans/activity',
+        builder: (context, state) => const ClanActivityScreen(),
+      ),
+      GoRoute(
+        path: '/clans/preferences',
+        builder: (context, state) => const ClanPreferencesScreen(),
+      ),
+      GoRoute(
+        path: '/clans/focus',
+        builder: (context, state) => const ClanFocusScreen(),
       ),
       GoRoute(
         path: '/clans/:id',

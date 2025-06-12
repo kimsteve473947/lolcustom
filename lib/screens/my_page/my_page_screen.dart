@@ -7,6 +7,7 @@ import 'package:lol_custom_game_manager/screens/my_page/tournaments_by_date_scre
 import 'package:lol_custom_game_manager/models/user_model.dart';
 import 'package:provider/provider.dart';
 import 'package:go_router/go_router.dart';
+import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_edit_screen.dart';
 
 class MyPageScreen extends StatefulWidget {
   const MyPageScreen({Key? key}) : super(key: key);
@@ -294,11 +295,11 @@ class _MyPageScreenState extends State<MyPageScreen> {
           children: [
             Stack(
               alignment: Alignment.bottomRight,
-              children: [
-                const CircleAvatar(
+          children: [
+            const CircleAvatar(
                   radius: 50,
                   backgroundColor: AppColors.primary,
-                  backgroundImage: AssetImage('assets/images/profile_placeholder.png'),
+              backgroundImage: AssetImage('assets/images/profile_placeholder.png'),
                   child: Icon(Icons.person, size: 50, color: Colors.white),
                 ),
                 Container(
@@ -337,7 +338,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
                 child: Chip(
                   label: Text(
                     UserModel.tierToString(user.tier),
-                    style: const TextStyle(
+              style: const TextStyle(
                       color: Colors.white,
                       fontWeight: FontWeight.bold,
                     ),
@@ -433,8 +434,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
                     labelText: '라이엇 ID',
                     hintText: '게임 내 라이엇 ID',
                     prefixIcon: Icon(Icons.gamepad_outlined),
-                  ),
-                ),
+              ),
+            ),
                 const SizedBox(height: 16),
                 DropdownButtonFormField<PlayerTier>(
                   value: selectedTier,
@@ -537,7 +538,12 @@ class _MyPageScreenState extends State<MyPageScreen> {
           title: const Text('용병 등록 / 수정'),
           subtitle: const Text('용병으로 활동하여 내전에 참여하세요'),
           onTap: () {
-            context.push('/mercenaries/edit');
+            Navigator.push(
+              context,
+              MaterialPageRoute(
+                builder: (context) => MercenaryEditScreen(mercenaryId: null),
+              ),
+            );
           },
           tileColor: AppColors.primary.withOpacity(0.05),
           shape: RoundedRectangleBorder(
