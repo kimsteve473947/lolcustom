@@ -447,7 +447,7 @@ class _ClanSearchScreenState extends State<ClanSearchScreen> {
         onTap: () {
           final clanId = clan.id;
           debugPrint('검색 화면에서 클랜 상세로 이동: $clanId');
-          context.go('/clans/detail/$clanId');
+          context.push('/clans/detail/$clanId');
         },
         borderRadius: BorderRadius.circular(12),
         child: Padding(
