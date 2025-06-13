@@ -9,12 +9,8 @@ import 'package:lol_custom_game_manager/screens/auth/signup_screen.dart';
 import 'package:lol_custom_game_manager/screens/chat/chat_list_screen.dart';
 import 'package:lol_custom_game_manager/screens/chat/chat_room_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_detail_screen.dart';
-import 'package:lol_custom_game_manager/screens/clans/clan_emblem_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_list_screen.dart';
-import 'package:lol_custom_game_manager/screens/clans/clan_basic_info_screen.dart';
-import 'package:lol_custom_game_manager/screens/clans/clan_activity_screen.dart';
-import 'package:lol_custom_game_manager/screens/clans/clan_preferences_screen.dart';
-import 'package:lol_custom_game_manager/screens/clans/clan_focus_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_creation_flow_screen.dart';
 import 'package:lol_custom_game_manager/screens/main_screen.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_detail_screen.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_edit_screen.dart';
@@ -33,9 +29,7 @@ class AppRouter {
   
   AppRouter({required this.authService});
   
-  // 라우터용 네비게이터 키 정의
   final _rootNavigatorKey = GlobalKey<NavigatorState>();
-  final _shellNavigatorKey = GlobalKey<NavigatorState>();
   
   late final router = GoRouter(
     initialLocation: '/',
@@ -44,35 +38,18 @@ class AppRouter {
     refreshListenable: GoRouterRefreshStream(authService.authStateChanges()),
     redirect: (BuildContext context, GoRouterState state) {
       final isLoggedIn = authService.isLoggedIn;
-      final isInitializing = state.uri.path == '/';
-      final isLoggingIn = state.uri.path == '/login';
-      final isSigningUp = state.uri.path == '/signup';
-      final isPasswordReset = state.uri.path == '/password-reset';
-      
-      // 인증이 필요하지 않은 경로 목록
-      final publicPaths = [
-        '/',
-        '/login',
-        '/signup',
-        '/password-reset',
-      ];
-      
-      // 초기화 중일 때는 리다이렉트하지 않음
-      if (isInitializing) {
-        return null;
-      }
-      
-      // 로그인한 사용자가 로그인/회원가입 페이지에 접근하면 메인으로 리다이렉트
-      if (isLoggedIn && (isLoggingIn || isSigningUp || isPasswordReset)) {
-        return '/main';
-      }
-      
-      // 로그인하지 않은 사용자가 보호된 경로에 접근하면 로그인 페이지로 리다이렉트
-      if (!isLoggedIn && !publicPaths.contains(state.uri.path)) {
+      final loggingIn = state.uri.path == '/login' || state.uri.path == '/signup';
+
+      // 사용자가 로그인하지 않았고, 로그인/회원가입 페이지가 아니며, 스플래시 페이지도 아니라면 로그인 페이지로 리디렉션합니다.
+      if (!isLoggedIn && !loggingIn && state.uri.path != '/') {
         return '/login?redirect=${state.uri.path}';
       }
-      
-      // 그 외의 경우 정상 진행
+
+      // 사용자가 로그인했고, 로그인/회원가입 페이지에 있다면 메인 페이지로 리디렉션합니다.
+      if (isLoggedIn && loggingIn) {
+        return '/main';
+      }
+
       return null;
     },
     routes: [
@@ -91,18 +68,8 @@ class AppRouter {
         builder: (context, state) => const SignupScreen(),
       ),
       GoRoute(
-        path: '/home',
-        builder: (context, state) => const MainScreen(),
-      ),
-      GoRoute(
         path: '/main',
         builder: (context, state) => const MainScreen(),
-      ),
-      GoRoute(
-        path: '/tournaments',
-        builder: (context, state) => const MainScreen(
-          initialTabIndex: 0,
-        ),
       ),
       GoRoute(
         path: '/tournaments/create',
@@ -112,88 +79,54 @@ class AppRouter {
         path: '/tournaments/:id',
         builder: (context, state) {
           final tournamentId = state.pathParameters['id']!;
-          return TournamentDetailScreen(
-            tournamentId: tournamentId,
-          );
+          return TournamentDetailScreen(tournamentId: tournamentId);
         },
       ),
       GoRoute(
         path: '/mercenaries/:id',
         builder: (context, state) {
           final userId = state.pathParameters['id']!;
-          return MainScreen(
-            child: MercenaryDetailScreen(mercenaryId: userId),
-          );
+          return MainScreen(child: MercenaryDetailScreen(mercenaryId: userId));
         },
       ),
       GoRoute(
         path: '/clans',
-        builder: (context, state) => const MainScreen(
-          initialTabIndex: 1,
-        ),
+        builder: (context, state) => const MainScreen(initialTabIndex: 1),
       ),
       GoRoute(
         path: '/clans/create',
-        builder: (context, state) => const ClanBasicInfoScreen(),
-      ),
-      GoRoute(
-        path: '/clans/emblem',
-        builder: (context, state) => const ClanEmblemScreen(),
-      ),
-      GoRoute(
-        path: '/clans/activity',
-        builder: (context, state) => const ClanActivityScreen(),
-      ),
-      GoRoute(
-        path: '/clans/preferences',
-        builder: (context, state) => const ClanPreferencesScreen(),
-      ),
-      GoRoute(
-        path: '/clans/focus',
-        builder: (context, state) => const ClanFocusScreen(),
+        builder: (context, state) => const ClanCreationFlowScreen(),
       ),
       GoRoute(
         path: '/clans/:id',
         builder: (context, state) {
           final clanId = state.pathParameters['id']!;
-          return MainScreen(
-            child: ClanDetailScreen(clanId: clanId),
-          );
+          return MainScreen(child: ClanDetailScreen(clanId: clanId));
         },
       ),
       GoRoute(
         path: '/chat',
-        builder: (context, state) => const MainScreen(
-          initialTabIndex: 2,
-        ),
+        builder: (context, state) => const MainScreen(initialTabIndex: 2),
       ),
       GoRoute(
         path: '/chat/:id',
         parentNavigatorKey: _rootNavigatorKey,
         pageBuilder: (context, state) {
           final chatId = state.pathParameters['id']!;
-          return NoTransitionPage(
-            child: ChatRoomScreen(chatRoomId: chatId),
-          );
+          return NoTransitionPage(child: ChatRoomScreen(chatRoomId: chatId));
         },
       ),
       GoRoute(
         path: '/rankings',
-        builder: (context, state) => const MainScreen(
-          initialTabIndex: 3,
-        ),
+        builder: (context, state) => const MainScreen(initialTabIndex: 3),
       ),
       GoRoute(
         path: '/mypage',
-        builder: (context, state) => const MainScreen(
-          initialTabIndex: 4,
-        ),
+        builder: (context, state) => const MainScreen(initialTabIndex: 4),
       ),
       GoRoute(
         path: '/admin',
-        builder: (context, state) => MainScreen(
-          child: const AdminToolsScreen(),
-        ),
+        builder: (context, state) => MainScreen(child: const AdminToolsScreen()),
       ),
       GoRoute(
         path: '/settings/fcm-test',
@@ -201,9 +134,7 @@ class AppRouter {
       ),
     ],
     errorBuilder: (context, state) => Scaffold(
-      appBar: AppBar(
-        title: const Text('페이지를 찾을 수 없습니다'),
-      ),
+      appBar: AppBar(title: const Text('페이지를 찾을 수 없습니다')),
       body: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -221,18 +152,16 @@ class AppRouter {
   );
 }
 
-// AuthService의 상태 변경을 감지하기 위한 리스너
 class GoRouterRefreshStream extends ChangeNotifier {
-  final StreamSubscription<dynamic> _subscription;
+  late final StreamSubscription<dynamic> _subscription;
   
-  GoRouterRefreshStream(Stream<dynamic> stream) 
-      : _subscription = stream.asBroadcastStream().listen((dynamic _) {
-          // 최신 버전의 go_router에서는 ChangeNotifier를 사용하지 않으므로 여기서 notifyListeners()를 직접 호출하지 않음
-        });
+  GoRouterRefreshStream(Stream<dynamic> stream) {
+    _subscription = stream.asBroadcastStream().listen((_) => notifyListeners());
+  }
   
   @override
   void dispose() {
     _subscription.cancel();
     super.dispose();
   }
-} 
+}

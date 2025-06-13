@@ -40,8 +40,8 @@ class ClanCreationProvider extends ChangeNotifier {
     GenderPreference? genderPreference,
     ClanFocus? focus,
     int? focusRating,
-    String? websiteUrl,
-    bool? isPublic,
+    String? discordUrl,
+    bool? areMembersPublic,
     bool? isRecruiting,
   }) {
     if (_clanData == null) {
@@ -59,8 +59,8 @@ class ClanCreationProvider extends ChangeNotifier {
       genderPreference: genderPreference,
       focus: focus,
       focusRating: focusRating,
-      websiteUrl: websiteUrl,
-      isPublic: isPublic,
+      discordUrl: discordUrl,
+      areMembersPublic: areMembersPublic,
       isRecruiting: isRecruiting,
     );
     
@@ -68,26 +68,22 @@ class ClanCreationProvider extends ChangeNotifier {
   }
   
   Future<ClanModel> createClan(String userId) async {
-    if (_clanData == null) {
-      throw Exception('클랜 데이터가 없습니다');
-    }
-    
     // 클랜 ID 생성
     final clanId = await _clanService.createClan(
-      _clanData!.name,
+      _name,
       userId,
-      description: _clanData!.description,
-      emblem: _clanData!.emblem,
-      activityDays: _clanData!.activityDays,
-      activityTimes: _clanData!.activityTimes,
-      ageGroups: _clanData!.ageGroups,
-      genderPreference: _clanData!.genderPreference,
-      focus: _clanData!.focus,
-      focusRating: _clanData!.focusRating,
-      websiteUrl: _clanData!.websiteUrl,
-      isPublic: _clanData!.isPublic,
-      isRecruiting: _clanData!.isRecruiting,
-      memberCount: _clanData!.memberCount,
+      description: _description,
+      emblem: _emblem,
+      activityDays: _activityDays,
+      activityTimes: _activityTimes,
+      ageGroups: _ageGroups,
+      genderPreference: _genderPreference,
+      focus: _focus,
+      focusRating: _focusRating,
+      discordUrl: _discordUrl,
+      areMembersPublic: _areMembersPublic,
+      isRecruiting: _isRecruiting,
+      memberCount: 1,
     );
     
     // 생성된 클랜 정보 가져오기
@@ -99,12 +95,13 @@ class ClanCreationProvider extends ChangeNotifier {
     return clan;
   }
   
-  bool isFormValid() {
-    if (_clanData == null) {
-      return false;
-    }
-    
-    return _clanData!.name.isNotEmpty;
+  bool isReadyToCreate() {
+    return _name.isNotEmpty &&
+           _description.isNotEmpty &&
+           _hasEmblem &&
+           _activityDays.isNotEmpty &&
+           _activityTimes.isNotEmpty &&
+           _ageGroups.isNotEmpty;
   }
   
   void reset() {
@@ -116,10 +113,10 @@ class ClanCreationProvider extends ChangeNotifier {
   String _name = '';
   String _code = '';
   String _description = '';
-  String? _websiteUrl;
+  String? _discordUrl;
   String? _region;
   int _maxMembers = 20;
-  bool _isPublic = true;
+  bool _areMembersPublic = true;
   bool _isRecruiting = true;
 
   // Emblem Info
@@ -145,10 +142,10 @@ class ClanCreationProvider extends ChangeNotifier {
   String get name => _name;
   String get code => _code;
   String get description => _description;
-  String? get websiteUrl => _websiteUrl;
+  String? get discordUrl => _discordUrl;
   String? get region => _region;
   int get maxMembers => _maxMembers;
-  bool get isPublic => _isPublic;
+  bool get areMembersPublic => _areMembersPublic;
   bool get isRecruiting => _isRecruiting;
   
   dynamic get emblem => _emblem;
@@ -181,8 +178,8 @@ class ClanCreationProvider extends ChangeNotifier {
     notifyListeners();
   }
   
-  void setWebsiteUrl(String value) {
-    _websiteUrl = value;
+  void setDiscordUrl(String value) {
+    _discordUrl = value;
     notifyListeners();
   }
   
@@ -196,8 +193,8 @@ class ClanCreationProvider extends ChangeNotifier {
     notifyListeners();
   }
   
-  void setIsPublic(bool value) {
-    _isPublic = value;
+  void setAreMembersPublic(bool value) {
+    _areMembersPublic = value;
     notifyListeners();
   }
   
@@ -328,7 +325,7 @@ class ClanCreationProvider extends ChangeNotifier {
       genderPreference: _genderPreference,
       focus: _focus,
       focusRating: _focusRating,
-      websiteUrl: _websiteUrl,
+      discordUrl: _discordUrl,
       createdAt: Timestamp.now(),
       maxMembers: _maxMembers,
       members: [userId],
@@ -370,7 +367,7 @@ class ClanCreationProvider extends ChangeNotifier {
       case ClanCreationStep.focusSelection:
         return isFocusSelectionValid();
       case ClanCreationStep.confirmation:
-        return isFormValid();
+        return isReadyToCreate();
       default:
         return false;
     }

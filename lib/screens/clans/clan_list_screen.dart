@@ -34,6 +34,16 @@ class _ClanListScreenState extends State<ClanListScreen> {
     );
     _loadUserClan();
   }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    final route = GoRouter.of(context);
+    final uri = route.routeInformationProvider.value.uri;
+    if (uri.queryParameters['refresh'] == 'true') {
+      _loadUserClan();
+    }
+  }
   
   Future<void> _loadUserClan() async {
     setState(() {
@@ -82,39 +92,45 @@ class _ClanListScreenState extends State<ClanListScreen> {
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
               onRefresh: _loadUserClan,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildHeroSection(),
-                    
-                    // 내 클랜 정보 (클랜이 있는 경우)
-                    if (_userClan != null)
-                      _buildUserClanSection(_userClan!, _isUserClanOwner),
-                      
-                    _buildRecruitingClansSection(),
-                    _buildClanTournamentsSection(),
-                    
-                    // 로그인한 경우에만 신청 내역 표시
-                    if (isLoggedIn)
-                      _buildApplicationHistorySection(),
-                      
-                    const SizedBox(height: 80), // Bottom padding for safe area
-                  ],
-                ),
+              child: Stack(
+                children: [
+                  SingleChildScrollView(
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildHeroSection(),
+                        
+                        // 내 클랜 정보 (클랜이 있는 경우)
+                        if (_userClan != null)
+                          _buildUserClanSection(_userClan!, _isUserClanOwner),
+                          
+                        _buildRecruitingClansSection(),
+                        _buildClanTournamentsSection(),
+                        
+                        // 로그인한 경우에만 신청 내역 표시
+                        if (isLoggedIn)
+                          _buildApplicationHistorySection(),
+                          
+                        const SizedBox(height: 80), // Bottom padding for safe area
+                      ],
+                    ),
+                  ),
+                  if (_userClan == null && authProvider.isLoggedIn)
+                    Positioned(
+                      bottom: 16,
+                      right: 16,
+                      child: FloatingActionButton(
+                        onPressed: () {
+                          context.push('/clans/create');
+                        },
+                        backgroundColor: Colors.orange,
+                        child: const Icon(Icons.add, color: Colors.white),
+                      ),
+                    ),
+                ],
               ),
             ),
-      floatingActionButton: (_userClan == null && authProvider.isLoggedIn)
-          ? FloatingActionButton(
-              onPressed: () {
-                // 팀 생성의 첫 화면으로 이동 (기본 정보 입력 화면)
-                context.push('/clans/create');
-              },
-              backgroundColor: AppColors.primary,
-              child: const Icon(Icons.add),
-            )
-          : null,
     );
   }
   
@@ -170,13 +186,23 @@ class _ClanListScreenState extends State<ClanListScreen> {
                 ),
                 Row(
                   children: [
-          IconButton(
+                    // 임시 데이터 초기화 버튼
+                    IconButton(
+                      icon: const Icon(Icons.delete_forever, color: Colors.red),
+                      onPressed: () async {
+                        await _clanService.removeAllClanDataFromUsers();
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('모든 유저의 클랜 데이터가 초기화되었습니다.')),
+                        );
+                        _loadUserClan(); // UI 새로고침
+                      },
+                      tooltip: '모든 유저 클랜 데이터 삭제',
+                    ),
+                    IconButton(
                       icon: const Icon(Icons.search, color: Colors.white),
-            onPressed: () {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('클랜 검색 기능은 준비 중입니다')),
-              );
-            },
+                      onPressed: () {
+                        context.push('/clans/search');
+                      },
                     ),
                     IconButton(
                       icon: const Icon(Icons.notifications_outlined, color: Colors.white),
@@ -229,7 +255,7 @@ class _ClanListScreenState extends State<ClanListScreen> {
                     ),
                   ),
                   child: const Text(
-                    '팀 만들기',
+                    '클랜 만들기',
                     style: TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
@@ -262,7 +288,7 @@ class _ClanListScreenState extends State<ClanListScreen> {
               if (isOwner)
                 TextButton(
                   onPressed: () {
-                    context.push('/clans/${clan.id}/manage');
+                    context.push('/clan/${clan.id}/manage');
                   },
                   child: const Text('관리하기'),
                 ),
@@ -272,7 +298,7 @@ class _ClanListScreenState extends State<ClanListScreen> {
           InkWell(
             onTap: () {
               debugPrint('클랜 상세 페이지로 이동: ${clan.id}');
-              context.push('/clans/detail/${clan.id}');
+              context.push('/clans/${clan.id}');
             },
             child: Container(
               padding: const EdgeInsets.all(16),
@@ -478,7 +504,7 @@ class _ClanListScreenState extends State<ClanListScreen> {
   Widget _buildClanCard(ClanModel clan) {
     return GestureDetector(
       onTap: () {
-        final String correctPath = '/clans/detail/${clan.id}';
+        final String correctPath = '/clans/${clan.id}';
         debugPrint('클랜 카드 클릭: 클랜 ID=${clan.id}, 경로=$correctPath');
         context.push(correctPath);
       },
@@ -925,4 +951,4 @@ class _ClanListScreenState extends State<ClanListScreen> {
     
     return iconMap[symbol] ?? Icons.star;
   }
-} 
+}

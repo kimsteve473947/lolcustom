@@ -23,9 +23,9 @@ class _ClanManagementScreenState extends State<ClanManagementScreen> {
   
   final TextEditingController _nameController = TextEditingController();
   final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _websiteController = TextEditingController();
+  final TextEditingController _discordController = TextEditingController();
   
-  bool _isPublic = true;
+  bool _areMembersPublic = true;
   bool _isRecruiting = true;
   
   @override
@@ -38,7 +38,7 @@ class _ClanManagementScreenState extends State<ClanManagementScreen> {
   void dispose() {
     _nameController.dispose();
     _descriptionController.dispose();
-    _websiteController.dispose();
+    _discordController.dispose();
     super.dispose();
   }
   
@@ -107,8 +107,8 @@ class _ClanManagementScreenState extends State<ClanManagementScreen> {
         _clan = clan;
         _nameController.text = clan.name;
         _descriptionController.text = clan.description ?? '';
-        _websiteController.text = clan.websiteUrl ?? '';
-        _isPublic = clan.isPublic;
+        _discordController.text = clan.discordUrl ?? '';
+        _areMembersPublic = clan.areMembersPublic;
         _isRecruiting = clan.isRecruiting;
         _isLoading = false;
       });
@@ -133,8 +133,8 @@ class _ClanManagementScreenState extends State<ClanManagementScreen> {
         final Map<String, dynamic> updates = {
           'name': _nameController.text,
           'description': _descriptionController.text,
-          'websiteUrl': _websiteController.text,
-          'isPublic': _isPublic,
+          'discordUrl': _discordController.text,
+          'areMembersPublic': _areMembersPublic,
           'isRecruiting': _isRecruiting,
         };
         
@@ -215,26 +215,26 @@ class _ClanManagementScreenState extends State<ClanManagementScreen> {
               ),
               const SizedBox(height: 16.0),
               
-              // 웹사이트
+              // 디스코드
               TextFormField(
-                controller: _websiteController,
+                controller: _discordController,
                 decoration: const InputDecoration(
-                  labelText: '웹사이트 URL',
+                  labelText: '디스코드 URL',
                   border: OutlineInputBorder(),
-                  hintText: 'https://',
+                  hintText: 'https://discord.gg/your-server',
                 ),
                 keyboardType: TextInputType.url,
               ),
               const SizedBox(height: 24.0),
               
-              // 공개 여부 및 모집 상태 설정
+              // 멤버 공개 여부 및 모집 상태 설정
               SwitchListTile(
-                title: const Text('클랜 공개'),
-                subtitle: const Text('클랜을 검색 결과에 표시합니다'),
-                value: _isPublic,
+                title: const Text('멤버 공개 여부'),
+                subtitle: const Text('다른 사용자들이 클랜원들을 참고할 수 있습니다.'),
+                value: _areMembersPublic,
                 onChanged: (value) {
                   setState(() {
-                    _isPublic = value;
+                    _areMembersPublic = value;
                   });
                 },
                 activeColor: AppColors.primary,

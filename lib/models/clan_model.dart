@@ -43,14 +43,17 @@ class ClanModel extends Equatable {
   final GenderPreference genderPreference;
   final ClanFocus focus;
   final int focusRating; // 1-10 scale where 1 is fully casual, 10 is fully competitive
-  final String? websiteUrl;
+  final String? discordUrl;
   final Timestamp createdAt;
   final int memberCount;
   final int maxMembers;
   final List<String> members;
   final List<String> pendingMembers;
-  final bool isPublic;
+  final bool areMembersPublic;
   final bool isRecruiting;
+  final int level;
+  final int xp;
+  final int xpToNextLevel;
 
   const ClanModel({
     required this.id,
@@ -66,14 +69,17 @@ class ClanModel extends Equatable {
     this.genderPreference = GenderPreference.any,
     this.focus = ClanFocus.balanced,
     this.focusRating = 5,
-    this.websiteUrl,
+    this.discordUrl,
     required this.createdAt,
     this.memberCount = 1,
     this.maxMembers = 20,
     this.members = const [],
     this.pendingMembers = const [],
-    this.isPublic = true,
+    this.areMembersPublic = true,
     this.isRecruiting = true,
+    this.level = 1,
+    this.xp = 0,
+    this.xpToNextLevel = 100,
   });
 
   ClanModel copyWith({
@@ -90,14 +96,17 @@ class ClanModel extends Equatable {
     GenderPreference? genderPreference,
     ClanFocus? focus,
     int? focusRating,
-    String? websiteUrl,
+    String? discordUrl,
     Timestamp? createdAt,
     int? memberCount,
     int? maxMembers,
     List<String>? members,
     List<String>? pendingMembers,
-    bool? isPublic,
+    bool? areMembersPublic,
     bool? isRecruiting,
+    int? level,
+    int? xp,
+    int? xpToNextLevel,
   }) {
     return ClanModel(
       id: id ?? this.id,
@@ -113,14 +122,17 @@ class ClanModel extends Equatable {
       genderPreference: genderPreference ?? this.genderPreference,
       focus: focus ?? this.focus,
       focusRating: focusRating ?? this.focusRating,
-      websiteUrl: websiteUrl ?? this.websiteUrl,
+      discordUrl: discordUrl ?? this.discordUrl,
       createdAt: createdAt ?? this.createdAt,
       memberCount: memberCount ?? this.memberCount,
       maxMembers: maxMembers ?? this.maxMembers,
       members: members ?? this.members,
       pendingMembers: pendingMembers ?? this.pendingMembers,
-      isPublic: isPublic ?? this.isPublic,
+      areMembersPublic: areMembersPublic ?? this.areMembersPublic,
       isRecruiting: isRecruiting ?? this.isRecruiting,
+      level: level ?? this.level,
+      xp: xp ?? this.xp,
+      xpToNextLevel: xpToNextLevel ?? this.xpToNextLevel,
     );
   }
 
@@ -138,14 +150,17 @@ class ClanModel extends Equatable {
       'genderPreference': genderPreference.index,
       'focus': focus.index,
       'focusRating': focusRating,
-      'websiteUrl': websiteUrl,
+      'discordUrl': discordUrl,
       'createdAt': createdAt,
       'memberCount': memberCount,
       'maxMembers': maxMembers,
       'members': members,
       'pendingMembers': pendingMembers,
-      'isPublic': isPublic,
+      'areMembersPublic': areMembersPublic,
       'isRecruiting': isRecruiting,
+      'level': level,
+      'xp': xp,
+      'xpToNextLevel': xpToNextLevel,
     };
     
     // 엠블럼 데이터 처리
@@ -205,14 +220,17 @@ class ClanModel extends Equatable {
           ? ClanFocus.values[map['focus'] as int]
           : ClanFocus.balanced,
       focusRating: map['focusRating'] as int? ?? 5,
-      websiteUrl: map['websiteUrl'] as String?,
+      discordUrl: map['discordUrl'] as String?,
       createdAt: map['createdAt'] as Timestamp,
       memberCount: map['memberCount'] as int? ?? 1,
       maxMembers: map['maxMembers'] as int? ?? 20,
       members: List<String>.from(map['members'] ?? []),
       pendingMembers: List<String>.from(map['pendingMembers'] ?? []),
-      isPublic: map['isPublic'] as bool? ?? true,
+      areMembersPublic: map['areMembersPublic'] as bool? ?? true,
       isRecruiting: map['isRecruiting'] as bool? ?? true,
+      level: map['level'] as int? ?? 1,
+      xp: map['xp'] as int? ?? 0,
+      xpToNextLevel: map['xpToNextLevel'] as int? ?? 100,
     );
   }
   
@@ -229,7 +247,8 @@ class ClanModel extends Equatable {
   List<Object?> get props => [
     id, name, code, description, ownerId, profileUrl, emblem,
     activityDays, activityTimes, ageGroups, genderPreference,
-    focus, focusRating, websiteUrl, createdAt, memberCount,
-    maxMembers, members, pendingMembers, isPublic, isRecruiting
+    focus, focusRating, discordUrl, createdAt, memberCount,
+    maxMembers, members, pendingMembers, areMembersPublic, isRecruiting,
+    level, xp, xpToNextLevel
   ];
-} 
+}
