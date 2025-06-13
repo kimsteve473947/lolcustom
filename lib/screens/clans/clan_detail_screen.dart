@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/models/clan_model.dart';
+import 'package:lol_custom_game_manager/models/clan_application_model.dart';
 import 'package:lol_custom_game_manager/services/clan_service.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:intl/intl.dart';
@@ -56,53 +57,67 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
     try {
       // 클랜 상세 정보 로드
       debugPrint('클랜 정보 로드 시작: ${widget.clanId}');
+      
+      // 먼저 클랜이 존재하는지 확인
+      final docExists = await FirebaseFirestore.instance
+          .collection('clans')
+          .doc(widget.clanId)
+          .get()
+          .then((doc) => doc.exists);
+      
+      if (!docExists) {
+        debugPrint('클랜 문서가 존재하지 않음: ${widget.clanId}');
+        throw Exception('클랜을 찾을 수 없습니다');
+      }
+      
       final clan = await _clanService.getClanById(widget.clanId);
       debugPrint('클랜 정보 로드 결과: ${clan != null ? '성공' : '실패'}');
       
-      if (clan != null) {
-        // 현재 사용자 정보 확인
-        final currentUser = FirebaseAuth.instance.currentUser;
-        bool isMember = false;
-        bool isOwner = false;
+      if (clan == null) {
+        throw Exception('클랜 정보를 로드할 수 없습니다');
+      }
+      
+      // 현재 사용자 정보 확인
+      final currentUser = FirebaseAuth.instance.currentUser;
+      bool isMember = false;
+      bool isOwner = false;
+      bool hasPendingApplication = false;
+      
+      if (currentUser != null) {
+        isMember = clan.members.contains(currentUser.uid);
+        isOwner = clan.ownerId == currentUser.uid;
         
-        if (currentUser != null) {
-          isMember = clan.members.contains(currentUser.uid);
-          isOwner = clan.ownerId == currentUser.uid;
-          debugPrint('현재 사용자 정보: ${currentUser.uid}, 멤버: $isMember, 소유자: $isOwner');
+        // 가입 신청 여부 확인
+        if (!isMember) {
+          final pendingApplication = await FirebaseFirestore.instance
+              .collection('clan_applications')
+              .where('userUid', isEqualTo: currentUser.uid)
+              .where('clanId', isEqualTo: widget.clanId)
+              .where('status', isEqualTo: ClanApplicationStatus.pending.index)
+              .get();
+          
+          hasPendingApplication = pendingApplication.docs.isNotEmpty;
         }
         
-        // 멤버 정보 로드
-        final membersList = await _loadMemberDetails(clan.members);
-        
-        // 활동 내역 로드 (예시로 구현)
-        final activitiesList = await _loadClanActivities(widget.clanId);
-        
-        if (mounted) {
-          setState(() {
-            _clan = clan;
-            _isCurrentUserMember = isMember;
-            _isCurrentUserOwner = isOwner;
-            _members = membersList;
-            _activities = activitiesList;
-            _isLoading = false;
-          });
-        }
-      } else {
-        debugPrint('클랜 정보를 찾을 수 없음: ${widget.clanId}');
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('클랜 정보를 찾을 수 없습니다')),
-          );
-          setState(() {
-            _isLoading = false;
-          });
-          // 3초 후 이전 화면으로 돌아가기
-          Future.delayed(const Duration(seconds: 3), () {
-            if (mounted) {
-              context.pop();
-            }
-          });
-        }
+        debugPrint('현재 사용자 정보: ${currentUser.uid}, 멤버: $isMember, 소유자: $isOwner, 신청중: $hasPendingApplication');
+      }
+      
+      // 멤버 정보 로드
+      final membersList = await _loadMemberDetails(clan.members);
+      
+      // 활동 내역 로드 (예시로 구현)
+      final activitiesList = await _loadClanActivities(widget.clanId);
+      
+      if (mounted) {
+        setState(() {
+          _clan = clan;
+          _isCurrentUserMember = isMember;
+          _isCurrentUserOwner = isOwner;
+          _hasPendingApplication = hasPendingApplication;
+          _members = membersList;
+          _activities = activitiesList;
+          _isLoading = false;
+        });
       }
     } catch (e) {
       debugPrint('클랜 정보 로드 오류: $e');
@@ -110,9 +125,21 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
         setState(() {
           _isLoading = false;
         });
+        
+        // 오류 메시지 표시
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('클랜 정보 로드 중 오류가 발생했습니다: $e')),
+          SnackBar(
+            content: Text('클랜 정보 로드 중 오류가 발생했습니다: $e'),
+            duration: const Duration(seconds: 3),
+          ),
         );
+        
+        // 3초 후 이전 화면으로 이동
+        Future.delayed(const Duration(seconds: 3), () {
+          if (mounted) {
+            context.pop();
+          }
+        });
       }
     }
   }
@@ -803,29 +830,22 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
     });
     
     try {
-      final user = FirebaseAuth.instance.currentUser;
-      if (user == null) {
-        throw Exception('로그인이 필요합니다');
+      // Navigate to ClanJoinScreen instead of directly applying
+      if(mounted) {
+        setState(() {
+          _isJoining = false;
+        });
+        context.push('/clans/join/${_clan!.id}');
       }
-      
-      await _clanService.applyToClan(_clan!.id, user.uid);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('클랜 가입 신청이 완료되었습니다')),
-      );
-      
-      // 상태 업데이트
-      setState(() {
-        _hasPendingApplication = true;
-      });
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('가입 신청 실패: $e')),
+        SnackBar(content: Text('가입 신청 화면 이동 실패: $e')),
       );
-    } finally {
-      setState(() {
-        _isJoining = false;
-      });
+      if(mounted) {
+        setState(() {
+          _isJoining = false;
+        });
+      }
     }
   }
 } 

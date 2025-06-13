@@ -135,57 +135,15 @@ class ClanService {
   
   // Apply to join a clan
   Future<void> applyToClan(String clanId, String userId) async {
-    // Check if the user is already a member or has a pending application
-    final clanDoc = await _clansCollection.doc(clanId).get();
-    if (!clanDoc.exists) {
-      throw Exception('클랜이 존재하지 않습니다');
-    }
-    
-    final clanData = clanDoc.data() as Map<String, dynamic>;
-    final List<String> members = List<String>.from(clanData['members'] ?? []);
-    final List<String> pendingMembers = List<String>.from(clanData['pendingMembers'] ?? []);
-    
-    if (members.contains(userId)) {
-      throw Exception('이미 클랜의 멤버입니다');
-    }
-    
-    if (pendingMembers.contains(userId)) {
-      throw Exception('이미 가입 신청을 했습니다');
-    }
-    
-    // Check if the clan is recruiting
-    if (clanData['isRecruiting'] != true) {
-      throw Exception('현재 이 클랜은 멤버를 모집하지 않습니다');
-    }
-    
-    // Check if the clan is full
-    final int memberCount = clanData['memberCount'] ?? members.length;
-    final int maxMembers = clanData['maxMembers'] ?? 30;
-    
-    if (memberCount >= maxMembers) {
-      throw Exception('클랜이 가득 찼습니다');
-    }
-    
-    // Add user to pending members
-    await _clansCollection.doc(clanId).update({
-      'pendingMembers': FieldValue.arrayUnion([userId]),
-    });
-    
-    // Create application notification for clan owner
-    final ownerId = clanData['ownerId'];
-    if (ownerId != null) {
-      // 알림 생성 로직
-      await _firestore.collection('notifications').add({
-        'userId': ownerId,
-        'type': 'clan_application',
-        'message': '새로운 클랜 가입 신청이 있습니다',
-        'data': {
-          'clanId': clanId,
-          'applicantId': userId,
-        },
-        'read': false,
-        'createdAt': Timestamp.now(),
-      });
+    try {
+      debugPrint('레거시 applyToClan 호출, 새 메서드로 전환: $clanId, $userId');
+      await applyClanWithDetails(
+        clanId: clanId,
+        message: '가입 신청합니다.',
+      );
+    } catch (e) {
+      debugPrint('레거시 applyToClan 오류: $e');
+      rethrow;
     }
   }
   
@@ -460,13 +418,25 @@ class ClanService {
   }) async {
     try {
       final user = _auth.currentUser;
-      if (user == null) return false;
+      if (user == null) {
+        throw Exception('로그인이 필요합니다');
+      }
+
+      debugPrint('클랜 가입 신청 시작: $clanId, 유저: ${user.uid}');
+
+      // 클랜이 존재하는지 확인
+      final clanDoc = await _firestore.collection('clans').doc(clanId).get();
+      if (!clanDoc.exists) {
+        debugPrint('클랜이 존재하지 않음: $clanId');
+        throw Exception('존재하지 않는 클랜입니다.');
+      }
 
       // 이미 클랜에 속해있는지 확인
       final userDoc = await _firestore.collection('users').doc(user.uid).get();
       if (userDoc.exists) {
         final userData = userDoc.data();
         if (userData != null && userData['clanId'] != null) {
+          debugPrint('이미 클랜에 소속됨: ${userData['clanId']}');
           throw Exception('이미 클랜에 소속되어 있습니다.');
         }
       }
@@ -480,9 +450,11 @@ class ClanService {
           .get();
 
       if (existingApplications.docs.isNotEmpty) {
+        debugPrint('이미 신청함: ${existingApplications.docs.first.id}');
         throw Exception('이미 해당 클랜에 가입 신청을 하셨습니다.');
       }
 
+      debugPrint('신청서 생성 중...');
       // 신청서 생성
       final application = ClanApplicationModel(
         id: '', // Firestore에서 자동 생성
@@ -499,12 +471,33 @@ class ClanService {
       );
 
       // Firestore에 저장
-      await _firestore.collection('clan_applications').add(application.toFirestore());
+      final docRef = await _firestore.collection('clan_applications').add(application.toFirestore());
+      debugPrint('신청서 저장 완료: ${docRef.id}');
 
       // 클랜의 pendingMembers 배열에 사용자 ID 추가
       await _firestore.collection('clans').doc(clanId).update({
         'pendingMembers': FieldValue.arrayUnion([user.uid]),
       });
+      debugPrint('pendingMembers 업데이트 완료');
+
+      // 알림 생성 - 클랜 소유자에게 알림
+      final clan = ClanModel.fromMap(clanDoc.data() as Map<String, dynamic>);
+      await _firestore.collection('notifications').add({
+        'userId': clan.ownerId,
+        'type': 'clan_application',
+        'title': '새로운 클랜 가입 신청',
+        'message': '${user.displayName ?? "사용자"}님이 클랜 가입을 신청했습니다.',
+        'data': {
+          'clanId': clanId,
+          'clanName': clan.name,
+          'applicationId': docRef.id,
+          'applicantId': user.uid,
+          'applicantName': user.displayName,
+        },
+        'read': false,
+        'createdAt': Timestamp.now(),
+      });
+      debugPrint('알림 생성 완료');
 
       return true;
     } catch (e) {

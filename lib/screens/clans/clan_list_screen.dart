@@ -170,13 +170,13 @@ class _ClanListScreenState extends State<ClanListScreen> {
                 ),
                 Row(
                   children: [
-                    IconButton(
+          IconButton(
                       icon: const Icon(Icons.search, color: Colors.white),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('클랜 검색 기능은 준비 중입니다')),
-                        );
-                      },
+            onPressed: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('클랜 검색 기능은 준비 중입니다')),
+              );
+            },
                     ),
                     IconButton(
                       icon: const Icon(Icons.notifications_outlined, color: Colors.white),
@@ -619,9 +619,9 @@ class _ClanListScreenState extends State<ClanListScreen> {
             style: TextStyle(
               fontSize: 20,
               fontWeight: FontWeight.bold,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
           Row(
             children: [
               Expanded(child: _buildActivityCard('클랜 토너먼트', Icons.emoji_events, Colors.green)),
@@ -647,7 +647,7 @@ class _ClanListScreenState extends State<ClanListScreen> {
             SnackBar(content: Text('$title 기능은 준비 중입니다')),
           );
         }
-      },
+              },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
@@ -702,7 +702,7 @@ class _ClanListScreenState extends State<ClanListScreen> {
               ),
               IconButton(
                 icon: const Icon(Icons.chevron_right),
-                onPressed: () {
+        onPressed: () {
                   context.push('/applications');
                 },
               ),

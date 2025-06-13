@@ -101,6 +101,13 @@ final GoRouter appRouter = GoRouter(
           builder: (context, state) => const ClanSearchScreen(),
         ),
         GoRoute(
+          path: 'join/:clanId',
+          builder: (context, state) {
+            final clanId = state.pathParameters['clanId']!;
+            return ClanJoinScreen(clanId: clanId);
+          },
+        ),
+        GoRoute(
           path: 'members/:clanId',
           builder: (context, state) {
             final clanId = state.pathParameters['clanId']!;
