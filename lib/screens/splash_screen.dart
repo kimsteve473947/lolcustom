@@ -28,7 +28,7 @@ class _SplashScreenState extends State<SplashScreen> {
     
     // 로그인 상태에 따라 적절한 화면으로 이동
     if (authProvider.isLoggedIn) {
-      context.go('/home');
+      context.go('/main');
     } else {
       context.go('/login');
     }

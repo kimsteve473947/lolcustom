@@ -77,7 +77,7 @@ class _ClanSearchScreenState extends State<ClanSearchScreen> {
       } else if (_selectedCategory == '대회 준비') {
         result = result.where((clan) => clan.focus == ClanFocus.balanced || clan.focus == ClanFocus.competitive).toList();
       } else if (_selectedCategory == '팀 매칭') {
-        result = result.where((clan) => clan.isPublic).toList();
+        result = result.where((clan) => clan.areMembersPublic).toList();
       } else if (_selectedCategory == '5vs5 풀살') {
         result = result.where((clan) => clan.description?.contains('5vs5') ?? false).toList();
       } else if (_selectedCategory == '전문 코치') {

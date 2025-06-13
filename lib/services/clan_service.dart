@@ -30,8 +30,8 @@ class ClanService {
     GenderPreference? genderPreference,
     ClanFocus? focus,
     int? focusRating,
-    String? websiteUrl,
-    bool? isPublic,
+    String? discordUrl,
+    bool? areMembersPublic,
     bool? isRecruiting,
     int? memberCount,
   }) async {
@@ -68,13 +68,16 @@ class ClanService {
       genderPreference: genderPreference ?? GenderPreference.any,
       focus: focus ?? ClanFocus.balanced,
       focusRating: focusRating ?? 5,
-      websiteUrl: websiteUrl,
+      discordUrl: discordUrl,
       createdAt: Timestamp.now(),
       memberCount: memberCount ?? 1,
       maxMembers: 30,
       members: [userId],
-      isPublic: isPublic ?? true,
+      areMembersPublic: areMembersPublic ?? true,
       isRecruiting: isRecruiting ?? true,
+      level: 1,
+      xp: 0,
+      xpToNextLevel: 100,
     );
     
     // Save clan to Firestore
@@ -123,13 +126,17 @@ class ClanService {
   Future<List<ClanModel>> getRecruitingClans({int limit = 10}) async {
     final querySnapshot = await _clansCollection
         .where('isRecruiting', isEqualTo: true)
-        .where('isPublic', isEqualTo: true)
+        .where('areMembersPublic', isEqualTo: true)
         .orderBy('createdAt', descending: true)
         .limit(limit)
         .get();
     
     return querySnapshot.docs
-        .map((doc) => ClanModel.fromMap(doc.data() as Map<String, dynamic>))
+        .map((doc) {
+          final data = doc.data() as Map<String, dynamic>;
+          data['id'] = doc.id;
+          return ClanModel.fromMap(data);
+        })
         .toList();
   }
   
@@ -352,7 +359,9 @@ class ClanService {
     
     return query.snapshots().map((snapshot) {
       return snapshot.docs.map((doc) {
-        return ClanModel.fromMap(doc.data() as Map<String, dynamic>);
+        final data = doc.data() as Map<String, dynamic>;
+        data['id'] = doc.id;
+        return ClanModel.fromMap(data);
       }).toList();
     });
   }
@@ -608,6 +617,23 @@ class ClanService {
       debugPrint('Error getting clan members: $e');
       return [];
     }
+  }
+
+  // 모든 유저의 클랜 정보 초기화 (일회성 사용)
+  Future<void> removeAllClanDataFromUsers() async {
+    final usersSnapshot = await _firestore.collection('users').get();
+    
+    final WriteBatch batch = _firestore.batch();
+    
+    for (final doc in usersSnapshot.docs) {
+      batch.update(doc.reference, {
+        'clanId': FieldValue.delete(),
+        'isOwnerOfClan': FieldValue.delete(),
+      });
+    }
+    
+    await batch.commit();
+    debugPrint('모든 유저의 클랜 정보가 초기화되었습니다.');
   }
 
   // 사용자의 가입 신청 내역 가져오기
