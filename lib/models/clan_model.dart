@@ -35,6 +35,7 @@ class ClanModel extends Equatable {
   final String? code;
   final String? description;
   final String ownerId;
+  final String ownerName;
   final String? profileUrl;
   final dynamic emblem; // 사용자 정의 이미지(File) 또는 Map<String, dynamic>
   final List<String> activityDays; // ['월', '화', '수', '목', '금', '토', '일']
@@ -45,9 +46,9 @@ class ClanModel extends Equatable {
   final int focusRating; // 1-10 scale where 1 is fully casual, 10 is fully competitive
   final String? discordUrl;
   final Timestamp createdAt;
-  final int memberCount;
   final int maxMembers;
   final List<String> members;
+  int get memberCount => members.length;
   final List<String> pendingMembers;
   final bool areMembersPublic;
   final bool isRecruiting;
@@ -61,6 +62,7 @@ class ClanModel extends Equatable {
     this.code,
     this.description,
     required this.ownerId,
+    required this.ownerName,
     this.profileUrl,
     this.emblem,
     this.activityDays = const [],
@@ -71,8 +73,7 @@ class ClanModel extends Equatable {
     this.focusRating = 5,
     this.discordUrl,
     required this.createdAt,
-    this.memberCount = 1,
-    this.maxMembers = 20,
+    this.maxMembers = 15,
     this.members = const [],
     this.pendingMembers = const [],
     this.areMembersPublic = true,
@@ -88,6 +89,7 @@ class ClanModel extends Equatable {
     String? code,
     String? description,
     String? ownerId,
+    String? ownerName,
     String? profileUrl,
     dynamic emblem,
     List<String>? activityDays,
@@ -98,7 +100,6 @@ class ClanModel extends Equatable {
     int? focusRating,
     String? discordUrl,
     Timestamp? createdAt,
-    int? memberCount,
     int? maxMembers,
     List<String>? members,
     List<String>? pendingMembers,
@@ -114,6 +115,7 @@ class ClanModel extends Equatable {
       code: code ?? this.code,
       description: description ?? this.description,
       ownerId: ownerId ?? this.ownerId,
+      ownerName: ownerName ?? this.ownerName,
       profileUrl: profileUrl ?? this.profileUrl,
       emblem: emblem ?? this.emblem,
       activityDays: activityDays ?? this.activityDays,
@@ -124,7 +126,6 @@ class ClanModel extends Equatable {
       focusRating: focusRating ?? this.focusRating,
       discordUrl: discordUrl ?? this.discordUrl,
       createdAt: createdAt ?? this.createdAt,
-      memberCount: memberCount ?? this.memberCount,
       maxMembers: maxMembers ?? this.maxMembers,
       members: members ?? this.members,
       pendingMembers: pendingMembers ?? this.pendingMembers,
@@ -143,6 +144,7 @@ class ClanModel extends Equatable {
       'code': code,
       'description': description,
       'ownerId': ownerId,
+      'ownerName': ownerName,
       'profileUrl': profileUrl,
       'activityDays': activityDays,
       'activityTimes': activityTimes.map((t) => t.index).toList(),
@@ -152,7 +154,6 @@ class ClanModel extends Equatable {
       'focusRating': focusRating,
       'discordUrl': discordUrl,
       'createdAt': createdAt,
-      'memberCount': memberCount,
       'maxMembers': maxMembers,
       'members': members,
       'pendingMembers': pendingMembers,
@@ -184,7 +185,20 @@ class ClanModel extends Equatable {
     return data;
   }
 
-  factory ClanModel.fromMap(Map<String, dynamic> map) {
+  static int _dynamicToInt(dynamic value, {int defaultValue = 0}) {
+    if (value == null) return defaultValue;
+    if (value is int) return value;
+    if (value is double) return value.toInt();
+    if (value is String) {
+      final parsedValue = int.tryParse(value);
+      return parsedValue ?? defaultValue;
+    }
+    return defaultValue;
+  }
+
+  factory ClanModel.fromFirestore(DocumentSnapshot doc) {
+    final map = doc.data() as Map<String, dynamic>;
+
     // 엠블럼 데이터 처리
     dynamic emblemData;
     if (map['emblem'] != null) {
@@ -199,38 +213,38 @@ class ClanModel extends Equatable {
     }
     
     return ClanModel(
-      id: map['id'] as String,
+      id: doc.id,
       name: map['name'] as String,
       code: map['code'] as String?,
       description: map['description'] as String?,
       ownerId: map['ownerId'] as String,
+      ownerName: map['ownerName'] as String? ?? '이름 없음',
       profileUrl: map['profileUrl'] as String?,
       emblem: emblemData,
       activityDays: List<String>.from(map['activityDays'] ?? []),
       activityTimes: (map['activityTimes'] as List<dynamic>?)
-          ?.map((e) => PlayTimeType.values[e as int])
+          ?.map((e) => PlayTimeType.values[_dynamicToInt(e, defaultValue: 0)])
           .toList() ?? [],
       ageGroups: (map['ageGroups'] as List<dynamic>?)
-          ?.map((e) => AgeGroup.values[e as int])
+          ?.map((e) => _convertLegacyAgeGroup(_dynamicToInt(e, defaultValue: 0)))
           .toList() ?? [],
       genderPreference: map['genderPreference'] != null
-          ? GenderPreference.values[map['genderPreference'] as int]
+          ? GenderPreference.values[_dynamicToInt(map['genderPreference'], defaultValue: 2)] // any
           : GenderPreference.any,
       focus: map['focus'] != null
-          ? ClanFocus.values[map['focus'] as int]
+          ? ClanFocus.values[_dynamicToInt(map['focus'], defaultValue: 2)] // balanced
           : ClanFocus.balanced,
-      focusRating: map['focusRating'] as int? ?? 5,
+      focusRating: _dynamicToInt(map['focusRating'], defaultValue: 5),
       discordUrl: map['discordUrl'] as String?,
       createdAt: map['createdAt'] as Timestamp,
-      memberCount: map['memberCount'] as int? ?? 1,
-      maxMembers: map['maxMembers'] as int? ?? 20,
+      maxMembers: _dynamicToInt(map['maxMembers'], defaultValue: 15),
       members: List<String>.from(map['members'] ?? []),
       pendingMembers: List<String>.from(map['pendingMembers'] ?? []),
       areMembersPublic: map['areMembersPublic'] as bool? ?? true,
       isRecruiting: map['isRecruiting'] as bool? ?? true,
-      level: map['level'] as int? ?? 1,
-      xp: map['xp'] as int? ?? 0,
-      xpToNextLevel: map['xpToNextLevel'] as int? ?? 100,
+      level: _dynamicToInt(map['level'], defaultValue: 1),
+      xp: _dynamicToInt(map['xp'], defaultValue: 0),
+      xpToNextLevel: _dynamicToInt(map['xpToNextLevel'], defaultValue: 100),
     );
   }
   
@@ -245,9 +259,9 @@ class ClanModel extends Equatable {
 
   @override
   List<Object?> get props => [
-    id, name, code, description, ownerId, profileUrl, emblem,
+    id, name, code, description, ownerId, ownerName, profileUrl, emblem,
     activityDays, activityTimes, ageGroups, genderPreference,
-    focus, focusRating, discordUrl, createdAt, memberCount,
+    focus, focusRating, discordUrl, createdAt,
     maxMembers, members, pendingMembers, areMembersPublic, isRecruiting,
     level, xp, xpToNextLevel
   ];

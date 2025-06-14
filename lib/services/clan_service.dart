@@ -8,6 +8,8 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lol_custom_game_manager/models/clan_application_model.dart';
 import 'package:flutter/material.dart';
 import 'dart:math';
+import 'package:lol_custom_game_manager/constants/lol_constants.dart';
+import 'package:lol_custom_game_manager/models/user_model.dart';
 
 class ClanService {
   final FirebaseFirestore _firestore = FirebaseFirestore.instance;
@@ -21,7 +23,8 @@ class ClanService {
   // Create a new clan
   Future<String> createClan(
     String name,
-    String userId, {
+    String userId,
+    String ownerName, {
     String? description,
     dynamic emblem,
     List<String>? activityDays,
@@ -33,7 +36,6 @@ class ClanService {
     String? discordUrl,
     bool? areMembersPublic,
     bool? isRecruiting,
-    int? memberCount,
   }) async {
     // Generate a unique clan ID
     final String clanId = _uuid.v4();
@@ -61,6 +63,7 @@ class ClanService {
       name: name,
       description: description,
       ownerId: userId,
+      ownerName: ownerName,
       emblem: processedEmblem,
       activityDays: activityDays ?? [],
       activityTimes: activityTimes ?? [],
@@ -70,8 +73,7 @@ class ClanService {
       focusRating: focusRating ?? 5,
       discordUrl: discordUrl,
       createdAt: Timestamp.now(),
-      memberCount: memberCount ?? 1,
-      maxMembers: 30,
+      // maxMembers는 ClanModel의 기본값을 따르도록 제거
       members: [userId],
       areMembersPublic: areMembersPublic ?? true,
       isRecruiting: isRecruiting ?? true,
@@ -104,7 +106,7 @@ class ClanService {
       final data = doc.data() as Map<String, dynamic>;
       debugPrint('클랜 데이터: ${data.toString().substring(0, min(100, data.toString().length))}...');
       
-      return ClanModel.fromMap(data);
+      return ClanModel.fromFirestore(doc);
     } catch (e) {
       debugPrint('getClanById 오류: $e');
       return null;
@@ -118,7 +120,7 @@ class ClanService {
         .get();
     
     return querySnapshot.docs
-        .map((doc) => ClanModel.fromMap(doc.data() as Map<String, dynamic>))
+        .map((doc) => ClanModel.fromFirestore(doc))
         .toList();
   }
   
@@ -131,13 +133,7 @@ class ClanService {
         .limit(limit)
         .get();
     
-    return querySnapshot.docs
-        .map((doc) {
-          final data = doc.data() as Map<String, dynamic>;
-          data['id'] = doc.id;
-          return ClanModel.fromMap(data);
-        })
-        .toList();
+    return querySnapshot.docs.map((doc) => ClanModel.fromFirestore(doc)).toList();
   }
   
   // Apply to join a clan
@@ -166,10 +162,9 @@ class ClanService {
         throw Exception('클랜이 존재하지 않습니다');
       }
       
-      final clanData = clanDoc.data() as Map<String, dynamic>;
-      final List<String> pendingMembers = List<String>.from(clanData['pendingMembers'] ?? []);
-      final int memberCount = clanData['memberCount'] ?? 0;
-      final int maxMembers = clanData['maxMembers'] ?? 30;
+      final clanModel = ClanModel.fromFirestore(clanDoc);
+      final List<String> pendingMembers = clanModel.pendingMembers;
+      final int maxMembers = clanModel.maxMembers;
       
       // 대기 중인 멤버 리스트에 해당 사용자가 있는지 확인
       if (!pendingMembers.contains(userId)) {
@@ -177,7 +172,7 @@ class ClanService {
       }
       
       // 멤버 수 제한 확인
-      if (memberCount >= maxMembers) {
+      if (clanModel.memberCount >= maxMembers) {
         throw Exception('클랜이 가득 찼습니다');
       }
       
@@ -185,7 +180,6 @@ class ClanService {
       transaction.update(clanDocRef, {
         'members': FieldValue.arrayUnion([userId]),
         'pendingMembers': FieldValue.arrayRemove([userId]),
-        'memberCount': FieldValue.increment(1),
       });
       
       // 사용자 정보 업데이트
@@ -203,7 +197,7 @@ class ClanService {
         'message': '클랜 가입 신청이 수락되었습니다',
         'data': {
           'clanId': clanId,
-          'clanName': clanData['name'],
+          'clanName': clanModel.name,
         },
         'read': false,
         'createdAt': Timestamp.now(),
@@ -240,7 +234,7 @@ class ClanService {
       'message': '클랜 가입 신청이 거절되었습니다',
       'data': {
         'clanId': clanId,
-        'clanName': clanData['name'],
+        'clanName': (clanDoc.data() as Map<String, dynamic>)['name'],
       },
       'read': false,
       'createdAt': Timestamp.now(),
@@ -251,7 +245,6 @@ class ClanService {
   Future<void> removeMember(String clanId, String userId) async {
     await _clansCollection.doc(clanId).update({
       'members': FieldValue.arrayRemove([userId]),
-      'memberCount': FieldValue.increment(-1),
     });
     
     // Update user's clan association
@@ -313,9 +306,7 @@ class ClanService {
         .limit(limit)
         .get();
     
-    return querySnapshot.docs
-        .map((doc) => ClanModel.fromMap(doc.data() as Map<String, dynamic>))
-        .toList();
+    return querySnapshot.docs.map((doc) => ClanModel.fromFirestore(doc)).toList();
   }
   
   // 특정 나이대의 클랜 검색
@@ -328,9 +319,7 @@ class ClanService {
         .limit(limit)
         .get();
     
-    return querySnapshot.docs
-        .map((doc) => ClanModel.fromMap(doc.data() as Map<String, dynamic>))
-        .toList();
+    return querySnapshot.docs.map((doc) => ClanModel.fromFirestore(doc)).toList();
   }
   
   // 특정 성향(focus)의 클랜 검색
@@ -344,9 +333,7 @@ class ClanService {
         .limit(limit)
         .get();
     
-    return querySnapshot.docs
-        .map((doc) => ClanModel.fromMap(doc.data() as Map<String, dynamic>))
-        .toList();
+    return querySnapshot.docs.map((doc) => ClanModel.fromFirestore(doc)).toList();
   }
 
   // 모든 클랜 가져오기
@@ -358,11 +345,7 @@ class ClanService {
     }
     
     return query.snapshots().map((snapshot) {
-      return snapshot.docs.map((doc) {
-        final data = doc.data() as Map<String, dynamic>;
-        data['id'] = doc.id;
-        return ClanModel.fromMap(data);
-      }).toList();
+      return snapshot.docs.map((doc) => ClanModel.fromFirestore(doc)).toList();
     });
   }
 
@@ -371,7 +354,7 @@ class ClanService {
     try {
       final doc = await _firestore.collection('clans').doc(clanId).get();
       if (doc.exists) {
-        return ClanModel.fromMap(doc.data() as Map<String, dynamic>);
+        return ClanModel.fromFirestore(doc);
       }
       return null;
     } catch (e) {
@@ -490,7 +473,7 @@ class ClanService {
       debugPrint('pendingMembers 업데이트 완료');
 
       // 알림 생성 - 클랜 소유자에게 알림
-      final clan = ClanModel.fromMap(clanDoc.data() as Map<String, dynamic>);
+      final clan = ClanModel.fromFirestore(clanDoc);
       await _firestore.collection('notifications').add({
         'userId': clan.ownerId,
         'type': 'clan_application',
@@ -549,7 +532,6 @@ class ClanService {
         await _firestore.collection('clans').doc(application.clanId).update({
           'members': FieldValue.arrayUnion([application.userUid]),
           'pendingMembers': FieldValue.arrayRemove([application.userUid]),
-          'memberCount': FieldValue.increment(1),
         });
 
         // 사용자의 clanId 필드 업데이트
@@ -591,8 +573,8 @@ class ClanService {
       if (!clanDoc.exists) {
         throw Exception('존재하지 않는 클랜입니다.');
       }
-
-      final clan = ClanModel.fromMap(clanDoc.data() as Map<String, dynamic>);
+      
+      final clan = ClanModel.fromFirestore(clanDoc);
       
       // 멤버 정보 가져오기
       final members = <Map<String, dynamic>>[];
@@ -604,7 +586,7 @@ class ClanService {
           if (data != null) {
             members.add({
               'uid': memberId,
-              'displayName': data['displayName'] ?? '이름 없음',
+              'displayName': memberId == clan.ownerId ? clan.ownerName : (data['nickname'] ?? '이름 없음'),
               'photoURL': data['photoURL'],
               'isOwner': memberId == clan.ownerId,
             });
@@ -653,4 +635,112 @@ class ClanService {
       }).toList();
     });
   }
-} 
+
+  // 클랜 가입 신청 취소
+  Future<void> cancelClanApplication(String applicationId) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('로그인이 필요합니다.');
+    }
+
+    final applicationRef = _firestore.collection('clan_applications').doc(applicationId);
+
+    return _firestore.runTransaction((transaction) async {
+      final applicationDoc = await transaction.get(applicationRef);
+      if (!applicationDoc.exists) {
+        throw Exception('존재하지 않는 신청서입니다.');
+      }
+
+      final applicationData = applicationDoc.data() as Map<String, dynamic>;
+      if (applicationData['userUid'] != user.uid) {
+        throw Exception('신청을 취소할 권한이 없습니다.');
+      }
+
+      // 신청서 삭제
+      transaction.delete(applicationRef);
+
+      // 클랜의 pendingMembers에서 사용자 제거
+      final clanId = applicationData['clanId'];
+      if (clanId != null) {
+        final clanRef = _firestore.collection('clans').doc(clanId);
+        transaction.update(clanRef, {
+          'pendingMembers': FieldValue.arrayRemove([user.uid])
+        });
+      }
+    });
+  }
+
+  // 클랜 평균 티어 계산
+  Future<String> getAverageTier(String clanId) async {
+    try {
+      final clanDoc = await _clansCollection.doc(clanId).get();
+      if (!clanDoc.exists) return '정보 없음';
+
+      final clan = ClanModel.fromFirestore(clanDoc);
+      if (clan.members.isEmpty) return 'Unranked';
+
+      double totalScore = 0;
+      int memberWithTierCount = 0;
+
+      for (final memberId in clan.members) {
+        final memberDoc = await _firestore.collection('users').doc(memberId).get();
+        if (memberDoc.exists && memberDoc.data()!.containsKey('tier')) {
+          final tierString = memberDoc.data()!['tier'] as String;
+          final parts = tierString.split(' ');
+          if (parts.length == 2) {
+            final tierName = parts[0];
+            final tierRank = int.tryParse(parts[1]);
+            if (LolTiers.scores.containsKey(tierName) && tierRank != null) {
+              totalScore += (LolTiers.scores[tierName]! + (4 - tierRank));
+              memberWithTierCount++;
+            }
+          }
+        }
+      }
+
+      if (memberWithTierCount == 0) return 'Unranked';
+
+      final averageScore = totalScore / memberWithTierCount;
+      final averageTierName = LolTiers.getTierFromScore(averageScore);
+      
+      return LolTiers.kr[averageTierName] ?? averageTierName;
+
+    } catch (e) {
+      debugPrint('Error getting average tier: $e');
+      return '정보 없음';
+    }
+  }
+
+  // 사용자를 클랜에 초대
+  Future<void> inviteUserToClan(String clanId, String userIdToInvite, String inviterName) async {
+    final clanDoc = await _clansCollection.doc(clanId).get();
+    if (!clanDoc.exists) {
+      throw Exception('존재하지 않는 클랜입니다.');
+    }
+
+    final userDoc = await _firestore.collection('users').doc(userIdToInvite).get();
+    if (!userDoc.exists) {
+      throw Exception('존재하지 않는 사용자입니다.');
+    }
+    final userToInvite = UserModel.fromFirestore(userDoc);
+
+    if (userToInvite.clanId != null && userToInvite.clanId!.isNotEmpty) {
+      throw Exception('이미 다른 클랜에 소속된 사용자입니다.');
+    }
+
+    // 초대 알림 생성
+    await _firestore.collection('notifications').add({
+      'userId': userIdToInvite,
+      'type': 'clan_invitation',
+      'title': '클랜 초대',
+      'message': '$inviterName 님이 당신을 ${(clanDoc.data() as Map<String, dynamic>)['name']} 클랜에 초대했습니다.',
+      'data': {
+        'clanId': clanId,
+        'clanName': (clanDoc.data() as Map<String, dynamic>)['name'],
+        'inviterName': inviterName,
+      },
+      'read': false,
+      'createdAt': Timestamp.now(),
+    });
+  }
+}

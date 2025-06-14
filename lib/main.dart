@@ -8,6 +8,8 @@ import 'package:provider/provider.dart';
 import 'package:lol_custom_game_manager/providers/auth_provider.dart' as CustomAuth;
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
+import 'package:lol_custom_game_manager/models/chat_model.dart';
+import 'package:lol_custom_game_manager/services/chat_service.dart';
 import 'package:lol_custom_game_manager/services/cloud_functions_service.dart';
 import 'package:lol_custom_game_manager/services/firebase_service.dart';
 import 'package:lol_custom_game_manager/services/firebase_messaging_service.dart';
@@ -180,12 +182,9 @@ class MyApp extends StatelessWidget {
     
     return MultiProvider(
       providers: [
-        // Auth provider
         ChangeNotifierProvider<CustomAuth.AuthProvider>(
           create: (_) => CustomAuth.AuthProvider(authService: authService),
         ),
-        
-        // App state provider
         ChangeNotifierProvider<AppStateProvider>(
           create: (_) => AppStateProvider(
             authService: authService,
@@ -193,39 +192,43 @@ class MyApp extends StatelessWidget {
             cloudFunctionsService: cloudFunctionsService,
           ),
         ),
-        
-        // Service providers
         Provider<AuthService>(create: (_) => authService),
         Provider<FirebaseService>(create: (_) => firebaseService),
         Provider<CloudFunctionsService>(create: (_) => cloudFunctionsService),
         Provider<TournamentService>(create: (_) => tournamentService),
         Provider<FirebaseMessagingService>(create: (_) => messagingService),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
-        ChangeNotifierProvider(
-          create: (_) => ClanCreationProvider(),
-        ),
+        ChangeNotifierProvider(create: (_) => ClanCreationProvider()),
       ],
-      child: Builder(
-        builder: (context) {
-          // 두 프로바이더 간의 상태 동기화 설정
-          _setupProviderSynchronization(context);
-          
-          return MaterialApp.router(
-            title: '스크림져드',
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
-            themeMode: ThemeMode.system,
-            debugShowCheckedModeBanner: false,
-            routerConfig: appRouter.router,
-            localizationsDelegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: const [
-              Locale('en', 'US'),
-              Locale('ko', 'KR'),
-            ],
+      child: Consumer<AppStateProvider>(
+        builder: (context, appState, child) {
+          return StreamProvider<List<ChatRoomModel>>.value(
+            value: appState.currentUser != null
+                ? ChatService().getUserChatRooms(appState.currentUser!.uid)
+                : Stream.value([]),
+            initialData: const [],
+            child: Builder(
+              builder: (context) {
+                _setupProviderSynchronization(context);
+                return MaterialApp.router(
+                  title: '스크림져드',
+                  theme: AppTheme.lightTheme,
+                  darkTheme: AppTheme.darkTheme,
+                  themeMode: ThemeMode.system,
+                  debugShowCheckedModeBanner: false,
+                  routerConfig: appRouter.router,
+                  localizationsDelegates: const [
+                    GlobalMaterialLocalizations.delegate,
+                    GlobalWidgetsLocalizations.delegate,
+                    GlobalCupertinoLocalizations.delegate,
+                  ],
+                  supportedLocales: const [
+                    Locale('en', 'US'),
+                    Locale('ko', 'KR'),
+                  ],
+                );
+              },
+            ),
           );
         },
       ),

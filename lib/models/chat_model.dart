@@ -19,6 +19,7 @@ class ChatRoomModel {
   final String? tournamentId;
   final Timestamp createdAt;
   final int participantCount; // Number of participants
+  final List<String> hiddenFor; // List of user UIDs who have "left" the chat
 
   ChatRoomModel({
     required this.id,
@@ -33,6 +34,7 @@ class ChatRoomModel {
     this.tournamentId,
     required this.createdAt,
     this.participantCount = 0, // Default to 0 if not provided
+    this.hiddenFor = const [],
   });
 
   factory ChatRoomModel.fromFirestore(DocumentSnapshot doc) {
@@ -86,6 +88,7 @@ class ChatRoomModel {
       tournamentId: data['tournamentId'],
       createdAt: data['createdAt'] ?? Timestamp.now(),
       participantCount: data['participantCount'] ?? participantIds.length, // Use length as fallback
+      hiddenFor: List<String>.from(data['hiddenFor'] ?? []),
     );
   }
 
@@ -102,6 +105,7 @@ class ChatRoomModel {
       'tournamentId': tournamentId,
       'createdAt': createdAt,
       'participantCount': participantCount,
+      'hiddenFor': hiddenFor,
     };
   }
 
@@ -118,6 +122,7 @@ class ChatRoomModel {
     String? tournamentId,
     Timestamp? createdAt,
     int? participantCount,
+    List<String>? hiddenFor,
   }) {
     return ChatRoomModel(
       id: id ?? this.id,
@@ -132,6 +137,7 @@ class ChatRoomModel {
       tournamentId: tournamentId ?? this.tournamentId,
       createdAt: createdAt ?? this.createdAt,
       participantCount: participantCount ?? this.participantCount,
+      hiddenFor: hiddenFor ?? this.hiddenFor,
     );
   }
 }

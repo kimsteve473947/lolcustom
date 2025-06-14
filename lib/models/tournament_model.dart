@@ -240,6 +240,15 @@ class TournamentModel extends Equatable {
   // Firestore에서 데이터 로드
   factory TournamentModel.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+
+    // Helper to safely convert dynamic values to int
+    int _dynamicToInt(dynamic value, {int defaultValue = 0}) {
+      if (value == null) return defaultValue;
+      if (value is int) return value;
+      if (value is double) return value.toInt();
+      if (value is String) return int.tryParse(value) ?? defaultValue;
+      return defaultValue;
+    }
     
     // 필수 타임스탬프 필드 안전하게 변환
     Timestamp startsAt;
@@ -282,13 +291,9 @@ class TournamentModel extends Equatable {
     // Status 안전하게 변환
     TournamentStatus status;
     try {
-      if (data['status'] is int) {
-        final statusIndex = data['status'] as int;
-        if (statusIndex >= 0 && statusIndex < TournamentStatus.values.length) {
-          status = TournamentStatus.values[statusIndex];
-        } else {
-          status = TournamentStatus.open;
-        }
+      final statusIndex = _dynamicToInt(data['status'], defaultValue: TournamentStatus.open.index);
+      if (statusIndex >= 0 && statusIndex < TournamentStatus.values.length) {
+        status = TournamentStatus.values[statusIndex];
       } else {
         status = TournamentStatus.open;
       }
@@ -300,13 +305,9 @@ class TournamentModel extends Equatable {
     // GameFormat 안전하게 변환
     GameFormat gameFormat;
     try {
-      if (data['gameFormat'] is int) {
-        final formatIndex = data['gameFormat'] as int;
-        if (formatIndex >= 0 && formatIndex < GameFormat.values.length) {
-          gameFormat = GameFormat.values[formatIndex];
-        } else {
-          gameFormat = GameFormat.single;
-        }
+      final formatIndex = _dynamicToInt(data['gameFormat'], defaultValue: GameFormat.single.index);
+      if (formatIndex >= 0 && formatIndex < GameFormat.values.length) {
+        gameFormat = GameFormat.values[formatIndex];
       } else {
         gameFormat = GameFormat.single;
       }
@@ -318,13 +319,9 @@ class TournamentModel extends Equatable {
     // GameServer 안전하게 변환
     GameServer gameServer;
     try {
-      if (data['gameServer'] is int) {
-        final serverIndex = data['gameServer'] as int;
-        if (serverIndex >= 0 && serverIndex < GameServer.values.length) {
-          gameServer = GameServer.values[serverIndex];
-        } else {
-          gameServer = GameServer.kr;
-        }
+      final serverIndex = _dynamicToInt(data['gameServer'], defaultValue: GameServer.kr.index);
+      if (serverIndex >= 0 && serverIndex < GameServer.values.length) {
+        gameServer = GameServer.values[serverIndex];
       } else {
         gameServer = GameServer.kr;
       }
@@ -342,13 +339,7 @@ class TournamentModel extends Equatable {
           final result = <String, int>{};
           
           for (final entry in rawMap.entries) {
-            if (entry.value is int) {
-              result[entry.key.toString()] = entry.value as int;
-            } else if (entry.value is num) {
-              result[entry.key.toString()] = (entry.value as num).toInt();
-            } else {
-              result[entry.key.toString()] = 0; // 기본값
-            }
+            result[entry.key.toString()] = _dynamicToInt(entry.value);
           }
           return result;
         }
@@ -387,10 +378,13 @@ class TournamentModel extends Equatable {
     // tierLimit을 문자열에서 PlayerTier enum으로 변환
     PlayerTier? tierLimit;
     if (data['tierLimit'] != null) {
-      if (data['tierLimit'] is int) {
-        tierLimit = PlayerTier.values[data['tierLimit'] as int];
-      } else if (data['tierLimit'] is String) {
+      if (data['tierLimit'] is String) {
         tierLimit = UserModel.tierFromString(data['tierLimit'] as String);
+      } else {
+        final tierIndex = _dynamicToInt(data['tierLimit'], defaultValue: -1);
+        if (tierIndex >= 0 && tierIndex < PlayerTier.values.length) {
+          tierLimit = PlayerTier.values[tierIndex];
+        }
       }
     }
 
@@ -399,21 +393,21 @@ class TournamentModel extends Equatable {
     TournamentType tournamentType;
     
     // 1. 명시적 tournamentType 필드가 있는 경우
-    if (data.containsKey('tournamentType') && data['tournamentType'] is int) {
-      final typeIndex = data['tournamentType'] as int;
+    if (data.containsKey('tournamentType')) {
+      final typeIndex = _dynamicToInt(data['tournamentType'], defaultValue: TournamentType.casual.index);
       if (typeIndex >= 0 && typeIndex < TournamentType.values.length) {
         tournamentType = TournamentType.values[typeIndex];
       } else {
         // 인덱스가 범위를 벗어나면 기본값 사용
         tournamentType = TournamentType.casual;
       }
-    } 
+    }
     // 2. isPaid 필드가 있는 경우 (레거시 호환성)
     else if (data.containsKey('isPaid')) {
-      tournamentType = data['isPaid'] == true 
-          ? TournamentType.competitive 
+      tournamentType = data['isPaid'] == true
+          ? TournamentType.competitive
           : TournamentType.casual;
-    } 
+    }
     // 3. 기본값 설정
     else {
       tournamentType = TournamentType.casual;
@@ -423,9 +417,9 @@ class TournamentModel extends Equatable {
     int? creditCost;
     if (tournamentType == TournamentType.competitive) {
       if (data.containsKey('creditCost')) {
-        creditCost = data['creditCost'] as int?;
+        creditCost = _dynamicToInt(data['creditCost']);
       } else if (data.containsKey('price')) {
-        creditCost = data['price'] as int?;
+        creditCost = _dynamicToInt(data['price']);
       }
       
       // 경쟁전은 항상 크레딧 비용이 있어야 함 (기본값 20)
@@ -463,7 +457,7 @@ class TournamentModel extends Equatable {
     }
     
     // 이전 데이터 구조에서 업데이트 (참가자 배열이 있지만 역할별 참가자 목록이 없는 경우)
-    if (participants.isNotEmpty && 
+    if (participants.isNotEmpty &&
         participantsByRole.values.every((list) => list.isEmpty)) {
       participantsByRole = defaultParticipantsByRole;
     }
@@ -513,7 +507,7 @@ class TournamentModel extends Equatable {
       location: data['location'] ?? '',
       tournamentType: tournamentType,
       creditCost: creditCost,
-      ovrLimit: data['ovrLimit'],
+      ovrLimit: data.containsKey('ovrLimit') ? _dynamicToInt(data['ovrLimit']) : null,
       tierLimit: tierLimit,
       premiumBadge: data['premiumBadge'] ?? false,
       status: status,
@@ -527,7 +521,7 @@ class TournamentModel extends Equatable {
       participantsByRole: participantsByRole,
       rules: data['rules'],
       results: data['results'],
-      distance: data['distance']?.toDouble(),
+      distance: (data['distance'] as num?)?.toDouble(),
       gameFormat: gameFormat,
       gameServer: gameServer,
       customRoomName: data['customRoomName'],

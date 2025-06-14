@@ -1,362 +1,400 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
-import 'package:go_router/go_router.dart';
-import 'package:lol_custom_game_manager/constants/app_theme.dart';
-import 'package:lol_custom_game_manager/constants/app_colors.dart';
 import 'package:lol_custom_game_manager/models/clan_model.dart';
 import 'package:lol_custom_game_manager/services/clan_service.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
+import 'package:provider/provider.dart';
+import 'package:lol_custom_game_manager/providers/auth_provider.dart';
+import 'package:lol_custom_game_manager/constants/app_theme.dart';
 
 class ClanManagementScreen extends StatefulWidget {
-  const ClanManagementScreen({Key? key}) : super(key: key);
+  final String clanId;
+
+  const ClanManagementScreen({Key? key, required this.clanId}) : super(key: key);
 
   @override
-  State<ClanManagementScreen> createState() => _ClanManagementScreenState();
+  _ClanManagementScreenState createState() => _ClanManagementScreenState();
 }
 
 class _ClanManagementScreenState extends State<ClanManagementScreen> {
-  final ClanService _clanService = ClanService();
-  ClanModel? _clan;
-  bool _isLoading = true;
   final _formKey = GlobalKey<FormState>();
-  
-  final TextEditingController _nameController = TextEditingController();
-  final TextEditingController _descriptionController = TextEditingController();
-  final TextEditingController _discordController = TextEditingController();
-  
+  final ClanService _clanService = ClanService();
+  late Future<ClanModel?> _clanFuture;
+
+  bool _isLoading = false;
+  bool _isInitialized = false;
+
+  // Form-related state
+  String? _name;
+  String? _description;
+  String? _discordUrl;
   bool _areMembersPublic = true;
   bool _isRecruiting = true;
-  
+
+  // Activity-related state
+  Set<String> _activityDays = {};
+  Set<PlayTimeType> _activityTimes = {};
+
+  // Preference-related state
+  Set<AgeGroup> _ageGroups = {};
+  GenderPreference _genderPreference = GenderPreference.any;
+
+  // Focus-related state
+  double _focusRating = 5.0;
+  ClanFocus _focus = ClanFocus.balanced;
+
   @override
   void initState() {
     super.initState();
-    _loadClanData();
+    _clanFuture = _clanService.getClan(widget.clanId);
   }
-  
-  @override
-  void dispose() {
-    _nameController.dispose();
-    _descriptionController.dispose();
-    _discordController.dispose();
-    super.dispose();
-  }
-  
-  Future<void> _loadClanData() async {
-    setState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      final currentUser = FirebaseAuth.instance.currentUser;
-      if (currentUser == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('로그인이 필요합니다')),
-        );
-        context.go('/auth/login');
-        return;
-      }
-      
-      // 사용자의 클랜 정보 가져오기
-      final userDoc = await FirebaseFirestore.instance
-          .collection('users')
-          .doc(currentUser.uid)
-          .get();
-      
-      if (!userDoc.exists) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('사용자 정보를 찾을 수 없습니다')),
-        );
-        context.go('/');
-        return;
-      }
-      
-      final userData = userDoc.data() as Map<String, dynamic>;
-      final clanId = userData['clanId'];
-      
-      if (clanId == null) {
-        // 클랜이 없는 경우
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('소속된 클랜이 없습니다')),
-        );
-        context.go('/clans');
-        return;
-      }
-      
-      // 클랜 정보 가져오기
-      final clan = await _clanService.getClanById(clanId);
-      
-      if (clan == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('클랜 정보를 찾을 수 없습니다')),
-        );
-        context.go('/clans');
-        return;
-      }
-      
-      // 클랜장인지 확인
-      if (clan.ownerId != currentUser.uid) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('클랜 관리 권한이 없습니다')),
-        );
-        context.go('/clans/detail/$clanId');
-        return;
-      }
-      
-      setState(() {
-        _clan = clan;
-        _nameController.text = clan.name;
-        _descriptionController.text = clan.description ?? '';
-        _discordController.text = clan.discordUrl ?? '';
-        _areMembersPublic = clan.areMembersPublic;
-        _isRecruiting = clan.isRecruiting;
-        _isLoading = false;
-      });
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류가 발생했습니다: $e')),
-      );
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-  
-  Future<void> _updateClan() async {
-    if (_formKey.currentState!.validate() && _clan != null) {
+
+  void _updateClan() async {
+    if (_formKey.currentState!.validate()) {
+      _formKey.currentState!.save();
       setState(() {
         _isLoading = true;
       });
-      
+
       try {
-        // 업데이트할 클랜 데이터
-        final Map<String, dynamic> updates = {
-          'name': _nameController.text,
-          'description': _descriptionController.text,
-          'discordUrl': _discordController.text,
-          'areMembersPublic': _areMembersPublic,
-          'isRecruiting': _isRecruiting,
-        };
-        
-        // 클랜 정보 업데이트
-        await _clanService.updateClan(_clan!.id, updates);
-        
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('클랜 정보가 업데이트되었습니다')),
+        final originalClan = await _clanFuture;
+        if (originalClan == null) {
+          throw Exception("Original clan not found");
+        }
+
+        final authProvider = Provider.of<AuthProvider>(context, listen: false);
+        final currentUser = authProvider.user;
+
+        if (currentUser == null || originalClan.ownerId != currentUser.uid) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('권한이 없습니다.')),
+          );
+          return;
+        }
+
+        final updatedClan = originalClan.copyWith(
+          name: _name,
+          description: _description,
+          discordUrl: _discordUrl,
+          areMembersPublic: _areMembersPublic,
+          isRecruiting: _isRecruiting,
+          activityDays: _activityDays.toList(),
+          activityTimes: _activityTimes.toList(),
+          ageGroups: _ageGroups.toList(),
+          genderPreference: _genderPreference,
+          focusRating: _focusRating.toInt(),
+          focus: _focus,
         );
-        
-        // 클랜 상세 페이지로 이동
-        context.go('/clans/detail/${_clan!.id}');
+
+        await _clanService.updateClan(updatedClan.id, updatedClan.toMap());
+
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('클랜 정보가 성공적으로 업데이트되었습니다.')),
+        );
+        Navigator.of(context).pop();
       } catch (e) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('클랜 정보 업데이트 실패: $e')),
+          SnackBar(content: Text('클랜 정보 업데이트에 실패했습니다: $e')),
         );
-        setState(() {
-          _isLoading = false;
-        });
+      } finally {
+        if (mounted) {
+          setState(() {
+            _isLoading = false;
+          });
+        }
       }
     }
   }
-  
-  @override
-  Widget build(BuildContext context) {
-    if (_isLoading) {
-      return const Scaffold(
-        body: Center(
-          child: LoadingIndicator(),
-        ),
-      );
-    }
-    
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('클랜 관리'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.people),
-            onPressed: () {
-              context.push('/clans/members/${_clan!.id}');
-            },
-            tooltip: '멤버 관리',
-          ),
-        ],
+
+  Widget _buildSectionTitle(String title) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Text(
+        title,
+        style: Theme.of(context).textTheme.titleLarge,
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16.0),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+    );
+  }
+
+  Widget _buildActivityDayChips() {
+    final dayLabels = {'월': '월', '화': '화', '수': '수', '목': '목', '금': '금', '토': '토', '일': '일'};
+    return Wrap(
+      spacing: 8.0,
+      runSpacing: 4.0,
+      children: dayLabels.entries.map((entry) {
+        final day = entry.key;
+        final isSelected = _activityDays.contains(day);
+        return ChoiceChip(
+          label: Text(entry.value),
+          selected: isSelected,
+          onSelected: (selected) {
+            setState(() {
+              if (selected) {
+                _activityDays.add(day);
+              } else {
+                _activityDays.remove(day);
+              }
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildActivityTimeChips() {
+    final timeLabels = {
+      PlayTimeType.morning: '아침\n6-10시',
+      PlayTimeType.daytime: '낮\n10-18시',
+      PlayTimeType.evening: '저녁\n18-24시',
+      PlayTimeType.night: '심야\n24-6시',
+    };
+    return Wrap(
+      spacing: 8.0,
+      runSpacing: 4.0,
+      children: timeLabels.entries.map((entry) {
+        final time = entry.key;
+        final isSelected = _activityTimes.contains(time);
+        return ChoiceChip(
+          label: Text(entry.value, textAlign: TextAlign.center),
+          selected: isSelected,
+          onSelected: (selected) {
+            setState(() {
+              if (selected) {
+                _activityTimes.add(time);
+              } else {
+                _activityTimes.remove(time);
+              }
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildAgeGroupChips() {
+    final ageLabels = {
+      AgeGroup.teens: '10대', AgeGroup.twenties: '20대',
+      AgeGroup.thirties: '30대', AgeGroup.fortyPlus: '40대 이상',
+    };
+    return Wrap(
+      spacing: 8.0,
+      runSpacing: 4.0,
+      children: ageLabels.entries.map((entry) {
+        final ageGroup = entry.key;
+        final isSelected = _ageGroups.contains(ageGroup);
+        return ChoiceChip(
+          label: Text(entry.value),
+          selected: isSelected,
+          onSelected: (selected) {
+            setState(() {
+              if (selected) {
+                _ageGroups.add(ageGroup);
+              } else {
+                _ageGroups.remove(ageGroup);
+              }
+            });
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildGenderChips() {
+    final genderLabels = {
+      GenderPreference.male: '남자', GenderPreference.female: '여자', GenderPreference.any: '남녀 모두',
+    };
+    return Wrap(
+      spacing: 8.0,
+      children: genderLabels.entries.map((entry) {
+        return ChoiceChip(
+          label: Text(entry.value),
+          selected: _genderPreference == entry.key,
+          onSelected: (selected) {
+            if (selected) {
+              setState(() {
+                _genderPreference = entry.key;
+              });
+            }
+          },
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _buildFocusSlider() {
+    if (_focusRating <= 3) {
+      _focus = ClanFocus.casual;
+    } else if (_focusRating >= 7) {
+      _focus = ClanFocus.competitive;
+    } else {
+      _focus = ClanFocus.balanced;
+    }
+
+    Color focusColor;
+    String focusLabel;
+    switch (_focus) {
+      case ClanFocus.casual:
+        focusColor = Colors.green.shade600;
+        focusLabel = '친목 위주';
+        break;
+      case ClanFocus.competitive:
+        focusColor = Colors.red.shade600;
+        focusLabel = '실력 위주';
+        break;
+      case ClanFocus.balanced:
+        focusColor = AppColors.primary;
+        focusLabel = '균형잡힌 스타일';
+        break;
+    }
+
+    return Column(
+      children: [
+        Text(focusLabel, style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold, color: focusColor)),
+        Slider(
+          value: _focusRating,
+          min: 1,
+          max: 10,
+          divisions: 9,
+          label: _focusRating.round().toString(),
+          activeColor: focusColor,
+          onChanged: (value) {
+            setState(() {
+              _focusRating = value;
+            });
+          },
+        ),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              // 클랜 이름
-              TextFormField(
-                controller: _nameController,
-                decoration: const InputDecoration(
-                  labelText: '클랜 이름',
-                  border: OutlineInputBorder(),
-                ),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '클랜 이름을 입력하세요';
-                  }
-                  return null;
-                },
-              ),
-              const SizedBox(height: 16.0),
-              
-              // 클랜 설명
-              TextFormField(
-                controller: _descriptionController,
-                decoration: const InputDecoration(
-                  labelText: '클랜 설명',
-                  border: OutlineInputBorder(),
-                ),
-                maxLines: 3,
-              ),
-              const SizedBox(height: 16.0),
-              
-              // 디스코드
-              TextFormField(
-                controller: _discordController,
-                decoration: const InputDecoration(
-                  labelText: '디스코드 URL',
-                  border: OutlineInputBorder(),
-                  hintText: 'https://discord.gg/your-server',
-                ),
-                keyboardType: TextInputType.url,
-              ),
-              const SizedBox(height: 24.0),
-              
-              // 멤버 공개 여부 및 모집 상태 설정
-              SwitchListTile(
-                title: const Text('멤버 공개 여부'),
-                subtitle: const Text('다른 사용자들이 클랜원들을 참고할 수 있습니다.'),
-                value: _areMembersPublic,
-                onChanged: (value) {
-                  setState(() {
-                    _areMembersPublic = value;
-                  });
-                },
-                activeColor: AppColors.primary,
-              ),
-              
-              SwitchListTile(
-                title: const Text('멤버 모집'),
-                subtitle: const Text('새로운 멤버를 모집합니다'),
-                value: _isRecruiting,
-                onChanged: (value) {
-                  setState(() {
-                    _isRecruiting = value;
-                  });
-                },
-                activeColor: AppColors.primary,
-              ),
-              
-              const SizedBox(height: 32.0),
-              
-              // 저장 버튼
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: _updateClan,
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  ),
-                  child: const Text(
-                    '변경사항 저장',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16.0,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              
-              const SizedBox(height: 16.0),
-              
-              // 클랜 삭제 버튼
-              SizedBox(
-                width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    _showDeleteConfirmationDialog();
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.red,
-                    padding: const EdgeInsets.symmetric(vertical: 16.0),
-                  ),
-                  child: const Text(
-                    '클랜 삭제',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16.0,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
+              Text('친목', style: TextStyle(color: Colors.green[700])),
+              Text('실력', style: TextStyle(color: Colors.red[700])),
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('클랜 정보 수정'),
+      ),
+      body: FutureBuilder<ClanModel?>(
+        future: _clanFuture,
+        builder: (context, snapshot) {
+          if (snapshot.connectionState == ConnectionState.waiting) {
+            return const Center(child: LoadingIndicator());
+          }
+          if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
+            return const Center(child: Text('클랜 정보를 불러올 수 없습니다.'));
+          }
+
+          final clan = snapshot.data!;
+          if (!_isInitialized) {
+            _name = clan.name;
+            _description = clan.description;
+            _discordUrl = clan.discordUrl;
+            _areMembersPublic = clan.areMembersPublic;
+            _isRecruiting = clan.isRecruiting;
+            _activityDays = clan.activityDays.toSet();
+            _activityTimes = clan.activityTimes.toSet();
+            _ageGroups = clan.ageGroups.toSet();
+            _genderPreference = clan.genderPreference;
+            _focusRating = clan.focusRating.toDouble();
+            _focus = clan.focus;
+            _isInitialized = true;
+          }
+
+          return _isLoading
+              ? const Center(child: LoadingIndicator())
+              : SingleChildScrollView(
+                  padding: const EdgeInsets.all(16.0),
+                  child: Form(
+                    key: _formKey,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        _buildSectionTitle('클랜 기본 정보'),
+                        TextFormField(
+                          initialValue: _name,
+                          decoration: const InputDecoration(labelText: '클랜 이름', border: OutlineInputBorder()),
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) return '클랜 이름을 입력해주세요.';
+                            if (value.trim().length < 2) return '최소 2자 이상 입력해주세요.';
+                            return null;
+                          },
+                          onSaved: (value) => _name = value?.trim(),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          initialValue: _description,
+                          decoration: const InputDecoration(labelText: '클랜 설명', border: OutlineInputBorder()),
+                          maxLines: 3,
+                          validator: (value) {
+                            if (value == null || value.trim().isEmpty) return '클랜 설명을 입력해주세요.';
+                            if (value.trim().length < 10) return '최소 10자 이상 입력해주세요.';
+                            return null;
+                          },
+                          onSaved: (value) => _description = value?.trim(),
+                        ),
+                        const SizedBox(height: 16),
+                        TextFormField(
+                          initialValue: _discordUrl,
+                          decoration: const InputDecoration(labelText: '디스코드 URL (선택)', border: OutlineInputBorder()),
+                          onSaved: (value) => _discordUrl = value?.trim(),
+                        ),
+                        const SizedBox(height: 16),
+                        SwitchListTile(
+                          title: const Text('멤버 목록 공개'),
+                          value: _areMembersPublic,
+                          onChanged: (value) => setState(() => _areMembersPublic = value),
+                        ),
+                        SwitchListTile(
+                          title: const Text('멤버 모집'),
+                          value: _isRecruiting,
+                          onChanged: (value) => setState(() => _isRecruiting = value),
+                        ),
+                        const Divider(height: 48),
+                        _buildSectionTitle('주요 활동 시간'),
+                        const SizedBox(height: 8),
+                        const Text('활동 요일'),
+                        const SizedBox(height: 8),
+                        _buildActivityDayChips(),
+                        const SizedBox(height: 24),
+                        const Text('활동 시간대'),
+                        const SizedBox(height: 8),
+                        _buildActivityTimeChips(),
+                        const Divider(height: 48),
+                        _buildSectionTitle('클랜 선호도'),
+                        const SizedBox(height: 8),
+                        const Text('주요 나이대 (복수선택 가능)'),
+                        const SizedBox(height: 8),
+                        _buildAgeGroupChips(),
+                        const SizedBox(height: 24),
+                        const Text('선호 성별'),
+                        const SizedBox(height: 8),
+                        _buildGenderChips(),
+                        const Divider(height: 48),
+                        _buildSectionTitle('클랜 성향'),
+                        const SizedBox(height: 8),
+                        _buildFocusSlider(),
+                        const SizedBox(height: 48),
+                        Center(
+                          child: ElevatedButton(
+                            onPressed: _updateClan,
+                            style: ElevatedButton.styleFrom(padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15)),
+                            child: const Text('저장'),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+        },
       ),
     );
   }
-  
-  void _showDeleteConfirmationDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('클랜 삭제'),
-        content: const Text(
-          '정말로 클랜을 삭제하시겠습니까? 이 작업은 되돌릴 수 없으며, 모든 클랜 데이터가 영구적으로 삭제됩니다.',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('취소'),
-          ),
-          TextButton(
-            onPressed: () async {
-              Navigator.of(context).pop();
-              await _deleteClan();
-            },
-            style: TextButton.styleFrom(
-              foregroundColor: Colors.red,
-            ),
-            child: const Text('삭제'),
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Future<void> _deleteClan() async {
-    if (_clan == null) return;
-    
-    setState(() {
-      _isLoading = true;
-    });
-    
-    try {
-      await _clanService.deleteClan(_clan!.id);
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('클랜이 삭제되었습니다')),
-      );
-      
-      context.go('/clans');
-    } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('클랜 삭제 실패: $e')),
-      );
-      
-      setState(() {
-        _isLoading = false;
-      });
-    }
-  }
-} 
+}
