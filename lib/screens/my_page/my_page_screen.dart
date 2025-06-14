@@ -146,73 +146,248 @@ class _MyPageScreenState extends State<MyPageScreen> with SingleTickerProviderSt
     return Container(
       decoration: BoxDecoration(
         color: AppColors.primary,
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
       ),
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(16, 60, 16, 16),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.end,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                CircleAvatar(
-                  radius: 40,
-                  backgroundColor: Colors.white,
-                  backgroundImage: user.profileImageUrl.isNotEmpty ? NetworkImage(user.profileImageUrl) : null,
-                  child: user.profileImageUrl.isEmpty ? const Icon(Icons.person, size: 40, color: AppColors.primary) : null,
-                ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        user.nickname, 
-                        style: const TextStyle(
-                          fontSize: 22, 
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 24),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.end,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  // Profile Image
+                  Container(
+                    width: 80,
+                    height: 80,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(color: Colors.white, width: 3),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          spreadRadius: 1,
+                          offset: const Offset(0, 2),
                         ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        UserModel.tierToString(user.tier), 
-                        style: const TextStyle(
-                          fontSize: 15, 
-                          color: Colors.white70
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        user.email, 
-                        style: const TextStyle(
-                          fontSize: 14, 
-                          color: Colors.white70
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
+                    child: ClipOval(
+                      child: user.profileImageUrl.isNotEmpty
+                          ? Image.network(
+                              user.profileImageUrl,
+                              fit: BoxFit.cover,
+                              loadingBuilder: (context, child, loadingProgress) {
+                                if (loadingProgress == null) return child;
+                                return Center(
+                                  child: CircularProgressIndicator(
+                                    value: loadingProgress.expectedTotalBytes != null
+                                        ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                        : null,
+                                    color: Colors.white,
+                                    strokeWidth: 2,
+                                  ),
+                                );
+                              },
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  color: Colors.white.withOpacity(0.2),
+                                  child: const Icon(
+                                    Icons.person,
+                                    size: 40,
+                                    color: Colors.white,
+                                  ),
+                                );
+                              },
+                            )
+                          : Container(
+                              color: Colors.white.withOpacity(0.2),
+                              child: const Icon(
+                                Icons.person,
+                                size: 40,
+                                color: Colors.white,
+                              ),
+                            ),
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            SizedBox(
-              height: 36,
-              child: OutlinedButton.icon(
-                onPressed: () {
-                  context.push('/my-page/edit-profile');
-                },
-                icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.white),
-                label: const Text('프로필 수정', style: TextStyle(color: Colors.white)),
-                style: OutlinedButton.styleFrom(
-                  side: const BorderSide(color: Colors.white70),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(20),
+                  const SizedBox(width: 16),
+                  
+                  // User Info
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Flexible(
+                              child: Text(
+                                user.nickname,
+                                style: const TextStyle(
+                                  fontSize: 22,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildTierBadge(user.tier),
+                          ],
+                        ),
+                        const SizedBox(height: 4),
+                        if (user.statusMessage != null && user.statusMessage!.isNotEmpty)
+                          Text(
+                            user.statusMessage!,
+                            style: const TextStyle(
+                              fontSize: 14,
+                              color: Colors.white,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        const SizedBox(height: 4),
+                        Text(
+                          user.email,
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.white.withOpacity(0.8),
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                    ),
                   ),
-                ),
+                ],
               ),
-            )
-          ],
+              const SizedBox(height: 20),
+              
+              // Edit Profile Button
+              Row(
+                children: [
+                  Expanded(
+                    child: OutlinedButton.icon(
+                      onPressed: () {
+                        context.push('/my-page/edit-profile');
+                      },
+                      icon: const Icon(Icons.edit_outlined, size: 18, color: Colors.white),
+                      label: const Text('프로필 수정', style: TextStyle(color: Colors.white)),
+                      style: OutlinedButton.styleFrom(
+                        side: BorderSide(color: Colors.white.withOpacity(0.7)),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  _buildQuickActionButton(
+                    icon: Icons.person_search,
+                    onTap: () {
+                      // Navigate to profile view
+                      context.push('/profile/${user.uid}');
+                    },
+                    tooltip: '내 프로필 보기',
+                  ),
+                  const SizedBox(width: 8),
+                  _buildQuickActionButton(
+                    icon: Icons.settings_outlined,
+                    onTap: () {
+                      // TODO: Navigate to settings
+                    },
+                    tooltip: '설정',
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTierBadge(PlayerTier tier) {
+    final tierName = UserModel.tierToString(tier);
+    final Color badgeColor = _getTierColor(tier);
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+      decoration: BoxDecoration(
+        color: badgeColor.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: badgeColor, width: 1),
+      ),
+      child: Text(
+        tierName,
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+          color: badgeColor,
+        ),
+      ),
+    );
+  }
+  
+  Color _getTierColor(PlayerTier tier) {
+    switch (tier) {
+      case PlayerTier.iron:
+        return Colors.grey[400]!;
+      case PlayerTier.bronze:
+        return Colors.brown[300]!;
+      case PlayerTier.silver:
+        return Colors.blueGrey[200]!;
+      case PlayerTier.gold:
+        return Colors.amber;
+      case PlayerTier.platinum:
+        return Colors.teal[300]!;
+      case PlayerTier.emerald:
+        return Colors.green[400]!;
+      case PlayerTier.diamond:
+        return Colors.lightBlue[300]!;
+      case PlayerTier.master:
+        return Colors.purple[300]!;
+      case PlayerTier.grandmaster:
+        return Colors.red[400]!;
+      case PlayerTier.challenger:
+        return Colors.orange[300]!;
+      default:
+        return Colors.grey;
+    }
+  }
+  
+  Widget _buildQuickActionButton({
+    required IconData icon,
+    required VoidCallback onTap,
+    required String tooltip,
+  }) {
+    return Tooltip(
+      message: tooltip,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          width: 40,
+          height: 40,
+          decoration: BoxDecoration(
+            color: Colors.white.withOpacity(0.2),
+            shape: BoxShape.circle,
+          ),
+          child: Icon(
+            icon,
+            color: Colors.white,
+            size: 20,
+          ),
         ),
       ),
     );

@@ -3,8 +3,10 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:lol_custom_game_manager/models/models.dart';
+import 'package:lol_custom_game_manager/models/models.dart' hide ClanModel;
+import 'package:lol_custom_game_manager/models/clan_model.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
+import 'package:lol_custom_game_manager/services/clan_service.dart';
 import 'package:lol_custom_game_manager/services/cloud_functions_service.dart';
 import 'package:lol_custom_game_manager/services/firebase_service.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -15,9 +17,11 @@ class AppStateProvider with ChangeNotifier {
   final AuthService _authService;
   final FirebaseService _firebaseService;
   final CloudFunctionsService _cloudFunctionsService;
+  final ClanService _clanService;
   
   // 앱 상태
   UserModel? _currentUser;
+  ClanModel? _myClan;
   bool _isLoading = false;
   String? _errorMessage;
   
@@ -35,15 +39,18 @@ class AppStateProvider with ChangeNotifier {
     AuthService? authService,
     FirebaseService? firebaseService,
     CloudFunctionsService? cloudFunctionsService,
-  }) : 
+    ClanService? clanService,
+  }) :
     _authService = authService ?? AuthService(),
     _firebaseService = firebaseService ?? FirebaseService(),
-    _cloudFunctionsService = cloudFunctionsService ?? CloudFunctionsService() {
+    _cloudFunctionsService = cloudFunctionsService ?? CloudFunctionsService(),
+    _clanService = clanService ?? ClanService() {
     _initializeApp();
   }
   
   // Getters
   UserModel? get currentUser => _currentUser;
+  ClanModel? get myClan => _myClan;
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _authService.isLoggedIn;
@@ -89,6 +96,12 @@ class AppStateProvider with ChangeNotifier {
       if (_currentUser != null) {
         debugPrint('AppStateProvider - 사용자 정보 로드 완료: ${_currentUser!.nickname} (${_currentUser!.uid})');
         
+        // 사용자의 클랜 정보 로드
+        _myClan = await _clanService.getCurrentUserClan();
+        if (_myClan != null) {
+          debugPrint('AppStateProvider - 사용자 클랜 정보 로드 완료: ${_myClan!.name}');
+        }
+
         // 이전 사용자와 다른 사용자인 경우 모든 캐시 클리어
         if (prevUser != null && prevUser.uid != _currentUser!.uid) {
           debugPrint('AppStateProvider - 사용자 변경 감지: ${prevUser.uid} → ${_currentUser!.uid}');
@@ -113,6 +126,7 @@ class AppStateProvider with ChangeNotifier {
     _tournaments.clear();
     _tournamentsByCategory.clear();
     _clans.clear();
+    _myClan = null;
     _chatRooms.clear();
     _notifications.clear();
     _mercenaries.clear();
@@ -195,6 +209,7 @@ class AppStateProvider with ChangeNotifier {
       
       // 사용자 데이터 명시적으로 초기화
       _currentUser = null;
+      _myClan = null;
       
       // 앱 상태 리셋
       _tournaments.clear();
@@ -931,40 +946,30 @@ class AppStateProvider with ChangeNotifier {
     notifyListeners();
   }
   
-  // 앱 전체에서 사용자 데이터 동기화
+  // Sync current user data with Firebase
   Future<void> syncCurrentUser() async {
+    if (!_authService.isLoggedIn) {
+      _currentUser = null;
+      notifyListeners();
+      return;
+    }
+    
     try {
-      if (!_authService.isLoggedIn) {
-        debugPrint('AppStateProvider.syncCurrentUser() - 로그인되어 있지 않음, currentUser 초기화');
-        _currentUser = null;
-        notifyListeners();
-        return;
-      }
-      
-      // FirebaseAuth에서 사용자 정보 새로고침
+      // First reload Firebase Auth user
       await _authService.reloadCurrentUser();
       
-      // 새로운 사용자 데이터 가져오기
-      final newUserData = await _firebaseService.getCurrentUser();
+      // Get user data from Firestore
+      _currentUser = await _firebaseService.getCurrentUser();
       
-      // 변경 사항이 있는지 확인 (사용자 전환 또는 데이터 업데이트)
-      final bool userChanged = _currentUser?.uid != newUserData?.uid;
-      final bool dataChanged = _currentUser?.nickname != newUserData?.nickname;
-      
-      if (userChanged) {
-        debugPrint('AppStateProvider.syncCurrentUser() - 사용자 변경됨: ${_currentUser?.uid} → ${newUserData?.uid}');
-        
-        // 다른 사용자로 변경되었으면 캐시 초기화
-        _clearAllCaches();
-      } else if (dataChanged) {
-        debugPrint('AppStateProvider.syncCurrentUser() - 사용자 데이터 변경됨: ${_currentUser?.nickname} → ${newUserData?.nickname}');
+      if (_currentUser != null) {
+        debugPrint('AppStateProvider - User data synced: ${_currentUser!.nickname}');
+      } else {
+        debugPrint('AppStateProvider - Failed to sync user data: No data found');
       }
       
-      // 사용자 데이터 업데이트
-      _currentUser = newUserData;
       notifyListeners();
     } catch (e) {
-      debugPrint('AppStateProvider.syncCurrentUser() - 오류 발생: $e');
+      debugPrint('AppStateProvider - Error syncing user data: $e');
     }
   }
 } 

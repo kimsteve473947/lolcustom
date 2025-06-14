@@ -128,11 +128,48 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
     final user = profile.user;
     return Column(
       children: [
-        CircleAvatar(
-          radius: 50,
-          backgroundImage: user.profileImageUrl.isNotEmpty
-              ? NetworkImage(user.profileImageUrl)
-              : const AssetImage('assets/images/profile_placeholder.png') as ImageProvider,
+        Container(
+          width: 100,
+          height: 100,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            border: Border.all(color: Colors.white, width: 3),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.1),
+                spreadRadius: 2,
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: ClipOval(
+            child: user.profileImageUrl.isNotEmpty
+                ? Image.network(
+                    user.profileImageUrl,
+                    fit: BoxFit.cover,
+                    loadingBuilder: (context, child, loadingProgress) {
+                      if (loadingProgress == null) return child;
+                      return Center(
+                        child: CircularProgressIndicator(
+                          value: loadingProgress.expectedTotalBytes != null
+                              ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                              : null,
+                        ),
+                      );
+                    },
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        color: Colors.grey.shade200,
+                        child: const Icon(Icons.person, size: 50, color: Colors.grey),
+                      );
+                    },
+                  )
+                : Container(
+                    color: Colors.grey.shade200,
+                    child: const Icon(Icons.person, size: 50, color: Colors.grey),
+                  ),
+          ),
         ),
         const SizedBox(height: 16),
         Text(

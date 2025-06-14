@@ -1,6 +1,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import 'package:lol_custom_game_manager/models/clan_model.dart';
+import 'package:lol_custom_game_manager/models/clan_recruitment_post_model.dart';
 import 'dart:io';
 import 'package:uuid/uuid.dart';
 import 'package:path/path.dart' as path;
@@ -19,6 +20,31 @@ class ClanService {
   
   // Collection reference
   CollectionReference get _clansCollection => _firestore.collection('clans');
+  CollectionReference get _recruitmentPostsCollection => _firestore.collection('clan_recruitment_posts');
+  
+  // --- Clan Recruitment ---
+
+  Stream<List<ClanRecruitmentPostModel>> getRecruitmentPostsStream({String? filter}) {
+    // TODO: Add filter logic
+    return _recruitmentPostsCollection
+        .where('isRecruiting', isEqualTo: true)
+        .orderBy('createdAt', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs.map((doc) => ClanRecruitmentPostModel.fromFirestore(doc)).toList();
+    });
+  }
+
+  Future<void> publishRecruitmentPost(ClanRecruitmentPostModel post) async {
+    try {
+      await _recruitmentPostsCollection.add(post.toFirestore());
+    } catch (e) {
+      debugPrint('Error publishing recruitment post: $e');
+      rethrow;
+    }
+  }
+
+  // --- Clan Management ---
   
   // Create a new clan
   Future<String> createClan(
