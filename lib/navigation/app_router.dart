@@ -13,7 +13,11 @@ import 'package:lol_custom_game_manager/screens/clans/clan_list_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_creation_flow_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_public_profile_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_management_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_recruitment_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_recruitment_list_screen.dart';
+import 'package:lol_custom_game_manager/providers/clan_recruitment_provider.dart';
 import 'package:lol_custom_game_manager/screens/main_screen.dart';
+import 'package:provider/provider.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_detail_screen.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_edit_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/my_page_screen.dart';
@@ -100,6 +104,19 @@ class AppRouter {
       GoRoute(
         path: '/clans/create',
         builder: (context, state) => const ClanCreationFlowScreen(),
+      ),
+      GoRoute(
+        path: '/clans/recruit',
+        builder: (context, state) {
+          return ChangeNotifierProvider(
+            create: (_) => ClanRecruitmentProvider(),
+            child: const ClanRecruitmentScreen(),
+          );
+        },
+      ),
+      GoRoute(
+        path: '/clans/recruitment-list',
+        builder: (context, state) => const ClanRecruitmentListScreen(),
       ),
       GoRoute(
         path: '/clans/:id',

@@ -242,6 +242,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                   final isHost = member['isHost'] ?? false;
                                   
                                   return ListTile(
+                                    onTap: () {
+                                      Navigator.of(context).pop(); // Close the modal
+                                      context.push('/profile/${member['userId']}');
+                                    },
                                     leading: Stack(
                                       children: [
                                         CircleAvatar(
@@ -677,41 +681,44 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         children: [
           // 발신자 프로필 이미지 (자신의 메시지는 표시 안함)
           if (!isCurrentUser)
-            Stack(
-              children: [
-                Container(
-                  margin: const EdgeInsets.only(top: 4),
-                  child: CircleAvatar(
-              radius: 16,
-                    backgroundColor: Colors.grey.shade200,
-                    backgroundImage: message.senderProfileImageUrl != null
-                  ? NetworkImage(message.senderProfileImageUrl!)
-                  : null,
-                    child: message.senderProfileImageUrl == null
-                        ? const Icon(Icons.person, size: 16, color: Colors.grey)
-                  : null,
-                  ),
-                ),
-                if (isHost)
-                  Positioned(
-                    right: 0,
-                    bottom: 0,
-                    child: Container(
-                      width: 12,
-                      height: 12,
-                      decoration: BoxDecoration(
-                        color: AppColors.primary,
-                        shape: BoxShape.circle,
-                        border: Border.all(color: Colors.white, width: 1),
-                      ),
-                      child: const Icon(
-                        Icons.star,
-                        size: 8,
-                        color: Colors.white,
-                      ),
+            GestureDetector(
+              onTap: () => context.push('/profile/${message.senderId}'),
+              child: Stack(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.only(top: 4),
+                    child: CircleAvatar(
+                radius: 16,
+                      backgroundColor: Colors.grey.shade200,
+                      backgroundImage: message.senderProfileImageUrl != null
+                    ? NetworkImage(message.senderProfileImageUrl!)
+                    : null,
+                      child: message.senderProfileImageUrl == null
+                          ? const Icon(Icons.person, size: 16, color: Colors.grey)
+                    : null,
                     ),
                   ),
-              ],
+                  if (isHost)
+                    Positioned(
+                      right: 0,
+                      bottom: 0,
+                      child: Container(
+                        width: 12,
+                        height: 12,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white, width: 1),
+                        ),
+                        child: const Icon(
+                          Icons.star,
+                          size: 8,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ),
+                ],
+              ),
             ),
             
           const SizedBox(width: 8),

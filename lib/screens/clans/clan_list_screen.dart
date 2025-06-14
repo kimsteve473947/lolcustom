@@ -672,14 +672,13 @@ class _ClanListScreenState extends State<ClanListScreen> {
     return GestureDetector(
       onTap: () {
         if (title == '클랜가입') {
-          debugPrint('클랜가입 버튼 클릭 - 검색 화면으로 이동');
-          context.go('/clans/search');
+          context.push('/clans/recruitment-list');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('$title 기능은 준비 중입니다')),
           );
         }
-              },
+      },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
