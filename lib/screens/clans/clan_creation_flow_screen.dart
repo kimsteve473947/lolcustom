@@ -151,7 +151,8 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
     final authProvider = Provider.of<CustomAuth.AuthProvider>(context, listen: false);
 
     try {
-      final clan = await provider.createClan(authProvider.user!.uid);
+      final user = authProvider.user!;
+      final clan = await provider.createClan(user.uid, user.nickname);
       provider.reset();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(

@@ -11,10 +11,13 @@ import 'package:lol_custom_game_manager/screens/chat/chat_room_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_detail_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_list_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_creation_flow_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_public_profile_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_management_screen.dart';
 import 'package:lol_custom_game_manager/screens/main_screen.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_detail_screen.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_edit_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/my_page_screen.dart';
+import 'package:lol_custom_game_manager/screens/my_page/edit_profile_screen.dart';
 import 'package:lol_custom_game_manager/screens/rankings/rankings_screen.dart';
 import 'package:lol_custom_game_manager/screens/settings/fcm_test_screen.dart';
 import 'package:lol_custom_game_manager/screens/splash_screen.dart';
@@ -23,6 +26,7 @@ import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_scre
 import 'package:lol_custom_game_manager/screens/tournaments/create_tournament_screen.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
 import 'package:lol_custom_game_manager/widgets/admin_tools.dart';
+import 'package:lol_custom_game_manager/screens/profile/user_profile_screen.dart';
 
 class AppRouter {
   final AuthService authService;
@@ -101,7 +105,21 @@ class AppRouter {
         path: '/clans/:id',
         builder: (context, state) {
           final clanId = state.pathParameters['id']!;
-          return MainScreen(child: ClanDetailScreen(clanId: clanId));
+          return ClanDetailScreen(clanId: clanId);
+        },
+      ),
+      GoRoute(
+        path: '/clans/public/:id',
+        builder: (context, state) {
+          final clanId = state.pathParameters['id']!;
+          return ClanPublicProfileScreen(clanId: clanId);
+        },
+      ),
+      GoRoute(
+        path: '/clans/:id/manage',
+        builder: (context, state) {
+          final clanId = state.pathParameters['id']!;
+          return ClanManagementScreen(clanId: clanId);
         },
       ),
       GoRoute(
@@ -123,6 +141,12 @@ class AppRouter {
       GoRoute(
         path: '/mypage',
         builder: (context, state) => const MainScreen(initialTabIndex: 4),
+        routes: [
+          GoRoute(
+            path: 'edit-profile',
+            builder: (context, state) => const EditProfileScreen(),
+          ),
+        ]
       ),
       GoRoute(
         path: '/admin',
@@ -131,6 +155,13 @@ class AppRouter {
       GoRoute(
         path: '/settings/fcm-test',
         builder: (context, state) => const FCMTestScreen(),
+      ),
+      GoRoute(
+        path: '/profile/:userId',
+        builder: (context, state) {
+          final userId = state.pathParameters['userId']!;
+          return UserProfileScreen(userId: userId);
+        },
       ),
     ],
     errorBuilder: (context, state) => Scaffold(

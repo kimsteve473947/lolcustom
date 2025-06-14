@@ -397,4 +397,95 @@ class ChatService {
       throw Exception('채팅방 멤버 정보를 가져오는 중 오류가 발생했습니다: $e');
     }
   }
-} 
+
+  /// 1:1 채팅방을 가져오거나 생성합니다.
+  Future<String> getOrCreateDirectChatRoom(String currentUserId, String otherUserId) async {
+    // 두 사용자 ID를 정렬하여 고유한 채팅방 ID 생성
+    List<String> userIds = [currentUserId, otherUserId]..sort();
+    String chatRoomId = 'dm_${userIds[0]}_${userIds[1]}';
+
+    final chatRoomDoc = await _firestore.collection('chatRooms').doc(chatRoomId).get();
+
+    // 채팅방이 이미 존재하면 ID 반환 (필요시 'hiddenFor'에서 사용자 제거)
+    if (chatRoomDoc.exists) {
+      final chatRoom = ChatRoomModel.fromFirestore(chatRoomDoc);
+      if (chatRoom.hiddenFor.contains(currentUserId)) {
+        // 사용자가 나갔던 방이면 다시 활성화
+        await _firestore.collection('chatRooms').doc(chatRoomId).update({
+          'hiddenFor': FieldValue.arrayRemove([currentUserId])
+        });
+      }
+      return chatRoomId;
+    }
+
+    // 채팅방이 없으면 새로 생성
+    final currentUserDoc = await _firestore.collection('users').doc(currentUserId).get();
+    final otherUserDoc = await _firestore.collection('users').doc(otherUserId).get();
+
+    if (!currentUserDoc.exists || !otherUserDoc.exists) {
+      throw Exception('사용자 정보를 찾을 수 없습니다.');
+    }
+
+    final currentUser = UserModel.fromFirestore(currentUserDoc);
+    final otherUser = UserModel.fromFirestore(otherUserDoc);
+
+    final chatRoom = ChatRoomModel(
+      id: chatRoomId,
+      title: otherUser.nickname, // 상대방 닉네임을 채팅방 제목으로
+      participantIds: userIds,
+      participantNames: {
+        currentUserId: currentUser.nickname,
+        otherUserId: otherUser.nickname,
+      },
+      participantProfileImages: {
+        currentUserId: currentUser.profileImageUrl,
+        otherUserId: otherUser.profileImageUrl,
+      },
+      unreadCount: {
+        currentUserId: 0,
+        otherUserId: 0,
+      },
+      type: ChatRoomType.direct,
+      createdAt: Timestamp.now(),
+      lastMessageTime: Timestamp.now(),
+    );
+
+    await _firestore.collection('chatRooms').doc(chatRoomId).set(chatRoom.toFirestore());
+
+    return chatRoomId;
+  }
+
+  // 채팅방 나가기 (내 목록에서 숨기기)
+  Future<void> leaveChatRoom(String chatRoomId, String userId) async {
+    await _firestore.collection('chatRooms').doc(chatRoomId).update({
+      'hiddenFor': FieldValue.arrayUnion([userId])
+    });
+  }
+
+  // 사용자가 참여하고 있는 채팅방 목록 가져오기 (숨김 처리된 방 제외)
+  Stream<List<ChatRoomModel>> getUserChatRooms(String userId) {
+    return _firestore
+        .collection('chatRooms')
+        .where('participantIds', arrayContains: userId)
+        .orderBy('lastMessageTime', descending: true)
+        .snapshots()
+        .map((snapshot) {
+      return snapshot.docs
+          .map((doc) => ChatRoomModel.fromFirestore(doc))
+          .where((chatRoom) => !chatRoom.hiddenFor.contains(userId))
+          .toList();
+   });
+ }
+
+ // 특정 채팅방의 메시지 목록을 실시간으로 가져오기
+ Stream<List<MessageModel>> getMessagesStream(String chatRoomId) {
+   return _firestore
+       .collection('messages')
+       .where('chatRoomId', isEqualTo: chatRoomId)
+       .orderBy('timestamp', descending: true)
+       .snapshots()
+       .map((snapshot) => snapshot.docs
+           .map((doc) => MessageModel.fromFirestore(doc))
+           .toList());
+ }
+}

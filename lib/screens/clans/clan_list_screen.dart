@@ -502,11 +502,17 @@ class _ClanListScreenState extends State<ClanListScreen> {
   }
 
   Widget _buildClanCard(ClanModel clan) {
+    final authProvider = Provider.of<CustomAuth.AuthProvider>(context, listen: false);
+    final currentUser = authProvider.user;
+    final isMember = currentUser != null && clan.members.contains(currentUser.uid);
+
     return GestureDetector(
       onTap: () {
-        final String correctPath = '/clans/${clan.id}';
-        debugPrint('클랜 카드 클릭: 클랜 ID=${clan.id}, 경로=$correctPath');
-        context.push(correctPath);
+        if (isMember) {
+          context.push('/clans/${clan.id}');
+        } else {
+          context.push('/clans/public/${clan.id}');
+        }
       },
       child: Container(
         margin: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
@@ -841,85 +847,130 @@ class _ClanListScreenState extends State<ClanListScreen> {
       builder: (context, snapshot) {
         final clan = snapshot.data;
         
-        return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          padding: const EdgeInsets.all(16),
-          decoration: BoxDecoration(
-            color: Colors.white,
-            borderRadius: BorderRadius.circular(12),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.grey.withOpacity(0.1),
-                spreadRadius: 1,
-                blurRadius: 3,
-                offset: const Offset(0, 1),
-              ),
-            ],
-          ),
-          child: Row(
-            children: [
-              if (clan != null) 
-                _buildClanEmblem(clan)
-              else
+        return InkWell(
+          onTap: () {
+            if (application.status == ClanApplicationStatus.pending) {
+              _showCancelApplicationDialog(application);
+            }
+          },
+          child: Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.grey.withOpacity(0.1),
+                  spreadRadius: 1,
+                  blurRadius: 3,
+                  offset: const Offset(0, 1),
+                ),
+              ],
+            ),
+            child: Row(
+              children: [
+                if (clan != null)
+                  _buildClanEmblem(clan)
+                else
+                  Container(
+                    width: 50,
+                    height: 50,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      shape: BoxShape.circle,
+                    ),
+                    child: const Center(
+                      child: Icon(
+                        Icons.sports_soccer,
+                        color: Colors.grey,
+                      ),
+                    ),
+                  ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        clan?.name ?? '불러오는 중...',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        '신청일: ${_formatDate(application.appliedAt)}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                 Container(
-                  width: 50,
-                  height: 50,
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                   decoration: BoxDecoration(
-                    color: Colors.grey[200],
-                    shape: BoxShape.circle,
+                    color: statusColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.sports_soccer,
-                      color: Colors.grey,
+                  child: Text(
+                    statusText,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 12,
                     ),
                   ),
                 ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      clan?.name ?? '불러오는 중...',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.bold,
-                        fontSize: 16,
-                      ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '신청일: ${_formatDate(application.appliedAt)}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: statusColor.withOpacity(0.1),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Text(
-                  statusText,
-                  style: TextStyle(
-                    color: statusColor,
-                    fontWeight: FontWeight.bold,
-                    fontSize: 12,
+                if (application.status == ClanApplicationStatus.pending)
+                  const Padding(
+                    padding: EdgeInsets.only(left: 8.0),
+                    child: Icon(Icons.touch_app, color: Colors.grey, size: 20),
                   ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
     );
   }
   
+  void _showCancelApplicationDialog(ClanApplicationModel application) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('신청 취소'),
+        content: Text('[${application.userName}] 클랜에 보낸 가입 신청을 취소하시겠습니까?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('닫기'),
+          ),
+          TextButton(
+            onPressed: () async {
+              try {
+                await _clanService.cancelClanApplication(application.id);
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('클랜 가입 신청이 취소되었습니다.')),
+                );
+              } catch (e) {
+                Navigator.of(context).pop();
+                ScaffoldMessenger.of(context).showSnackBar(
+                  SnackBar(content: Text('신청 취소 중 오류가 발생했습니다: $e')),
+                );
+              }
+            },
+            child: const Text('신청 취소', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+  }
+
   String _formatDate(Timestamp timestamp) {
     final date = timestamp.toDate();
     return '${date.year}/${date.month}/${date.day}';

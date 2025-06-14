@@ -33,6 +33,7 @@ class ClanCreationProvider extends ChangeNotifier {
     String? name,
     String? description,
     String? ownerId,
+    String? ownerName,
     dynamic emblem,
     List<String>? activityDays,
     List<PlayTimeType>? activityTimes,
@@ -52,6 +53,7 @@ class ClanCreationProvider extends ChangeNotifier {
       name: name,
       description: description,
       ownerId: ownerId,
+      ownerName: ownerName,
       emblem: emblem,
       activityDays: activityDays,
       activityTimes: activityTimes,
@@ -67,11 +69,12 @@ class ClanCreationProvider extends ChangeNotifier {
     notifyListeners();
   }
   
-  Future<ClanModel> createClan(String userId) async {
+  Future<ClanModel> createClan(String userId, String ownerName) async {
     // 클랜 ID 생성
     final clanId = await _clanService.createClan(
       _name,
       userId,
+      ownerName,
       description: _description,
       emblem: _emblem,
       activityDays: _activityDays,
@@ -83,7 +86,6 @@ class ClanCreationProvider extends ChangeNotifier {
       discordUrl: _discordUrl,
       areMembersPublic: _areMembersPublic,
       isRecruiting: _isRecruiting,
-      memberCount: 1,
     );
     
     // 생성된 클랜 정보 가져오기
@@ -299,7 +301,7 @@ class ClanCreationProvider extends ChangeNotifier {
   }
   
   // Build a clan model from current state
-  Future<ClanModel> buildClanModel(String userId) async {
+  Future<ClanModel> buildClanModel(String userId, String ownerName) async {
     print('buildClanModel 호출됨 - 사용자 ID: $userId');
     // 엠블럼 처리
     dynamic processedEmblem;
@@ -318,6 +320,7 @@ class ClanCreationProvider extends ChangeNotifier {
       code: _code,
       description: _description,
       ownerId: userId,
+      ownerName: ownerName,
       emblem: processedEmblem,
       activityDays: _activityDays,
       activityTimes: _activityTimes,
@@ -372,4 +375,4 @@ class ClanCreationProvider extends ChangeNotifier {
         return false;
     }
   }
-} 
+}

@@ -39,6 +39,9 @@ class UserModel extends Equatable {
   final int? totalRatingsCount;
   final int credits;
   final List<String>? preferredPositions;
+  final String? clanId;
+  final List<String>? friends;
+  final String? statusMessage;
 
   const UserModel({
     required this.uid,
@@ -58,6 +61,9 @@ class UserModel extends Equatable {
     this.totalRatingsCount,
     this.credits = 0,
     this.preferredPositions,
+    this.clanId,
+    this.friends,
+    this.statusMessage,
   });
 
   // 파이어스토어에서 데이터 불러오기
@@ -94,6 +100,9 @@ class UserModel extends Equatable {
       totalRatingsCount: data['totalRatingsCount'] as int?,
       credits: data['credits'] as int? ?? 0,
       preferredPositions: preferredPositions,
+      clanId: data['clanId'] as String?,
+      friends: List<String>.from(data['friends'] ?? []),
+      statusMessage: data['statusMessage'] as String?,
     );
   }
 
@@ -116,6 +125,9 @@ class UserModel extends Equatable {
       'totalRatingsCount': totalRatingsCount,
       'credits': credits,
       'preferredPositions': preferredPositions,
+      'clanId': clanId,
+      'friends': friends,
+      'statusMessage': statusMessage,
     };
   }
   
@@ -196,6 +208,9 @@ class UserModel extends Equatable {
     int? totalRatingsCount,
     int? credits,
     List<String>? preferredPositions,
+    String? clanId,
+    List<String>? friends,
+    String? statusMessage,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -215,6 +230,9 @@ class UserModel extends Equatable {
       totalRatingsCount: totalRatingsCount ?? this.totalRatingsCount,
       credits: credits ?? this.credits,
       preferredPositions: preferredPositions ?? this.preferredPositions,
+      clanId: clanId ?? this.clanId,
+      friends: friends ?? this.friends,
+      statusMessage: statusMessage ?? this.statusMessage,
     );
   }
 
@@ -237,5 +255,8 @@ class UserModel extends Equatable {
         totalRatingsCount,
         credits,
         preferredPositions,
+        clanId,
+        friends,
+        statusMessage,
       ];
-} 
+}

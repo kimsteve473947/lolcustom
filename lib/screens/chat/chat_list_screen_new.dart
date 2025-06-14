@@ -83,16 +83,14 @@ class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProvid
 
   Widget _buildHeader() {
     return Container(
-      decoration: BoxDecoration(
-        color: AppColors.primary,
-      ),
+      color: AppColors.primary,
       child: SafeArea(
         bottom: false,
         child: Column(
           children: [
             // Top section with title and actions
             Padding(
-              padding: const EdgeInsets.fromLTRB(20, 16, 20, 12),
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
@@ -118,7 +116,7 @@ class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProvid
                         padding: EdgeInsets.zero,
                         constraints: const BoxConstraints(),
                       ),
-                      const SizedBox(width: 16),
+                      const SizedBox(width: 20),
                       IconButton(
                         onPressed: () {
                           // 메뉴
@@ -138,71 +136,65 @@ class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProvid
             ),
             
             // Custom Tab Bar
-            Container(
-              margin: const EdgeInsets.fromLTRB(16, 8, 16, 16),
-              padding: const EdgeInsets.all(4),
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.2),
-                borderRadius: BorderRadius.circular(30),
-              ),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        _tabController.animateTo(0);
-                      },
-                      child: Container(
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: _selectedTabIndex == 0 ? Colors.white : Colors.transparent,
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '토너먼트',
-                            style: TextStyle(
-                              color: _selectedTabIndex == 0 ? AppColors.primary : Colors.white,
-                              fontWeight: _selectedTabIndex == 0 ? FontWeight.bold : FontWeight.normal,
-                              fontSize: 15,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+              child: Container(
+                height: 48,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          _tabController.animateTo(0);
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _selectedTabIndex == 0 ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '토너먼트',
+                              style: TextStyle(
+                                color: _selectedTabIndex == 0 ? AppColors.primary : Colors.white,
+                                fontWeight: _selectedTabIndex == 0 ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                  Expanded(
-                    child: GestureDetector(
-                      onTap: () {
-                        _tabController.animateTo(1);
-                      },
-                      child: Container(
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: _selectedTabIndex == 1 ? Colors.white : Colors.transparent,
-                          borderRadius: BorderRadius.circular(30),
-                        ),
-                        child: Center(
-                          child: Text(
-                            '개인 메시지',
-                            style: TextStyle(
-                              color: _selectedTabIndex == 1 ? AppColors.primary : Colors.white,
-                              fontWeight: _selectedTabIndex == 1 ? FontWeight.bold : FontWeight.normal,
-                              fontSize: 15,
+                    Expanded(
+                      child: GestureDetector(
+                        onTap: () {
+                          _tabController.animateTo(1);
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: _selectedTabIndex == 1 ? Colors.white : Colors.transparent,
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                          child: Center(
+                            child: Text(
+                              '개인 메시지',
+                              style: TextStyle(
+                                color: _selectedTabIndex == 1 ? AppColors.primary : Colors.white,
+                                fontWeight: _selectedTabIndex == 1 ? FontWeight.bold : FontWeight.normal,
+                                fontSize: 16,
+                              ),
                             ),
                           ),
                         ),
                       ),
                     ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-            
-            // Bottom divider
-            Container(
-              height: 1,
-              color: Colors.white.withOpacity(0.2),
             ),
           ],
         ),
@@ -471,4 +463,4 @@ class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProvid
         return '채팅방';
     }
   }
-}
+} 

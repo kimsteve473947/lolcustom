@@ -239,7 +239,8 @@ service cloud.firestore {
     // 클랜 컬렉션 규칙
     match /clans/{clanId} {
       // 모든 로그인 사용자는 클랜 정보를 읽을 수 있음
-      allow read: if request.auth != null;
+      // 클랜 멤버만 읽기 가능
+      allow read: if request.auth != null && request.auth.uid in resource.data.members;
       
       // 클랜 생성은 로그인한 사용자만 가능
       allow create: if request.auth != null && 
