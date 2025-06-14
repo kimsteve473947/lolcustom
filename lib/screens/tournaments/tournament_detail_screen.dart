@@ -2844,8 +2844,10 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> with Si
         return;
       }
       
-      // 채팅방으로 이동 - 채팅 탭 화면으로 이동
-      context.go('/chat/$chatRoomId');
+      // 채팅방으로 이동 - push를 사용하여 뒤로가기 버튼이 생기도록 함
+      await context.push('/chat/$chatRoomId');
+      // 채팅방에서 돌아온 후 데이터 새로고침
+      _loadTournamentDetails();
       
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(

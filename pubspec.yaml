@@ -45,7 +45,5 @@ flutter:
   - assets/images/
   - assets/images/tiers/
   - assets/images/lanes/
-  - assets/icons/
-  - assets/fonts/
   - ".env"
 dependency_overrides:

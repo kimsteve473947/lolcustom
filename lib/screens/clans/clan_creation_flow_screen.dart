@@ -108,7 +108,7 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
         final emblemData = {
           'frame': _selectedFrame,
           'symbol': _selectedSymbol,
-          'backgroundColor': _selectedColor,
+          'backgroundColor': _selectedColor.value, // Store color value
         };
         provider.setEmblem(emblemData);
       }
@@ -178,24 +178,19 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
     final provider = Provider.of<ClanCreationProvider>(context);
 
     return Scaffold(
+      backgroundColor: Colors.white,
       appBar: AppBar(
+        backgroundColor: Colors.white,
+        elevation: 0,
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
           onPressed: _previousPage,
         ),
-        title: Text('클랜 생성 (${_currentPage + 1}/5)'),
-        actions: [
-          if (_currentPage == 4)
-            Padding(
-              padding: const EdgeInsets.only(right: 8.0),
-              child: TextButton(
-                onPressed: _isCreating ? null : _createClan,
-                child: _isCreating
-                    ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2,))
-                    : const Text('완료'),
-              ),
-            )
-        ],
+        title: Text(
+          '클랜 만들기',
+          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        ),
+        centerTitle: true,
       ),
       body: PageView(
         controller: _pageController,
@@ -204,7 +199,7 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
             _currentPage = page;
           });
         },
-        physics: const NeverScrollableScrollPhysics(), // 버튼으로만 이동
+        physics: const NeverScrollableScrollPhysics(),
         children: [
           _buildBasicInfoStep(provider),
           _buildEmblemStep(provider),
@@ -219,23 +214,23 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
 
   Widget _buildBottomNavBar() {
     return Container(
-      padding: const EdgeInsets.all(16.0),
-      child: Row(
-        children: [
-          Expanded(
-            child: OutlinedButton(
-              onPressed: _previousPage,
-              child: const Text('이전'),
-            ),
-          ),
-          const SizedBox(width: 16),
-          Expanded(
-            child: ElevatedButton(
-              onPressed: _currentPage == 4 ? (_isCreating ? null : _createClan) : _nextPage,
-              child: Text(_currentPage == 4 ? '클랜 생성' : '다음'),
-            ),
-          ),
-        ],
+      padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+      color: Colors.white,
+      child: ElevatedButton(
+        onPressed: _currentPage == 4 ? (_isCreating ? null : _createClan) : _nextPage,
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          padding: const EdgeInsets.symmetric(vertical: 18),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          elevation: 0,
+        ),
+        child: _isCreating
+            ? const SizedBox(width: 24, height: 24, child: CircularProgressIndicator(color: Colors.white, strokeWidth: 3))
+            : Text(
+                _currentPage == 4 ? '클랜 만들기' : '다음',
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
       ),
     );
   }
@@ -243,41 +238,49 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
   // Step 1: Basic Info
   Widget _buildBasicInfoStep(ClanCreationProvider provider) {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.symmetric(horizontal: 24.0),
       child: Form(
         key: _basicInfoFormKey,
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text('클랜 기본 정보', style: Theme.of(context).textTheme.headlineSmall),
-            const SizedBox(height: 8),
-            Text('클랜의 이름과 설명을 입력해주세요. 이름은 나중에 변경할 수 없습니다.', style: Theme.of(context).textTheme.bodyMedium),
-            const SizedBox(height: 24),
-            TextFormField(
+            const SizedBox(height: 20),
+            const Text(
+              '어떤 클랜을 만드시나요?',
+              style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 12),
+            const Text(
+              '클랜을 잘 나타내는 이름과 소개를 적어주세요.',
+              style: TextStyle(fontSize: 16, color: Colors.grey),
+            ),
+            const SizedBox(height: 30),
+            _buildTextField(
               controller: _nameController,
-              decoration: const InputDecoration(labelText: '클랜 이름', border: OutlineInputBorder()),
+              label: '클랜 이름 (2~10자)',
               validator: (value) {
                 if (value == null || value.trim().isEmpty) return '클랜 이름을 입력해주세요.';
                 if (value.trim().length < 2) return '최소 2자 이상 입력해주세요.';
+                if (value.trim().length > 10) return '최대 10자까지 입력 가능합니다.';
                 return null;
               },
             ),
-            const SizedBox(height: 16),
-            TextFormField(
+            const SizedBox(height: 20),
+            _buildTextField(
               controller: _descriptionController,
-              decoration: const InputDecoration(labelText: '클랜 설명', border: OutlineInputBorder()),
-              maxLines: 3,
+              label: '클랜 소개 (10자 이상)',
+              maxLines: 4,
               validator: (value) {
                 if (value == null || value.trim().isEmpty) return '클랜 설명을 입력해주세요.';
                 if (value.trim().length < 10) return '최소 10자 이상 입력해주세요.';
                 return null;
               },
             ),
-            const SizedBox(height: 16),
-            TextFormField(
+            const SizedBox(height: 20),
+            _buildTextField(
               controller: _discordController,
-              decoration: const InputDecoration(labelText: '디스코드 URL (선택)', border: OutlineInputBorder()),
-               validator: (value) {
+              label: '디스코드 URL (선택)',
+              validator: (value) {
                 if (value != null && value.trim().isNotEmpty) {
                   final urlPattern = RegExp(r'^(https?:\/\/)?(www\.)?discord\.gg\/[a-zA-Z0-9]+([\-\.]{1}[a-zA-Z0-9]+)*$');
                   if (!urlPattern.hasMatch(value.trim())) return '올바른 디스코드 URL 형식을 입력해주세요.';
@@ -285,14 +288,17 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
                 return null;
               },
             ),
-            const SizedBox(height: 24),
-            SwitchListTile(
-              title: const Text('멤버 목록 공개'),
+            const SizedBox(height: 30),
+            _buildSwitch(
+              title: '멤버 목록 공개',
+              subtitle: '클랜원이 아닌 사람에게 멤버 목록을 공개합니다.',
               value: provider.areMembersPublic,
               onChanged: (value) => provider.setAreMembersPublic(value),
             ),
-            SwitchListTile(
-              title: const Text('멤버 모집'),
+            const SizedBox(height: 10),
+            _buildSwitch(
+              title: '멤버 모집',
+              subtitle: '클랜원 모집을 활성화합니다.',
               value: provider.isRecruiting,
               onChanged: (value) => provider.setIsRecruiting(value),
             ),
@@ -302,134 +308,246 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
     );
   }
 
+  Widget _buildTextField({
+    required TextEditingController controller,
+    required String label,
+    int maxLines = 1,
+    String? Function(String?)? validator,
+  }) {
+    return TextFormField(
+      controller: controller,
+      maxLines: maxLines,
+      decoration: InputDecoration(
+        labelText: label,
+        labelStyle: const TextStyle(color: Colors.grey),
+        filled: true,
+        fillColor: Colors.grey[100],
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: BorderSide(color: AppColors.primary, width: 2),
+        ),
+      ),
+      validator: validator,
+    );
+  }
+
+  Widget _buildSwitch({
+    required String title,
+    required String subtitle,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return SwitchListTile(
+      title: Text(title, style: const TextStyle(fontWeight: FontWeight.bold)),
+      subtitle: Text(subtitle, style: const TextStyle(color: Colors.grey)),
+      value: value,
+      onChanged: onChanged,
+      activeColor: AppColors.primary,
+      contentPadding: EdgeInsets.zero,
+    );
+  }
+
   // Step 2: Emblem
   Widget _buildEmblemStep(ClanCreationProvider provider) {
     return StatefulBuilder(
       builder: (BuildContext context, StateSetter setState) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('엠블럼 디자인', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              Text('클랜을 나타내는 엠블럼을 만들어보세요.', style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+              const Text(
+                '클랜을 대표하는 엠블럼을\n만들어보세요.',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '클랜의 개성을 뽐낼 수 있는 엠블럼을 선택해주세요.',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 30),
               Center(
                 child: Container(
-                  width: 200,
-                  height: 200,
+                  width: 150,
+                  height: 150,
                   decoration: BoxDecoration(
-                    color: Colors.grey[100],
+                    color: Colors.grey[200],
                     shape: BoxShape.circle,
                   ),
                   child: Center(
                     child: _isCustomImage && _imageFile != null
-                        ? ClipOval(child: Image.file(_imageFile!, width: 180, height: 180, fit: BoxFit.cover))
+                        ? ClipOval(child: Image.file(_imageFile!, width: 150, height: 150, fit: BoxFit.cover))
                         : _buildEmblemPreview(),
                   ),
                 ),
               ),
-              const SizedBox(height: 24),
-              Center(
-                child: OutlinedButton.icon(
-                  onPressed: () async {
-                    final file = await _pickImage();
-                    if (file != null) {
-                      setState(() {
-                        _imageFile = file;
-                        _isCustomImage = true;
-                      });
-                    }
-                  },
-                  icon: const Icon(Icons.photo_camera),
-                  label: const Text('사진 업로드'),
-                ),
-              ),
-              if (_imageFile != null)
-                Center(
-                  child: TextButton(
-                    onPressed: () => setState(() => _isCustomImage = !_isCustomImage),
-                    child: Text(_isCustomImage ? '기본 아이콘 선택' : '업로드한 사진 사용'),
-                  ),
-                ),
-              const SizedBox(height: 24),
-              if (!_isCustomImage) ...[
-                const Text('프레임', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                SingleChildScrollView(
-                  scrollDirection: Axis.horizontal,
-                  child: Row(
-                    children: _frames.map((frame) {
-                      final isSelected = frame == _selectedFrame;
-                      return Padding(
-                        padding: const EdgeInsets.only(right: 12),
-                        child: InkWell(
-                          onTap: () => setState(() => _selectedFrame = frame),
-                          child: Container(
-                            width: 60,
-                            height: 60,
-                            decoration: BoxDecoration(
-                              color: isSelected ? _selectedColor.withOpacity(0.2) : Colors.grey[100],
-                              border: isSelected ? Border.all(color: _selectedColor, width: 2) : null,
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Center(child: _buildFramePreview(frame, 40, _selectedColor)),
-                          ),
-                        ),
-                      );
-                    }).toList(),
-                  ),
-                ),
-                const SizedBox(height: 24),
-                const Text('아이콘', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 12, crossAxisSpacing: 12),
-                  itemCount: _symbols.length,
-                  itemBuilder: (context, index) {
-                    final symbol = _symbols[index];
-                    final isSelected = symbol == _selectedSymbol;
-                    return InkWell(
-                      onTap: () => setState(() => _selectedSymbol = symbol),
-                      child: Container(
-                        decoration: BoxDecoration(
-                          color: isSelected ? _selectedColor.withOpacity(0.2) : Colors.grey[100],
-                          border: isSelected ? Border.all(color: _selectedColor, width: 2) : null,
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        child: Center(child: Icon(_getIconData(symbol), color: isSelected ? _selectedColor : Colors.grey[600], size: 24)),
-                      ),
-                    );
-                  },
-                ),
-                const SizedBox(height: 24),
-                const Text('색상', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 16),
-                GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 5, mainAxisSpacing: 12, crossAxisSpacing: 12),
-                  itemCount: _colors.length,
-                  itemBuilder: (context, index) {
-                    final color = _colors[index];
-                    final isSelected = color.value == _selectedColor.value;
-                    return InkWell(
-                      onTap: () => setState(() => _selectedColor = color),
-                      child: Container(
-                        decoration: BoxDecoration(color: color, shape: BoxShape.circle, border: isSelected ? Border.all(color: Colors.white, width: 2) : null),
-                        child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 24) : null,
-                      ),
-                    );
-                  },
-                ),
-              ],
+              const SizedBox(height: 30),
+              _buildEmblemTypeSelector(setState),
+              const SizedBox(height: 20),
+              if (_isCustomImage)
+                _buildCustomImageUploader(setState)
+              else
+                _buildDefaultEmblemCreator(setState),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildEmblemTypeSelector(StateSetter setState) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.grey[200],
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: _buildTypeButton('기본', !_isCustomImage, () => setState(() => _isCustomImage = false)),
+          ),
+          Expanded(
+            child: _buildTypeButton('사진 업로드', _isCustomImage, () => setState(() => _isCustomImage = true)),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildTypeButton(String text, bool isSelected, VoidCallback onPressed) {
+    return GestureDetector(
+      onTap: onPressed,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 200),
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        decoration: BoxDecoration(
+          color: isSelected ? AppColors.primary : Colors.transparent,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Center(
+          child: Text(
+            text,
+            style: TextStyle(
+              color: isSelected ? Colors.white : Colors.black,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildCustomImageUploader(StateSetter setState) {
+    return Center(
+      child: OutlinedButton.icon(
+        onPressed: () async {
+          final file = await _pickImage();
+          if (file != null) {
+            setState(() {
+              _imageFile = file;
+            });
+          }
+        },
+        icon: const Icon(Icons.photo_library_outlined),
+        label: const Text('갤러리에서 사진 선택'),
+        style: OutlinedButton.styleFrom(
+          foregroundColor: AppColors.primary,
+          side: BorderSide(color: AppColors.primary),
+          padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDefaultEmblemCreator(StateSetter setState) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text('프레임', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          children: _frames.map((frame) {
+            final isSelected = frame == _selectedFrame;
+            return GestureDetector(
+              onTap: () => setState(() => _selectedFrame = frame),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 60,
+                height: 60,
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  border: isSelected ? Border.all(color: AppColors.primary, width: 2) : null,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(child: _buildFramePreview(frame, 40, _selectedColor)),
+              ),
+            );
+          }).toList(),
+        ),
+        const SizedBox(height: 24),
+        const Text('아이콘', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: Colors.grey[100],
+            borderRadius: BorderRadius.circular(12),
+          ),
+          child: GridView.builder(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 6, mainAxisSpacing: 10, crossAxisSpacing: 10),
+            itemCount: _symbols.length,
+            itemBuilder: (context, index) {
+              final symbol = _symbols[index];
+              final isSelected = symbol == _selectedSymbol;
+              return GestureDetector(
+                onTap: () => setState(() => _selectedSymbol = symbol),
+                child: AnimatedContainer(
+                  duration: const Duration(milliseconds: 200),
+                  decoration: BoxDecoration(
+                    color: isSelected ? AppColors.primary.withOpacity(0.2) : Colors.transparent,
+                    borderRadius: BorderRadius.circular(8),
+                    border: isSelected ? Border.all(color: AppColors.primary, width: 2) : null,
+                  ),
+                  child: Center(child: Icon(_getIconData(symbol), color: isSelected ? AppColors.primary : Colors.grey[600], size: 24)),
+                ),
+              );
+            },
+          ),
+        ),
+        const SizedBox(height: 24),
+        const Text('색상', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+        const SizedBox(height: 10),
+        Wrap(
+          spacing: 10,
+          runSpacing: 10,
+          children: _colors.map((color) {
+            final isSelected = color.value == _selectedColor.value;
+            return GestureDetector(
+              onTap: () => setState(() => _selectedColor = color),
+              child: AnimatedContainer(
+                duration: const Duration(milliseconds: 200),
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: color,
+                  shape: BoxShape.circle,
+                  border: isSelected ? Border.all(color: AppColors.primary, width: 3) : Border.all(color: Colors.grey.shade300),
+                ),
+                child: isSelected ? const Icon(Icons.check, color: Colors.white, size: 24) : null,
+              ),
+            );
+          }).toList(),
+        ),
+      ],
     );
   }
 
@@ -447,7 +565,7 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
   }
 
   Widget _buildEmblemPreview() {
-    return _buildFramePreview(_selectedFrame, 180, _selectedColor);
+    return _buildFramePreview(_selectedFrame, 150, _selectedColor);
   }
 
   Widget _buildFramePreview(String frameType, double size, Color backgroundColor) {
@@ -481,76 +599,67 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
     return StatefulBuilder(
       builder: (context, setState) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('주요 활동 시간', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              Text('주로 언제 활동하는지 알려주세요.', style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('활동 요일', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  if (provider.activityDays.isEmpty)
-                    Text('최소 1개 이상 선택해주세요', style: TextStyle(fontSize: 14, color: Colors.red[700])),
-                ],
+              const SizedBox(height: 20),
+              const Text(
+                '주로 언제 활동하시나요?',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              const SizedBox(height: 12),
+              const Text(
+                '정확하지 않아도 괜찮아요. 주로 활동하는 시간을 알려주세요.',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 30),
+              const Text('활동 요일', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
                 children: _dayLabels.entries.map((entry) {
                   final day = entry.key;
                   final label = entry.value;
                   final isSelected = provider.activityDays.contains(day);
-                  return GestureDetector(
-                    onTap: () {
+                  return ChoiceChip(
+                    label: Text(label),
+                    selected: isSelected,
+                    onSelected: (selected) {
                       provider.toggleActivityDay(day);
-                      setState(() {}); // Rebuild to show selection change
+                      setState(() {});
                     },
-                    child: Container(
-                      width: 40,
-                      height: 40,
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : Colors.grey[100],
-                        shape: BoxShape.circle,
-                      ),
-                      child: Center(child: Text(label, style: TextStyle(color: isSelected ? Colors.white : Colors.black, fontWeight: FontWeight.bold))),
-                    ),
+                    backgroundColor: Colors.grey[100],
+                    selectedColor: AppColors.primary,
+                    labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: BorderSide.none,
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 32),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('활동 시간대', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  if (provider.activityTimes.isEmpty)
-                    Text('최소 1개 이상 선택해주세요', style: TextStyle(fontSize: 14, color: Colors.red[700])),
-                ],
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+              const SizedBox(height: 30),
+              const Text('활동 시간대', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
                 children: _timeLabels.entries.map((entry) {
                   final time = entry.key;
-                  final label = entry.value;
+                  final label = entry.value.replaceAll('\n', ' ');
                   final isSelected = provider.activityTimes.contains(time);
-                  return GestureDetector(
-                    onTap: () {
+                  return ChoiceChip(
+                    label: Text(label),
+                    selected: isSelected,
+                    onSelected: (selected) {
                       provider.toggleActivityTime(time);
-                      setState(() {}); // Rebuild to show selection change
+                      setState(() {});
                     },
-                    child: Container(
-                      width: 72,
-                      height: 72,
-                      decoration: BoxDecoration(
-                        color: isSelected ? AppColors.primary : Colors.grey[100],
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      child: Center(child: Text(label, textAlign: TextAlign.center, style: TextStyle(color: isSelected ? Colors.white : Colors.black, fontWeight: FontWeight.w500, fontSize: 14))),
-                    ),
+                    backgroundColor: Colors.grey[100],
+                    selectedColor: AppColors.primary,
+                    labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: BorderSide.none,
                   );
                 }).toList(),
               ),
@@ -566,54 +675,64 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
     return StatefulBuilder(
       builder: (context, setState) {
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('클랜 선호도', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              Text('어떤 멤버들과 함께하고 싶나요?', style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 24),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text('주요 나이대 (복수선택 가능)', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  if (provider.ageGroups.isEmpty)
-                    Text('최소 1개 이상 선택해주세요', style: TextStyle(fontSize: 14, color: Colors.red[700])),
-                ],
+              const SizedBox(height: 20),
+              const Text(
+                '어떤 멤버와 함께하고 싶나요?',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
               ),
-              const SizedBox(height: 16),
+               const SizedBox(height: 12),
+              const Text(
+                '클랜의 선호 연령대와 성별을 선택해주세요.',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 30),
+              const Text('선호 연령대 (복수선택 가능)', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
               Wrap(
-                spacing: 12,
-                runSpacing: 12,
+                spacing: 10,
+                runSpacing: 10,
                 children: _ageLabels.entries.map((entry) {
-                  return _buildSelectionTile(
-                    label: entry.value,
-                    isSelected: provider.ageGroups.contains(entry.key),
-                    onTap: () {
+                  final isSelected = provider.ageGroups.contains(entry.key);
+                  return ChoiceChip(
+                    avatar: isSelected ? null : Icon(_getAgeIcon(entry.key), color: Colors.grey[600]),
+                    label: Text(entry.value),
+                    selected: isSelected,
+                    onSelected: (selected) {
                       provider.toggleAgeGroup(entry.key);
                       setState(() {});
                     },
-                    icon: _getAgeIcon(entry.key),
+                    backgroundColor: Colors.grey[100],
+                    selectedColor: AppColors.primary,
+                    labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: BorderSide.none,
                   );
                 }).toList(),
               ),
-              const SizedBox(height: 32),
-              const Text('성별', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              Row(
+              const SizedBox(height: 30),
+              const Text('선호 성별', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 10),
+              Wrap(
+                spacing: 10,
                 children: _genderLabels.entries.map((entry) {
-                  return Padding(
-                    padding: const EdgeInsets.only(right: 12.0),
-                    child: _buildSelectionTile(
-                      label: entry.value,
-                      isSelected: provider.genderPreference == entry.key,
-                      onTap: () {
-                        provider.setGenderPreference(entry.key);
-                        setState(() {});
-                      },
-                      icon: _getGenderIcon(entry.key),
-                    ),
+                  final isSelected = provider.genderPreference == entry.key;
+                  return ChoiceChip(
+                    avatar: isSelected ? null : Icon(_getGenderIcon(entry.key), color: Colors.grey[600]),
+                    label: Text(entry.value),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      provider.setGenderPreference(entry.key);
+                      setState(() {});
+                    },
+                    backgroundColor: Colors.grey[100],
+                    selectedColor: AppColors.primary,
+                    labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.black),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                    side: BorderSide.none,
                   );
                 }).toList(),
               ),
@@ -691,31 +810,38 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
         });
 
         return SingleChildScrollView(
-          padding: const EdgeInsets.all(16.0),
+          padding: const EdgeInsets.symmetric(horizontal: 24.0),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text('클랜 성향', style: Theme.of(context).textTheme.headlineSmall),
-              const SizedBox(height: 8),
-              Text('클랜의 주된 성향을 선택해주세요.', style: Theme.of(context).textTheme.bodyMedium),
-              const SizedBox(height: 24),
+              const SizedBox(height: 20),
+              const Text(
+                '클랜의 성향은 어떤가요?',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 12),
+              const Text(
+                '슬라이더를 움직여 클랜의 주된 성향을 알려주세요.',
+                style: TextStyle(fontSize: 16, color: Colors.grey),
+              ),
+              const SizedBox(height: 40),
               Container(
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
-                  color: Colors.white,
+                  color: Colors.grey[100],
                   borderRadius: BorderRadius.circular(16),
-                  boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.05), spreadRadius: 1, blurRadius: 5)],
                 ),
                 child: Column(
                   children: [
                     _buildFocusIndicator(label: _getFocusLabel(focus), description: _getFocusDescription(focus), color: _getFocusColor(focus)),
-                    const SizedBox(height: 32),
+                    const SizedBox(height: 20),
                     SliderTheme(
                       data: SliderTheme.of(context).copyWith(
                         activeTrackColor: _getFocusColor(focus),
-                        inactiveTrackColor: Colors.grey[200],
-                        thumbColor: _getFocusColor(focus),
+                        inactiveTrackColor: Colors.grey[300],
+                        thumbColor: Colors.white,
                         overlayColor: _getFocusColor(focus).withOpacity(0.2),
+                        trackHeight: 8,
                       ),
                       child: Slider(
                         value: _sliderValue,
@@ -726,7 +852,7 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
                       ),
                     ),
                     Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                      padding: const EdgeInsets.symmetric(horizontal: 8.0),
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -739,10 +865,85 @@ class _ClanCreationFlowScreenState extends State<ClanCreationFlowScreen> {
                   ],
                 ),
               ),
+              const SizedBox(height: 40),
+              const Text(
+                '마지막으로 확인해주세요',
+                style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 20),
+              _buildConfirmationSection(provider, focus),
             ],
           ),
         );
       },
+    );
+  }
+
+  Widget _buildConfirmationSection(ClanCreationProvider provider, ClanFocus focus) {
+    return Container(
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: Colors.grey[100],
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          _buildConfirmationItem('클랜 이름', provider.name),
+          _buildConfirmationItem('클랜 소개', provider.description),
+          _buildConfirmationItem('활동 요일', provider.activityDays.join(', ')),
+          _buildConfirmationItem('활동 시간', provider.activityTimes.map(_playTimeToString).join(', ')),
+          _buildConfirmationItem('선호 연령대', (provider.ageGroups..sort((a, b) => a.index.compareTo(b.index))).map(_ageGroupToString).join(', ')),
+          _buildConfirmationItem('선호 성별', _genderPreferenceToString(provider.genderPreference)),
+          _buildConfirmationItem('클랜 성향', _getFocusLabel(focus)),
+        ],
+      ),
+    );
+  }
+
+  String _playTimeToString(PlayTimeType type) {
+    switch (type) {
+      case PlayTimeType.morning: return '아침';
+      case PlayTimeType.daytime: return '낮';
+      case PlayTimeType.evening: return '저녁';
+      case PlayTimeType.night: return '심야';
+    }
+  }
+
+  String _ageGroupToString(AgeGroup group) {
+    switch (group) {
+      case AgeGroup.teens: return '10대';
+      case AgeGroup.twenties: return '20대';
+      case AgeGroup.thirties: return '30대';
+      case AgeGroup.fortyPlus: return '40대 이상';
+    }
+  }
+
+  String _genderPreferenceToString(GenderPreference preference) {
+    switch (preference) {
+      case GenderPreference.male: return '남자';
+      case GenderPreference.female: return '여자';
+      case GenderPreference.any: return '남녀 모두';
+    }
+  }
+
+  Widget _buildConfirmationItem(String label, String value) {
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 8.0),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Text(label, style: TextStyle(color: Colors.grey[600], fontSize: 16)),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 

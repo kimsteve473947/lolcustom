@@ -132,8 +132,24 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     );
 
     if (confirmed == true && mounted) {
-      await _chatService.leaveChatRoom(widget.chatRoomId, currentUser.uid);
-      context.pop();
+      final chatRoom = await _chatRoomFuture;
+      if (chatRoom.type == ChatRoomType.tournamentRecruitment && chatRoom.tournamentId != null) {
+        // 토너먼트 채팅방이면 토너먼트 나가기 로직 호출
+        final appState = Provider.of<AppStateProvider>(context, listen: false);
+        final tournament = await FirebaseService().getTournament(chatRoom.tournamentId!);
+        if (tournament != null) {
+          final userRole = tournament.participantsByRole.entries
+              .firstWhere((entry) => entry.value.contains(currentUser.uid), orElse: () => const MapEntry('', <String>[]))
+              .key;
+          if (userRole.isNotEmpty) {
+            await appState.leaveTournamentByRole(tournamentId: tournament.id, role: userRole);
+          }
+        }
+      } else {
+        // 일반 채팅방 나가기
+        await _chatService.leaveChatRoom(widget.chatRoomId, currentUser.uid);
+      }
+      context.pop(); // 현재 채팅방 화면 닫기
     }
   }
   
@@ -223,8 +239,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                 itemCount: members.length,
                                 itemBuilder: (context, index) {
                                   final member = members[index];
-                                  final isHost = chatRoom.type == ChatRoomType.tournamentRecruitment &&
-                                               chatRoom.participantIds.contains(member['userId']); // Simplified logic
+                                  final isHost = member['isHost'] ?? false;
                                   
                                   return ListTile(
                                     leading: Stack(
@@ -339,6 +354,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 'nickname': userData['nickname'] ?? 'Unknown',
                 'profileImageUrl': userData['profileImageUrl'],
                 'role': role,
+                'isHost': userId == tournament.hostId,
               });
             }
           }
