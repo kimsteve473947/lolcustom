@@ -1076,7 +1076,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
           ? _isUserHost()
               ? _buildHostActionButtons()  // 주최자 액션 버튼
               : _tournament!.status == TournamentStatus.open
-                  ? _buildParticipationButtons()  // 참가 버튼 표시 위젯을 호출
+          ? _buildParticipationButtons()  // 참가 버튼 표시 위젯을 호출
                   : null
           : null,
     );
@@ -1093,12 +1093,12 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   
   Widget _buildContent() {
     return CustomScrollView(
-      controller: _scrollController,
-      physics: const BouncingScrollPhysics(),
-      slivers: [
-        // App Bar
-        SliverToBoxAdapter(
-          child: Container(
+        controller: _scrollController,
+        physics: const BouncingScrollPhysics(),
+        slivers: [
+          // App Bar
+          SliverToBoxAdapter(
+            child: Container(
             padding: const EdgeInsets.fromLTRB(20, 20, 20, 16),
             decoration: const BoxDecoration(
               color: Colors.white,
@@ -1107,46 +1107,46 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                   color: Color(0xFFF0F0F0),
                   width: 1,
                 ),
+                ),
               ),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              mainAxisSize: MainAxisSize.min,
-              children: [
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                 Row(
                   children: [
                     Expanded(
                       child: Text(
-                        _tournament!.title,
-                        style: const TextStyle(
+                    _tournament!.title,
+                    style: const TextStyle(
                           fontSize: 24,
                           fontWeight: FontWeight.w700,
                           color: Color(0xFF1A1A1A),
                           height: 1.2,
                         ),
-                      ),
                     ),
+                  ),
                     const SizedBox(width: 12),
-                    Container(
+                  Container(
                       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: _getStatusColor().withOpacity(0.1),
+                    decoration: BoxDecoration(
+                      color: _getStatusColor().withOpacity(0.1),
                         borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Text(
-                        _getStatusText(),
-                        style: TextStyle(
+                    ),
+                    child: Text(
+                      _getStatusText(),
+                      style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.w600,
-                          color: _getStatusColor(),
-                        ),
+                        color: _getStatusColor(),
                       ),
                     ),
+                    ),
                   ],
-                ),
-                const SizedBox(height: 12),
-                Row(
-                  children: [
+                  ),
+                  const SizedBox(height: 12),
+                  Row(
+                    children: [
                     Container(
                       width: 28,
                       height: 28,
@@ -1167,20 +1167,20 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                               )
                             : const Icon(Icons.person, size: 16, color: Color(0xFF999999)),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
                           Text(
-                            _tournament!.hostNickname ?? _tournament!.hostName,
-                            style: const TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.w500,
-                              color: Colors.black87,
-                            ),
-                            overflow: TextOverflow.ellipsis,
+                          _tournament!.hostNickname ?? _tournament!.hostName,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w500,
+                            color: Colors.black87,
+                          ),
+                          overflow: TextOverflow.ellipsis,
                           ),
                           const SizedBox(height: 4),
                           // 주최자 신뢰도 표시
@@ -1190,81 +1190,81 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                             showDetails: true,
                           ),
                         ],
+                        ),
                       ),
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      DateFormat('yyyy.MM.dd').format(_tournament!.createdAt),
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: Colors.black54,
+                      const SizedBox(width: 8),
+                      Text(
+                        DateFormat('yyyy.MM.dd').format(_tournament!.createdAt),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: Colors.black54,
+                        ),
                       ),
-                    ),
-                  ],
-                ),
-              ],
+                    ],
+                  ),
+                ],
+              ),
             ),
           ),
-        ),
-        
-        // Content
-        SliverToBoxAdapter(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // Time and date card
-                _buildDateTimeCard(),
-                
-                // Description
-                if (_tournament!.description != null && _tournament!.description!.isNotEmpty) ...[
-                  _buildSectionTitle('내전 소개'),
-                  const SizedBox(height: 12),
-                  Card(
-                    elevation: 0,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                      side: BorderSide(color: Colors.grey.shade200),
-                    ),
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        _tournament!.description!,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          height: 1.5,
+          
+          // Content
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Time and date card
+                  _buildDateTimeCard(),
+                  
+                  // Description
+                  if (_tournament!.description != null && _tournament!.description!.isNotEmpty) ...[
+                    _buildSectionTitle('내전 소개'),
+                    const SizedBox(height: 12),
+                    Card(
+                      elevation: 0,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                        side: BorderSide(color: Colors.grey.shade200),
+                      ),
+                      child: Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text(
+                          _tournament!.description!,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            height: 1.5,
+                          ),
                         ),
                       ),
                     ),
-                  ),
+                    const SizedBox(height: 24),
+                  ],
+                  
+                  // Referee info
+                  if (_tournament!.tournamentType == TournamentType.competitive) ...[
+                    _buildRefereeInfo(),
+                    if (_isUserHost() && _tournament!.status != TournamentStatus.completed)
+                      Padding(
+                        padding: const EdgeInsets.only(top: 8.0),
+                        child: _buildRefereeManagementButtons(),
+                      ),
+                    const SizedBox(height: 24),
+                  ],
+                  
+                  // 포지션별 참가 현황 및 참가자 목록 (통합된 UI)
+                  _buildRolesList(),
                   const SizedBox(height: 24),
+                  
+                  // Host info
+                  _buildHostInfo(),
+                  
+                  const SizedBox(height: 50), // Extra space for bottom button
                 ],
-                
-                // Referee info
-                if (_tournament!.tournamentType == TournamentType.competitive) ...[
-                  _buildRefereeInfo(),
-                  if (_isUserHost() && _tournament!.status != TournamentStatus.completed)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8.0),
-                      child: _buildRefereeManagementButtons(),
-                    ),
-                  const SizedBox(height: 24),
-                ],
-                
-                // 포지션별 참가 현황 및 참가자 목록 (통합된 UI)
-                _buildRolesList(),
-                const SizedBox(height: 24),
-                
-                // Host info
-                _buildHostInfo(),
-                
-                const SizedBox(height: 50), // Extra space for bottom button
-              ],
+              ),
             ),
           ),
-        ),
-      ],
+        ],
     );
   }
   
@@ -2247,38 +2247,38 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                   },
                   borderRadius: BorderRadius.circular(20),
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: roleColor.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: roleColor.withOpacity(0.3),
-                        width: 1,
-                      ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: roleColor.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: roleColor.withOpacity(0.3),
+                      width: 1,
                     ),
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        if (app.userProfileImageUrl != null) ...[
-                          ImageUtils.safeCircleAvatar(
-                            imageUrl: app.userProfileImageUrl,
-                            radius: 14,
-                            backgroundColor: roleColor.withOpacity(0.2),
-                          ),
-                          const SizedBox(width: 8),
-                        ],
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      if (app.userProfileImageUrl != null) ...[
+                        ImageUtils.safeCircleAvatar(
+                          imageUrl: app.userProfileImageUrl,
+                          radius: 14,
+                          backgroundColor: roleColor.withOpacity(0.2),
+                        ),
+                        const SizedBox(width: 8),
+                      ],
                         Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            Text(
-                              app.userName,
-                              style: TextStyle(
-                                fontSize: 14,
-                                fontWeight: FontWeight.w500,
-                                color: roleColor,
-                              ),
-                            ),
+                      Text(
+                        app.userName,
+                        style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w500,
+                          color: roleColor,
+                        ),
+                      ),
                             // 참가자 신뢰도 점수 표시
                             FutureBuilder<double>(
                               future: _getParticipantScore(userId),
@@ -2300,7 +2300,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                             ),
                           ],
                         ),
-                      ],
+                    ],
                     ),
                   ),
                 );
@@ -3285,7 +3285,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       case TournamentStatus.cancelled:
         return const Color(0xFFF44336); // 빨간색
       default:
-        return Colors.grey;
+    return Colors.grey;
     }
   }
   

@@ -125,9 +125,9 @@ class _CreditHistoryTabState extends State<CreditHistoryTab> {
                       Expanded(
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '${NumberFormat.decimalPattern().format(payment.creditAmount)} C 충전',
+              children: [
+                Text(
+                  '${NumberFormat.decimalPattern().format(payment.creditAmount)} C 충전',
                               style: TextStyle(
                                 fontSize: 16,
                                 fontWeight: FontWeight.w700,

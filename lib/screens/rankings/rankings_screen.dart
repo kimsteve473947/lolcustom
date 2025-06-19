@@ -174,7 +174,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
         ),
       ),
       child: Row(
-        children: [
+                  children: [
           const Text(
             '랭킹',
             style: TextStyle(
@@ -199,8 +199,8 @@ class _RankingsScreenState extends State<RankingsScreen> {
               ),
             ),
           ),
-        ],
-      ),
+                  ],
+                ),
     );
   }
   
@@ -235,7 +235,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
           ),
           const SizedBox(width: 16),
           Expanded(
-            child: Column(
+        child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
@@ -316,9 +316,9 @@ class _RankingsScreenState extends State<RankingsScreen> {
                       : null,
                 ),
                 child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Icon(
                       Icons.military_tech,
                       size: 18,
                       color: _selectedTab == 0
@@ -368,11 +368,11 @@ class _RankingsScreenState extends State<RankingsScreen> {
                       color: _selectedTab == 1
                           ? AppColors.primary
                           : const Color(0xFF999999),
-                    ),
+            ),
                     const SizedBox(width: 6),
-                    Text(
+            Text(
                       '클랜 랭킹',
-                      style: TextStyle(
+              style: TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.w600,
                         color: _selectedTab == 1
@@ -383,11 +383,11 @@ class _RankingsScreenState extends State<RankingsScreen> {
                   ],
                 ),
               ),
+              ),
             ),
-          ),
-        ],
-      ),
-    );
+          ],
+        ),
+      );
   }
   
   Widget _buildMyRankCard(UserModel currentUser) {
@@ -600,7 +600,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
                           const SizedBox(width: 12),
                           Text(
                             '${data['totalGames']}전 ${data['wins']}승 ${data['losses']}패',
-                            style: const TextStyle(
+              style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF999999),
                             ),
@@ -608,15 +608,15 @@ class _RankingsScreenState extends State<RankingsScreen> {
                         ],
                       ),
                     ],
-                  ),
-                ),
+              ),
+            ),
                 // 레이팅 정보
                 Column(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [
                     Text(
                       '${data['rating']}',
-                      style: const TextStyle(
+              style: const TextStyle(
                         fontSize: 18,
                         fontWeight: FontWeight.w700,
                         color: Color(0xFF1A1A1A),
@@ -630,8 +630,8 @@ class _RankingsScreenState extends State<RankingsScreen> {
                             ? AppColors.success
                             : AppColors.error,
                         fontWeight: FontWeight.w600,
-                      ),
-                    ),
+              ),
+            ),
                   ],
                 ),
               ],
@@ -829,26 +829,26 @@ class _RankingsScreenState extends State<RankingsScreen> {
       bgColor = AppColors.primary;
       textColor = Colors.white;
     } else {
-      switch (rank) {
-        case 1:
+    switch (rank) {
+      case 1:
           bgColor = const Color(0xFFFFD700);
           textColor = Colors.white;
           icon = Icons.emoji_events;
-          break;
-        case 2:
+        break;
+      case 2:
           bgColor = const Color(0xFFC0C0C0);
           textColor = Colors.white;
           icon = Icons.emoji_events;
-          break;
-        case 3:
+        break;
+      case 3:
           bgColor = const Color(0xFFCD7F32);
           textColor = Colors.white;
           icon = Icons.emoji_events;
-          break;
-        default:
+        break;
+      default:
           bgColor = const Color(0xFFF5F5F5);
           textColor = const Color(0xFF666666);
-          break;
+        break;
       }
     }
     
@@ -867,7 +867,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
                 size: 24,
               )
             : Text(
-                '$rank',
+          '$rank',
                 style: TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
@@ -891,7 +891,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
           const SizedBox(height: 16),
           Text(
             message,
-            style: const TextStyle(
+          style: const TextStyle(
               fontSize: 16,
               color: Color(0xFF999999),
             ),
@@ -907,7 +907,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
       backgroundColor: Colors.transparent,
       builder: (context) => Container(
         decoration: const BoxDecoration(
-          color: Colors.white,
+            color: Colors.white,
           borderRadius: BorderRadius.vertical(
             top: Radius.circular(24),
           ),

@@ -57,11 +57,11 @@ class _FriendsTabState extends State<FriendsTab> with TickerProviderStateMixin {
         ),
         child: ListView(
           padding: const EdgeInsets.all(20),
-          children: [
+      children: [
             _buildFriendRequestList(context, widget.user.uid),
             const SizedBox(height: 24),
             _buildFriendList(context, widget.user.uid),
-          ],
+      ],
         ),
       ),
     );
@@ -244,7 +244,7 @@ class _FriendsTabState extends State<FriendsTab> with TickerProviderStateMixin {
                               child: CircularProgressIndicator(
                                 color: AppColors.primary,
                                 strokeWidth: 2,
-                              ),
+                          ),
                             ),
                           );
                         }
@@ -494,7 +494,7 @@ class _FriendsTabState extends State<FriendsTab> with TickerProviderStateMixin {
                         borderRadius: BorderRadius.circular(16),
                       ),
                       child: Text(
-                        '$count명',
+                      '$count명',
                         style: TextStyle(
                           color: Colors.grey.shade700,
                           fontWeight: FontWeight.w700,

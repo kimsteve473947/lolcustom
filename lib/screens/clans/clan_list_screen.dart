@@ -136,20 +136,20 @@ class _ClanListScreenState extends State<ClanListScreen> {
   
   Widget _buildHeroSection() {
     return Container(
-      width: double.infinity,
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
+          width: double.infinity,
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [
-            AppColors.primary,
+              colors: [
+                AppColors.primary,
             AppColors.primaryLight,
-          ],
-        ),
-      ),
+              ],
+            ),
+          ),
       child: SafeArea(
         bottom: false,
-        child: Padding(
+          child: Padding(
           padding: const EdgeInsets.only(bottom: 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
@@ -157,19 +157,19 @@ class _ClanListScreenState extends State<ClanListScreen> {
               // 상단 네비게이션
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    const Text(
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                const Text(
                       '클랜',
-                      style: TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
                         fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    Row(
-                      children: [
+                  ),
+                ),
+                Row(
+                  children: [
                         Container(
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.2),
@@ -177,9 +177,9 @@ class _ClanListScreenState extends State<ClanListScreen> {
                           ),
                           child: IconButton(
                             icon: const Icon(Icons.search, color: Colors.white, size: 22),
-                            onPressed: () {
-                              context.push('/clans/search');
-                            },
+                      onPressed: () {
+                        context.push('/clans/search');
+                      },
                             padding: const EdgeInsets.all(8),
                             constraints: const BoxConstraints(),
                           ),
@@ -189,11 +189,11 @@ class _ClanListScreenState extends State<ClanListScreen> {
                           decoration: BoxDecoration(
                             color: Colors.white.withOpacity(0.2),
                             borderRadius: BorderRadius.circular(12),
-                          ),
+                    ),
                           child: IconButton(
                             icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
-                            onPressed: () {
-                              ScaffoldMessenger.of(context).showSnackBar(
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
                                 SnackBar(
                                   content: const Text('알림 기능은 준비 중입니다'),
                                   backgroundColor: AppColors.info,
@@ -202,34 +202,34 @@ class _ClanListScreenState extends State<ClanListScreen> {
                                     borderRadius: BorderRadius.circular(12),
                                   ),
                                 ),
-                              );
-                            },
+                        );
+                      },
                             padding: const EdgeInsets.all(8),
                             constraints: const BoxConstraints(),
                           ),
-                        ),
-                      ],
                     ),
                   ],
                 ),
-              ),
+              ],
+            ),
+          ),
               
               const SizedBox(height: 40),
-              
+        
               // Hero 콘텐츠
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      _userClan != null
-                          ? _isUserClanOwner
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                _userClan != null
+                    ? _isUserClanOwner
                               ? '클랜을 성장시켜보세요'
                               : '함께 성장하는 클랜'
                           : '나만의 클랜을 만들어보세요',
-                      style: const TextStyle(
-                        color: Colors.white,
+                style: const TextStyle(
+                  color: Colors.white,
                         fontSize: 26,
                         fontWeight: FontWeight.w700,
                         height: 1.3,
@@ -244,35 +244,35 @@ class _ClanListScreenState extends State<ClanListScreen> {
                         color: Colors.white.withOpacity(0.9),
                         fontSize: 16,
                         fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                    if (_userClan == null)
-                      ElevatedButton(
-                        onPressed: () {
-                          context.push('/clans/create');
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.white,
-                          foregroundColor: AppColors.primary,
-                          elevation: 0,
-                          minimumSize: const Size(160, 48),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(24),
-                          ),
-                        ),
-                        child: const Text(
-                          '클랜 만들기',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                  ],
                 ),
               ),
+              const SizedBox(height: 24),
+              if (_userClan == null)
+                ElevatedButton(
+                  onPressed: () {
+                    context.push('/clans/create');
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    foregroundColor: AppColors.primary,
+                          elevation: 0,
+                          minimumSize: const Size(160, 48),
+                    shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                    ),
+                  ),
+                  child: const Text(
+                    '클랜 만들기',
+                    style: TextStyle(
+                      fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
             ],
+          ),
+        ),
+      ],
           ),
         ),
       ),
@@ -351,51 +351,51 @@ class _ClanListScreenState extends State<ClanListScreen> {
                         child: _buildClanEmblem(clan),
                       ),
                       const SizedBox(width: 20),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
                             Row(
                               children: [
                                 Expanded(
                                   child: Text(
-                                    clan.name,
-                                    style: const TextStyle(
+                          clan.name,
+                          style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w700,
                                       color: AppColors.textPrimary,
                                     ),
-                                  ),
+                          ),
                                 ),
                                 Icon(
                                   Icons.chevron_right_rounded,
                                   color: AppColors.textTertiary,
                                 ),
                               ],
-                            ),
+                        ),
                             const SizedBox(height: 6),
-                            Text(
+                        Text(
                               '${clan.description}',
-                              style: TextStyle(
-                                fontSize: 14,
+                          style: TextStyle(
+                            fontSize: 14,
                                 color: AppColors.textSecondary,
                               ),
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
                             ),
                           ],
-                        ),
+                          ),
                       ),
                     ],
-                  ),
+                        ),
                   const SizedBox(height: 20),
                   // 통계 정보
-                  Container(
+                            Container(
                     padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
+                              decoration: BoxDecoration(
                       color: AppColors.backgroundGrey,
                       borderRadius: BorderRadius.circular(16),
-                    ),
+                              ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.spaceAround,
                       children: [
@@ -415,8 +415,8 @@ class _ClanListScreenState extends State<ClanListScreen> {
                           value: isOwner ? '클랜장' : '클랜원',
                           label: '내 역할',
                           color: isOwner ? AppColors.warning : AppColors.info,
-                        ),
-                        Container(
+                                ),
+                            Container(
                           width: 1,
                           height: 40,
                           color: AppColors.divider,
@@ -427,14 +427,14 @@ class _ClanListScreenState extends State<ClanListScreen> {
                                  clan.focus == ClanFocus.competitive ? '실력' : '균형',
                           label: '성향',
                           color: AppColors.success,
-                        ),
+                                ),
                       ],
-                    ),
-                  ),
-                ],
-              ),
+                              ),
+                            ),
+                          ],
+                        ),
             ),
-          ),
+                    ),
         ],
       ),
     );
@@ -460,15 +460,15 @@ class _ClanListScreenState extends State<ClanListScreen> {
             fontSize: 16,
             fontWeight: FontWeight.w700,
             color: AppColors.textPrimary,
-          ),
-        ),
+              ),
+            ),
         const SizedBox(height: 2),
         Text(
           label,
           style: TextStyle(
             fontSize: 12,
             color: AppColors.textSecondary,
-          ),
+      ),
         ),
       ],
     );
@@ -640,40 +640,40 @@ class _ClanListScreenState extends State<ClanListScreen> {
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
-                  _buildClanEmblem(clan),
-                  const SizedBox(height: 12),
+            _buildClanEmblem(clan),
+            const SizedBox(height: 12),
                   Text(
-                    clan.name,
-                    style: const TextStyle(
+                clan.name,
+                style: const TextStyle(
                       fontWeight: FontWeight.w700,
-                      fontSize: 16,
+                  fontSize: 16,
                       color: AppColors.textPrimary,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                    maxLines: 1,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
                     textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
+            ),
+            const SizedBox(height: 4),
+            Text(
                     '멤버 ${clan.memberCount}/${clan.maxMembers}',
-                    style: TextStyle(
+              style: TextStyle(
                       color: AppColors.textSecondary,
                       fontSize: 13,
-                    ),
-                  ),
+              ),
+            ),
                   const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      _buildFocusBadge(clan.focus),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildFocusBadge(clan.focus),
                       const SizedBox(width: 8),
                       if (clan.isRecruiting)
-                        Container(
+                Container(
                           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
-                          decoration: BoxDecoration(
+                  decoration: BoxDecoration(
                             color: AppColors.success.withOpacity(0.1),
                             borderRadius: BorderRadius.circular(8),
-                          ),
+                  ),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
@@ -688,17 +688,17 @@ class _ClanListScreenState extends State<ClanListScreen> {
                               const SizedBox(width: 4),
                               Text(
                                 '모집중',
-                                style: TextStyle(
+                    style: TextStyle(
                                   color: AppColors.success,
                                   fontSize: 11,
                                   fontWeight: FontWeight.w600,
-                                ),
-                              ),
-                            ],
-                          ),
+                  ),
+                ),
+              ],
+            ),
                         ),
                     ],
-                  ),
+              ),
                 ],
               ),
             ),
@@ -747,12 +747,12 @@ class _ClanListScreenState extends State<ClanListScreen> {
           ),
           const SizedBox(width: 4),
           Text(
-            label,
-            style: TextStyle(
-              color: color,
+        label,
+        style: TextStyle(
+          color: color,
               fontSize: 11,
               fontWeight: FontWeight.w600,
-            ),
+        ),
           ),
         ],
       ),
@@ -780,9 +780,9 @@ class _ClanListScreenState extends State<ClanListScreen> {
             style: TextStyle(
               fontSize: 14,
               color: AppColors.textSecondary,
+              ),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 24),
           Row(
             children: [
               Expanded(
@@ -859,9 +859,9 @@ class _ClanListScreenState extends State<ClanListScreen> {
                     shape: BoxShape.circle,
                   ),
                   child: Icon(
-                    icon,
+              icon,
                     size: 24,
-                    color: color,
+              color: color,
                   ),
                 ),
                 if (badge != null)
@@ -996,19 +996,19 @@ class _ClanListScreenState extends State<ClanListScreen> {
   }
   
   Widget _buildEmptyStateWidget() {
-    return Container(
+                return Container(
       padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
-      decoration: BoxDecoration(
+                  decoration: BoxDecoration(
         color: AppColors.backgroundGrey,
         borderRadius: BorderRadius.circular(20),
         border: Border.all(
           color: AppColors.borderLight,
           width: 1,
         ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.center,
+                    children: [
           Container(
             width: 64,
             height: 64,
@@ -1028,24 +1028,24 @@ class _ClanListScreenState extends State<ClanListScreen> {
               size: 32,
               color: AppColors.textTertiary,
             ),
-          ),
+                      ),
           const SizedBox(height: 20),
-          Text(
+                      Text(
             '진행중인 신청이 없어요',
-            style: TextStyle(
-              fontSize: 16,
+                        style: TextStyle(
+                          fontSize: 16,
               fontWeight: FontWeight.w600,
               color: AppColors.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
             '새로운 클랜을 찾아 신청해보세요',
-            style: TextStyle(
-              fontSize: 14,
+                        style: TextStyle(
+                          fontSize: 14,
               color: AppColors.textSecondary,
-            ),
-          ),
+                        ),
+                      ),
           const SizedBox(height: 24),
           OutlinedButton.icon(
             onPressed: () {
@@ -1075,22 +1075,22 @@ class _ClanListScreenState extends State<ClanListScreen> {
         final clan = snapshot.data;
         
         return Container(
-          margin: const EdgeInsets.only(bottom: 12),
-          decoration: BoxDecoration(
+            margin: const EdgeInsets.only(bottom: 12),
+            decoration: BoxDecoration(
             color: AppColors.backgroundCard,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: AppColors.border,
               width: 1,
             ),
-            boxShadow: [
-              BoxShadow(
+              boxShadow: [
+                BoxShadow(
                 color: AppColors.shadowLight,
                 blurRadius: 10,
                 offset: const Offset(0, 2),
-              ),
-            ],
-          ),
+                ),
+              ],
+            ),
           child: Material(
             color: Colors.transparent,
             child: InkWell(
@@ -1107,41 +1107,41 @@ class _ClanListScreenState extends State<ClanListScreen> {
               },
               child: Padding(
                 padding: const EdgeInsets.all(16),
-                child: Row(
-                  children: [
+            child: Row(
+              children: [
                     // 클랜 엠블럼
-                    Container(
+                  Container(
                       width: 56,
                       height: 56,
-                      decoration: BoxDecoration(
-                        shape: BoxShape.circle,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
                         color: AppColors.backgroundGrey,
                         border: Border.all(
                           color: AppColors.border,
                           width: 1,
                         ),
-                      ),
+                    ),
                       child: clan != null 
                           ? _buildSmallClanEmblem(clan)
                           : const Center(
                               child: CircularProgressIndicator(
                                 strokeWidth: 2,
-                              ),
-                            ),
+                      ),
                     ),
-                    const SizedBox(width: 16),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
+                  ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
                           Row(
                             children: [
                               Expanded(
                                 child: Text(
-                                  clan?.name ?? '불러오는 중...',
-                                  style: const TextStyle(
+                        clan?.name ?? '불러오는 중...',
+                        style: const TextStyle(
                                     fontWeight: FontWeight.w600,
-                                    fontSize: 16,
+                          fontSize: 16,
                                     color: AppColors.textPrimary,
                                   ),
                                 ),
@@ -1162,20 +1162,20 @@ class _ClanListScreenState extends State<ClanListScreen> {
                                       decoration: BoxDecoration(
                                         color: AppColors.warning,
                                         shape: BoxShape.circle,
-                                      ),
-                                    ),
+                        ),
+                      ),
                                     const SizedBox(width: 6),
-                                    Text(
+                      Text(
                                       '검토중',
-                                      style: TextStyle(
+                        style: TextStyle(
                                         color: AppColors.warning,
                                         fontWeight: FontWeight.w500,
-                                        fontSize: 12,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
                             ],
                           ),
                           const SizedBox(height: 6),
@@ -1185,11 +1185,11 @@ class _ClanListScreenState extends State<ClanListScreen> {
                                 Icons.access_time,
                                 size: 14,
                                 color: AppColors.textTertiary,
-                              ),
+                  ),
                               const SizedBox(width: 4),
                               Text(
                                 _formatDate(application.appliedAt),
-                                style: TextStyle(
+                    style: TextStyle(
                                   fontSize: 13,
                                   color: AppColors.textSecondary,
                                 ),
@@ -1220,8 +1220,8 @@ class _ClanListScreenState extends State<ClanListScreen> {
                       Icons.chevron_right,
                       color: AppColors.textTertiary,
                       size: 20,
-                    ),
-                  ],
+                  ),
+              ],
                 ),
               ),
             ),
@@ -1316,7 +1316,7 @@ class _ClanListScreenState extends State<ClanListScreen> {
               try {
                 await _clanService.cancelClanApplication(application.id);
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: const Text('신청이 취소되었습니다'),
                       backgroundColor: AppColors.success,
@@ -1325,11 +1325,11 @@ class _ClanListScreenState extends State<ClanListScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                  );
+                );
                 }
               } catch (e) {
                 if (mounted) {
-                  ScaffoldMessenger.of(context).showSnackBar(
+                ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(
                       content: Text('취소 실패: $e'),
                       backgroundColor: AppColors.error,
@@ -1338,7 +1338,7 @@ class _ClanListScreenState extends State<ClanListScreen> {
                         borderRadius: BorderRadius.circular(12),
                       ),
                     ),
-                  );
+                );
                 }
               }
             },

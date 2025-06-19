@@ -273,7 +273,7 @@ class TournamentService {
  
       // 명시적으로 타입을 보장하여 반환
       final List<TournamentModel> typedTournaments = List<TournamentModel>.from(tournaments);
-      
+ 
       return {
         'tournaments': typedTournaments,
         'lastDoc': querySnapshot.docs.isNotEmpty ? querySnapshot.docs.last : null,

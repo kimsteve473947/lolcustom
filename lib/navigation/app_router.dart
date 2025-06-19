@@ -21,7 +21,7 @@ import 'package:lol_custom_game_manager/screens/main_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_detail_screen.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_edit_screen.dart';
-import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_register_screen.dart';
+import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_list_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/my_page_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/edit_profile_screen.dart';
 import 'package:lol_custom_game_manager/screens/rankings/rankings_screen.dart';
@@ -98,14 +98,14 @@ class AppRouter {
       GoRoute(
         path: '/mercenaries/register',
         builder: (context, state) {
-          return const MercenaryRegisterScreen();
+          return const MercenaryEditScreen();
         },
       ),
       GoRoute(
         path: '/mercenaries/edit/:id',
         builder: (context, state) {
           final mercenaryId = state.pathParameters['id']!;
-          return MercenaryRegisterScreen(mercenaryId: mercenaryId);
+          return MercenaryEditScreen(mercenaryId: mercenaryId);
         },
       ),
       GoRoute(

@@ -42,7 +42,7 @@ class UserModel extends Equatable {
   final String? clanId;
   final List<String>? friends;
   final String? statusMessage;
-  
+
   // Trust Score fields
   final double hostScore;
   final double playerScore;

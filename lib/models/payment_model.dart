@@ -103,8 +103,8 @@ class PaymentModel {
         status = PaymentStatus.initiated; // 기본값
       }
 
-      return PaymentModel(
-        id: doc.id,
+    return PaymentModel(
+      id: doc.id,
         userId: userId,
         amount: amount,
         creditAmount: creditAmount,
@@ -116,7 +116,7 @@ class PaymentModel {
         provider: data['provider'] as String? ?? 'toss_payments',
         errorCode: data['errorCode'] as String?,
         errorMessage: data['errorMessage'] as String?,
-      );
+    );
     } catch (e) {
       // 로깅용 - 실제 운영에서는 더 정교한 로깅 시스템 사용
       print('Error parsing PaymentModel from Firestore: $e');

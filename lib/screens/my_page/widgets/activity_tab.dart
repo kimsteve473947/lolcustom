@@ -49,7 +49,7 @@ class _ActivityTabState extends State<ActivityTab> with TickerProviderStateMixin
       opacity: _fadeAnimation,
       child: ListView(
         padding: const EdgeInsets.symmetric(vertical: 16),
-        children: [
+      children: [
           // 사용자 통계 카드
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16.0),
@@ -198,8 +198,8 @@ class _ActivityTabState extends State<ActivityTab> with TickerProviderStateMixin
           ),
         ),
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
@@ -331,8 +331,8 @@ class _ActivityTabState extends State<ActivityTab> with TickerProviderStateMixin
           ),
         ),
         padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
               children: [
@@ -682,10 +682,10 @@ class _ActivityTabState extends State<ActivityTab> with TickerProviderStateMixin
                 child: OutlinedButton.icon(
                   onPressed: () async {
                     final confirm = await _showLogoutDialog(context);
-                    if (confirm == true && context.mounted) {
+              if (confirm == true && context.mounted) {
                       try {
-                        await authProvider.signOut();
-                        context.go('/login');
+                await authProvider.signOut();
+                context.go('/login');
                       } catch (e) {
                         if (context.mounted) {
                           ScaffoldMessenger.of(context).showSnackBar(
@@ -699,7 +699,7 @@ class _ActivityTabState extends State<ActivityTab> with TickerProviderStateMixin
                     }
                   },
                   icon: const Icon(Icons.logout_outlined),
-                  label: const Text('로그아웃'),
+            label: const Text('로그아웃'),
                   style: OutlinedButton.styleFrom(
                     foregroundColor: AppColors.error,
                     side: BorderSide(color: AppColors.error.withOpacity(0.5)),

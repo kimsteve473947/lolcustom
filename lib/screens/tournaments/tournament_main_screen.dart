@@ -36,7 +36,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
   int _currentPageIndex = 0;
   final EvaluationService _evaluationService = EvaluationService();
   List<Map<String, dynamic>> _pendingEvaluations = [];
-  
+
   // 메뉴 아이템 정의 - 토스 스타일
   final List<Map<String, dynamic>> _menuItems = [
     {
@@ -92,9 +92,9 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
     _pageController.dispose();
     super.dispose();
   }
-
+  
   void _navigateToPage(int index) {
-    setState(() {
+      setState(() {
       _currentPageIndex = index;
     });
   }
@@ -146,12 +146,12 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF1A1A1A),
-                  ),
-                ),
+              ),
+            ),
                 const SizedBox(height: 16),
                 GridView.builder(
                   shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
+          physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
                     crossAxisSpacing: 12,
@@ -173,7 +173,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
       ],
     );
   }
-  
+
   Widget _buildPersonalMatchPage() {
     return Column(
       children: [
@@ -184,10 +184,10 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
             child: Column(
               children: [
                 _buildDateSelector(),
-                Container(
-                  color: Colors.white,
-                  child: TabBar(
-                    indicatorColor: AppColors.primary,
+        Container(
+          color: Colors.white,
+          child: TabBar(
+            indicatorColor: AppColors.primary,
                     indicatorWeight: 3,
                     labelColor: const Color(0xFF1A1A1A),
                     unselectedLabelColor: const Color(0xFF999999),
@@ -195,12 +195,12 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
                       fontSize: 16,
                       fontWeight: FontWeight.w600,
                     ),
-                    tabs: const [
-                      Tab(text: '일반전'),
-                      Tab(text: '경쟁전'),
-                    ],
-                  ),
-                ),
+            tabs: const [
+              Tab(text: '일반전'),
+              Tab(text: '경쟁전'),
+            ],
+          ),
+        ),
                 const Expanded(
                   child: TabBarView(
                     children: [
@@ -248,7 +248,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
                     fontSize: 20,
                     fontWeight: FontWeight.w700,
                     color: Color(0xFF1A1A1A),
-                  ),
+              ),
                 ),
                 const SizedBox(height: 8),
                 const Text(
@@ -257,8 +257,8 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
                     fontSize: 14,
                     color: Color(0xFF999999),
                   ),
-                ),
-              ],
+              ),
+            ],
             ),
           ),
         ),
@@ -289,7 +289,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
   }
   
   Widget _buildHeader(String title, {String? subtitle}) {
-    return Container(
+              return Container(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
       decoration: const BoxDecoration(
         color: Colors.white,
@@ -420,10 +420,10 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
               offset: const Offset(0, 2),
             ),
           ],
-        ),
-        child: Padding(
+                ),
+                child: Padding(
           padding: const EdgeInsets.all(20),
-          child: Column(
+                  child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
@@ -443,18 +443,18 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
                 ),
               ),
               Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
                     item['title'],
                     style: const TextStyle(
                       fontSize: 16,
                       fontWeight: FontWeight.w700,
                       color: Color(0xFF1A1A1A),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
                     item['subtitle'],
                     style: const TextStyle(
                       fontSize: 12,
@@ -515,11 +515,11 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
           const SizedBox(height: 8),
           Text(
             '총 상금 500만원 • 참가자 128명',
-            style: TextStyle(
+                        style: TextStyle(
               color: Colors.white.withOpacity(0.9),
-              fontSize: 14,
-            ),
-          ),
+                          fontSize: 14,
+                        ),
+                      ),
           const SizedBox(height: 16),
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -711,7 +711,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
               margin: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
                 color: isSelected 
-                    ? AppColors.primary 
+                      ? AppColors.primary 
                     : isToday 
                         ? AppColors.primary.withOpacity(0.1)
                         : const Color(0xFFF8F9FA),

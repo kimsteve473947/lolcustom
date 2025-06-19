@@ -77,7 +77,7 @@ class _ClanSearchScreenState extends State<ClanSearchScreen> {
       _searchResults = _allClans.where((clan) {
         final searchQuery = query.toLowerCase();
         return clan.name.toLowerCase().contains(searchQuery) ||
-               clan.description.toLowerCase().contains(searchQuery);
+               (clan.description?.toLowerCase().contains(searchQuery) ?? false);
       }).toList();
     });
   }
@@ -330,7 +330,7 @@ class _ClanSearchScreenState extends State<ClanSearchScreen> {
                       ),
                       const SizedBox(height: 4),
                       Text(
-                        clan.description,
+                        clan.description ?? '',
                         style: TextStyle(
                           fontSize: 14,
                           color: AppColors.textSecondary,

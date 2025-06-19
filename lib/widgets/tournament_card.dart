@@ -29,7 +29,7 @@ class TournamentCard extends StatelessWidget {
             color: AppColors.shadow,
             blurRadius: 10,
             offset: const Offset(0, 2),
-          ),
+      ),
         ],
       ),
       child: InkWell(
@@ -39,15 +39,15 @@ class TournamentCard extends StatelessWidget {
           children: [
             // 상단 헤더 섹션
             Container(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  _buildHeader(),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              _buildHeader(),
                   const SizedBox(height: 12),
                   _buildHostInfo(),
-                  const SizedBox(height: 12),
-                  _buildGameInfo(),
+              const SizedBox(height: 12),
+              _buildGameInfo(),
                 ],
               ),
             ),
@@ -96,8 +96,8 @@ class TournamentCard extends StatelessWidget {
       children: [
         // 제목과 배지
         Row(
-          children: [
-            Expanded(
+      children: [
+        Expanded(
               child: Text(
                 tournament.title,
                 style: const TextStyle(
@@ -108,25 +108,25 @@ class TournamentCard extends StatelessWidget {
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-            ),
+          ),
             const SizedBox(width: 8),
             // 티어 아이콘 또는 배지
-            if (tierIconPaths.isNotEmpty)
-              Row(
-                mainAxisSize: MainAxisSize.min,
+        if (tierIconPaths.isNotEmpty)
+          Row(
+            mainAxisSize: MainAxisSize.min,
                 children: tierIconPaths.take(2).map((path) => 
-                  Padding(
+              Padding(
                     padding: const EdgeInsets.only(left: 4),
-                    child: Image.asset(
-                      path,
-                      width: 24,
-                      height: 24,
-                    ),
-                  )
-                ).toList(),
+                child: Image.asset(
+                  path,
+                  width: 24,
+                  height: 24,
+                ),
               )
-            else if (tournament.title.toLowerCase().contains('랜덤'))
-              Container(
+            ).toList(),
+          )
+        else if (tournament.title.toLowerCase().contains('랜덤'))
+          Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                 decoration: BoxDecoration(
                   color: const Color(0xFFE8E0FF),
@@ -144,11 +144,11 @@ class TournamentCard extends StatelessWidget {
             else if (tournament.premiumBadge)
               Container(
                 padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                decoration: BoxDecoration(
+            decoration: BoxDecoration(
                   color: const Color(0xFFFFF4E0),
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: const Text(
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: const Text(
                   '⭐ 프리미엄',
                   style: TextStyle(
                     fontSize: 12,
@@ -180,7 +180,7 @@ class TournamentCard extends StatelessWidget {
             const Spacer(),
             _buildStatusBadge(),
           ],
-        ),
+          ),
       ],
     );
   }
@@ -215,8 +215,8 @@ class TournamentCard extends StatelessWidget {
         Expanded(
           child: Text(
             tournament.hostName,
-            style: const TextStyle(
-              fontSize: 14,
+                style: const TextStyle(
+                  fontSize: 14,
               fontWeight: FontWeight.w500,
               color: AppColors.textPrimary,
             ),
@@ -227,8 +227,8 @@ class TournamentCard extends StatelessWidget {
           hostId: tournament.hostId,
           isCompact: true,
           showDetails: true,
-        ),
-      ],
+              ),
+            ],
     );
   }
 
@@ -270,19 +270,19 @@ class TournamentCard extends StatelessWidget {
                 ),
                 Text(
                   NumberFormat('#,###').format(tournament.price ?? 0),
-                  style: const TextStyle(
+              style: const TextStyle(
                     fontSize: 13,
                     fontWeight: FontWeight.w600,
                     color: Colors.white,
                   ),
-                ),
+              ),
               ],
             ),
           ),
       ],
     );
   }
-
+  
   Widget _buildInfoChip({required IconData icon, required String text}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
@@ -292,7 +292,7 @@ class TournamentCard extends StatelessWidget {
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
-        children: [
+      children: [
           Icon(
             icon,
             size: 14,
@@ -307,7 +307,7 @@ class TournamentCard extends StatelessWidget {
               color: AppColors.textSecondary,
             ),
           ),
-        ],
+      ],
       ),
     );
   }
@@ -345,17 +345,17 @@ class TournamentCard extends StatelessWidget {
                 width: 1,
               ),
             ),
-            child: Column(
-              children: [
-                LaneIconWidget(
-                  lane: key,
-                  size: 24,
+          child: Column(
+            children: [
+              LaneIconWidget(
+                lane: key,
+                size: 24,
                   color: isFull ? AppColors.error : null,
-                ),
+              ),
                 const SizedBox(height: 4),
-                Text(
-                  '$filled/$total',
-                  style: TextStyle(
+              Text(
+                '$filled/$total',
+                style: TextStyle(
                     fontSize: 12,
                     fontWeight: FontWeight.w600,
                     color: isFull 
@@ -363,9 +363,9 @@ class TournamentCard extends StatelessWidget {
                         : filled > 0 
                             ? AppColors.warning
                             : AppColors.textSecondary,
-                  ),
                 ),
-              ],
+              ),
+            ],
             ),
           ),
         );
@@ -437,13 +437,13 @@ class TournamentCard extends StatelessWidget {
             const SizedBox(width: 4),
           ],
           Text(
-            text,
-            style: TextStyle(
-              fontSize: 12,
+        text,
+        style: TextStyle(
+          fontSize: 12,
               fontWeight: FontWeight.w600,
               color: textColor,
             ),
-          ),
+        ),
         ],
       ),
     );

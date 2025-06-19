@@ -109,7 +109,7 @@ class _MercenaryFinderViewState extends State<MercenaryFinderView> {
   }
   
   Future<void> _loadData() async {
-    setState(() {
+                        setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
@@ -132,7 +132,7 @@ class _MercenaryFinderViewState extends State<MercenaryFinderView> {
       // 전체 용병 목록 로드
       final mercenaries = await _firebaseService.getAvailableMercenaries(limit: 100);
       
-      setState(() {
+                        setState(() {
         _mercenaries = mercenaries;
         _filteredMercenaries = mercenaries;
         _isLoading = false;
@@ -679,32 +679,32 @@ class _MercenaryFinderViewState extends State<MercenaryFinderView> {
   
   Widget _buildMercenaryList() {
     if (_filteredMercenaries.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
             Icon(
               Icons.search_off,
               size: 64,
               color: Colors.grey[300],
             ),
-            const SizedBox(height: 16),
+                const SizedBox(height: 16),
             const Text(
               '검색 결과가 없습니다',
               style: TextStyle(
                 fontSize: 16,
                 color: Color(0xFF999999),
               ),
+                ),
+              ],
             ),
-          ],
-        ),
-      );
-    }
-    
-    return ListView.builder(
+          );
+        }
+
+        return ListView.builder(
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 80),
       itemCount: _filteredMercenaries.length,
-      itemBuilder: (context, index) {
+          itemBuilder: (context, index) {
         final mercenary = _filteredMercenaries[index];
         return _buildMercenaryCard(mercenary);
       },
@@ -1206,13 +1206,13 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
       }
     }
   }
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: const Color(0xFFF8F9FA),
       body: Column(
-        children: [
+      children: [
           // 상단 헤더 - 간소화
           Container(
             color: Colors.white,
@@ -1229,7 +1229,7 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: _showTierFilter,
-                          borderRadius: BorderRadius.circular(12),
+                borderRadius: BorderRadius.circular(12),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
                               horizontal: 16,
@@ -1333,10 +1333,10 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                         color: Colors.transparent,
                         child: InkWell(
                           onTap: () {
-                            setState(() {
+                setState(() {
                               _onlyMicEnabled = !_onlyMicEnabled;
-                            });
-                          },
+                });
+              },
                           borderRadius: BorderRadius.circular(12),
                           child: Container(
                             padding: const EdgeInsets.symmetric(
@@ -1375,9 +1375,9 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                                         ? AppColors.success
                                         : const Color(0xFF666666),
                                   ),
-                                ),
-                              ],
-                            ),
+            ),
+          ],
+        ),
                           ),
                         ),
                       ),
@@ -1412,7 +1412,7 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                 // 통계 정보 - 간소화
                 Row(
                   children: [
-                    Expanded(
+        Expanded(
                       child: _buildStatCard(
                         icon: Icons.people,
                         label: '현재 접속',
@@ -1451,18 +1451,18 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                 
                 if (snapshot.hasError) {
                   return Center(
-                    child: Column(
+        child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
+          children: [
                         Icon(
                           Icons.error_outline,
                           size: 48,
                           color: Colors.grey[400],
                         ),
-                        const SizedBox(height: 16),
+            const SizedBox(height: 16),
                         const Text(
                           '게시글을 불러올 수 없습니다',
-                          style: TextStyle(
+                  style: TextStyle(
                             fontSize: 16,
                             color: Color(0xFF666666),
                           ),
@@ -1490,8 +1490,8 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                           Icons.people_outline,
                           size: 64,
                           color: Colors.grey[300],
-                        ),
-                        const SizedBox(height: 16),
+            ),
+            const SizedBox(height: 16),
                         const Text(
                           '현재 듀오를 찾는 사람이 없습니다',
                           style: TextStyle(
@@ -1505,13 +1505,13 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                           style: TextStyle(
                             fontSize: 14,
                             color: Color(0xFFBBBBBB),
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }
-                
+              ),
+            ),
+          ],
+      ),
+    );
+  }
+
                 return ListView.builder(
                   padding: const EdgeInsets.all(20),
                   itemCount: posts.length,
@@ -1553,7 +1553,7 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
         borderRadius: BorderRadius.circular(12),
       ),
       child: Row(
-        children: [
+          children: [
           Container(
             width: 36,
             height: 36,
@@ -1573,7 +1573,7 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
           Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Text(
+            Text(
                 label,
                 style: const TextStyle(
                   fontSize: 12,
@@ -1586,9 +1586,9 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                   fontSize: 16,
                   fontWeight: FontWeight.w700,
                   color: Color(0xFF1A1A1A),
-                ),
               ),
-            ],
+            ),
+          ],
           ),
         ],
       ),
@@ -1610,8 +1610,8 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
           padding: const EdgeInsets.fromLTRB(24, 8, 24, 32),
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
               Center(
                 child: Container(
                   width: 48,
@@ -1632,9 +1632,9 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                 ),
               ),
               const SizedBox(height: 24),
-              Wrap(
-                spacing: 8,
-                runSpacing: 8,
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
                 children: PlayerTier.values.where((t) => t != PlayerTier.unranked).map((tier) {
                   final isSelected = _selectedTiers.contains(tier);
                   return GestureDetector(
@@ -1642,11 +1642,11 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                       setModalState(() {
                         if (isSelected) {
                           _selectedTiers.remove(tier);
-                        } else {
+                  } else {
                           _selectedTiers.add(tier);
-                        }
-                      });
-                    },
+                  }
+                });
+              },
                     child: Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 16,
@@ -1669,9 +1669,9 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                         ),
                       ),
                     ),
-                  );
-                }).toList(),
-              ),
+            );
+          }).toList(),
+        ),
               const SizedBox(height: 32),
               SizedBox(
                 width: double.infinity,
@@ -1712,7 +1712,7 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
       builder: (context) => StatefulBuilder(
         builder: (context, setModalState) => Container(
           decoration: const BoxDecoration(
-            color: Colors.white,
+      color: Colors.white,
             borderRadius: BorderRadius.vertical(
               top: Radius.circular(24),
             ),
@@ -1768,9 +1768,9 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                             : const Color(0xFFF5F5F5),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: Row(
+        child: Row(
                         mainAxisSize: MainAxisSize.min,
-                        children: [
+          children: [
                           LaneIconWidget(
                             lane: _getEnglishPosition(position).toLowerCase(),
                             size: 16,
@@ -1786,11 +1786,11 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                                   ? Colors.white
                                   : const Color(0xFF666666),
                             ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  );
+            ),
+          ],
+        ),
+      ),
+    );
                 }).toList(),
               ),
               const SizedBox(height: 32),
@@ -1877,21 +1877,21 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
             color: Colors.black.withOpacity(0.04),
             blurRadius: 10,
             offset: const Offset(0, 2),
-          ),
+      ),
         ],
       ),
       child: Material(
         color: Colors.transparent,
-        child: InkWell(
+      child: InkWell(
           onTap: isMyPost ? null : () => _showDuoDetailDialog(data),
-          borderRadius: BorderRadius.circular(16),
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
+        borderRadius: BorderRadius.circular(16),
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
                     // 프로필 이미지와 온라인 상태
                     Stack(
                       children: [
@@ -1934,14 +1934,14 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                             ),
                           ),
                       ],
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Row(
-                            children: [
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
                               Text(
                                 data['nickname'] ?? '알 수 없음',
                                 style: const TextStyle(
@@ -1950,7 +1950,7 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                                   color: Color(0xFF1A1A1A),
                                 ),
                               ),
-                              const SizedBox(width: 8),
+                            const SizedBox(width: 8),
                               // 티어 배지
                               Container(
                                 padding: const EdgeInsets.symmetric(
@@ -2015,16 +2015,16 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                                       color: const Color(0xFF666666),
                                     ),
                                     const SizedBox(width: 4),
-                                    Text(
+                        Text(
                                       _getKoreanPosition(position),
                                       style: const TextStyle(
                                         fontSize: 12,
                                         color: Color(0xFF666666),
                                       ),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                        ),
+                      ],
+                    ),
+                  ),
                               // 마이크
                               if (data['micEnabled'] == true) ...[
                                 const SizedBox(width: 8),
@@ -2033,9 +2033,9 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                                     horizontal: 8,
                                     vertical: 2,
                                   ),
-                                  decoration: BoxDecoration(
+                    decoration: BoxDecoration(
                                     color: AppColors.success.withOpacity(0.1),
-                                    borderRadius: BorderRadius.circular(12),
+                      borderRadius: BorderRadius.circular(12),
                                   ),
                                   child: Row(
                                     mainAxisSize: MainAxisSize.min,
@@ -2095,8 +2095,8 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                               padding: EdgeInsets.symmetric(
                                 horizontal: 16,
                                 vertical: 8,
-                              ),
-                              child: Text(
+                    ),
+                    child: Text(
                                 '메시지',
                                 style: TextStyle(
                                   fontSize: 13,
@@ -2111,24 +2111,24 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                   ],
                 ),
                 if (data['content'] != null && data['content'].isNotEmpty) ...[
-                  const SizedBox(height: 12),
-                  Container(
+                const SizedBox(height: 12),
+                Container(
                     width: double.infinity,
-                    padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(12),
                     decoration: BoxDecoration(
                       color: const Color(0xFFF8F9FA),
                       borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Text(
+                  child: Text(
                       data['content'],
                       style: const TextStyle(
                         fontSize: 14,
                         color: Color(0xFF666666),
                         height: 1.4,
                       ),
-                    ),
                   ),
-                ],
+                ),
+              ],
                 // 추가 정보 (조회수 등)
                 const SizedBox(height: 8),
                 Row(
@@ -2230,12 +2230,12 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
             bottom: MediaQuery.of(context).viewInsets.bottom,
           ),
           child: SingleChildScrollView(
-            child: Padding(
+      child: Padding(
               padding: const EdgeInsets.all(24),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          children: [
                   Center(
                     child: Container(
                       width: 48,
@@ -2245,8 +2245,8 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                         borderRadius: BorderRadius.circular(2),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
+            ),
+            const SizedBox(height: 24),
                   const Text(
                     '듀오 찾기',
                     style: TextStyle(
@@ -2273,7 +2273,7 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                       color: Color(0xFF1A1A1A),
                     ),
                   ),
-                  const SizedBox(height: 12),
+            const SizedBox(height: 12),
                   Wrap(
                     spacing: 8,
                     runSpacing: 8,
@@ -2307,7 +2307,7 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
                                 ),
                               if (pos != 'FILL')
                                 const SizedBox(width: 6),
-                              Text(
+            Text(
                                 _getKoreanPosition(pos),
                                 style: TextStyle(
                                   fontSize: 14,
@@ -2619,35 +2619,35 @@ class _DuoFinderViewState extends State<DuoFinderView> with TickerProviderStateM
       case '원딜': return 'ADC';
       case '서폿': return 'SUPPORT';
       default: return position;
-    }
   }
-  
-  String _getTierName(PlayerTier tier) {
-    switch (tier) {
-      case PlayerTier.iron: return '아이언';
-      case PlayerTier.bronze: return '브론즈';
-      case PlayerTier.silver: return '실버';
-      case PlayerTier.gold: return '골드';
-      case PlayerTier.platinum: return '플래티넘';
-      case PlayerTier.emerald: return '에메랄드';
-      case PlayerTier.diamond: return '다이아몬드';
-      case PlayerTier.master: return '마스터';
-      case PlayerTier.grandmaster: return '그랜드마스터';
-      case PlayerTier.challenger: return '챌린저';
-      case PlayerTier.unranked: return '언랭크';
-    }
+}
+
+String _getTierName(PlayerTier tier) {
+  switch (tier) {
+    case PlayerTier.iron: return '아이언';
+    case PlayerTier.bronze: return '브론즈';
+    case PlayerTier.silver: return '실버';
+    case PlayerTier.gold: return '골드';
+    case PlayerTier.platinum: return '플래티넘';
+    case PlayerTier.emerald: return '에메랄드';
+    case PlayerTier.diamond: return '다이아몬드';
+    case PlayerTier.master: return '마스터';
+    case PlayerTier.grandmaster: return '그랜드마스터';
+    case PlayerTier.challenger: return '챌린저';
+    case PlayerTier.unranked: return '언랭크';
   }
-  
-  Color _getTierColor(PlayerTier tier) {
-    switch (tier) {
+}
+
+Color _getTierColor(PlayerTier tier) {
+  switch (tier) {
       case PlayerTier.iron: return const Color(0xFF5C5C5C);
       case PlayerTier.bronze: return const Color(0xFF8B4513);
       case PlayerTier.silver: return const Color(0xFF808080);
-      case PlayerTier.gold: return const Color(0xFFFFD700);
+    case PlayerTier.gold: return const Color(0xFFFFD700);
       case PlayerTier.platinum: return const Color(0xFF00CED1);
-      case PlayerTier.emerald: return const Color(0xFF50C878);
+    case PlayerTier.emerald: return const Color(0xFF50C878);
       case PlayerTier.diamond: return const Color(0xFF00BFFF);
-      case PlayerTier.master: return const Color(0xFF9370DB);
+    case PlayerTier.master: return const Color(0xFF9370DB);
       case PlayerTier.grandmaster: return const Color(0xFFDC143C);
       case PlayerTier.challenger: return const Color(0xFFFFD700);
       case PlayerTier.unranked: return const Color(0xFF999999);

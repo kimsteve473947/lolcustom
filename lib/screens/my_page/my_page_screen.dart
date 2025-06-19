@@ -66,7 +66,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
         child: CustomScrollView(
           slivers: [
             // 토스 스타일 앱바
-            SliverAppBar(
+              SliverAppBar(
               expandedHeight: 0,
               floating: true,
               pinned: false,
@@ -79,12 +79,12 @@ class _MyPageScreenState extends State<MyPageScreen> {
                   fontSize: 24,
                   fontWeight: FontWeight.w700,
                 ),
-              ),
-              actions: [
-                IconButton(
+                ),
+                actions: [
+                  IconButton(
                   icon: const Icon(Icons.settings_outlined),
                   color: const Color(0xFF1A1A1A),
-                  onPressed: () {
+                    onPressed: () {
                     context.push('/settings/fcm-test');
                   },
                 ),
@@ -408,10 +408,10 @@ class _MyPageScreenState extends State<MyPageScreen> {
                       subtitle: '도움말 및 문의',
                       onTap: () {
                         // TODO: 고객센터 화면
-                      },
-                    ),
-                  ],
-                ),
+                    },
+                  ),
+                ],
+              ),
               ),
             ),
             
@@ -506,7 +506,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
             
             const SliverToBoxAdapter(
               child: SizedBox(height: 40),
-            ),
+                      ),
           ],
         ),
       ),
@@ -533,20 +533,20 @@ class _MyPageScreenState extends State<MyPageScreen> {
               decoration: BoxDecoration(
                 color: const Color(0xFFF5F5F5),
                 borderRadius: BorderRadius.circular(10),
-              ),
+                ),
               child: Center(
                 child: Icon(
                   icon,
                   color: const Color(0xFF666666),
                   size: 22,
-                ),
+              ),
               ),
             ),
             const SizedBox(width: 16),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+            children: [
                   Row(
                     children: [
                       Text(
@@ -588,8 +588,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
                       color: Color(0xFF999999),
                     ),
                   ),
-                ],
-              ),
+            ],
+          ),
             ),
             const Icon(
               Icons.chevron_right,
@@ -617,7 +617,7 @@ class _MyPageScreenState extends State<MyPageScreen> {
       ),
     );
   }
-  
+
   Color _getTierColor(PlayerTier tier) {
     switch (tier) {
       case PlayerTier.iron:

@@ -44,11 +44,11 @@ class _TossPaymentWebviewScreenState extends State<TossPaymentWebviewScreen> {
 
   void _initializeWebView() {
     try {
-      _controller = WebViewController()
-        ..setJavaScriptMode(JavaScriptMode.unrestricted)
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
         ..setUserAgent('Mozilla/5.0 (iPhone; CPU iPhone OS 14_0 like Mac OS X) AppleWebKit/605.1.15')
-        ..setNavigationDelegate(
-          NavigationDelegate(
+      ..setNavigationDelegate(
+        NavigationDelegate(
             onPageStarted: (String url) {
               setState(() {
                 _isLoading = true;
@@ -66,17 +66,17 @@ class _TossPaymentWebviewScreenState extends State<TossPaymentWebviewScreen> {
                 _errorMessage = '페이지 로드 중 오류가 발생했습니다: ${error.description}';
               });
             },
-            onNavigationRequest: (NavigationRequest request) {
+          onNavigationRequest: (NavigationRequest request) {
               if (request.url.startsWith(_successUrl)) {
-                _handlePaymentResult(request.url, true);
-                return NavigationDecision.prevent;
+              _handlePaymentResult(request.url, true);
+              return NavigationDecision.prevent;
               } else if (request.url.startsWith(_failUrl)) {
-                _handlePaymentResult(request.url, false);
-                return NavigationDecision.prevent;
-              }
-              return NavigationDecision.navigate;
-            },
-          ),
+              _handlePaymentResult(request.url, false);
+              return NavigationDecision.prevent;
+            }
+            return NavigationDecision.navigate;
+          },
+        ),
         );
 
       _loadPaymentPage();
@@ -91,12 +91,12 @@ class _TossPaymentWebviewScreenState extends State<TossPaymentWebviewScreen> {
   Future<void> _loadPaymentPage() async {
     try {
       final htmlContent = _generatePaymentHtml(
-        clientKey: widget.clientKey,
-        orderId: widget.orderId,
-        orderName: widget.orderName,
-        amount: widget.amount,
-        customerName: widget.customerName,
-        customerEmail: widget.customerEmail,
+          clientKey: widget.clientKey,
+          orderId: widget.orderId,
+          orderName: widget.orderName,
+          amount: widget.amount,
+          customerName: widget.customerName,
+          customerEmail: widget.customerEmail,
         successUrl: _successUrl,
         failUrl: _failUrl,
       );
@@ -115,15 +115,15 @@ class _TossPaymentWebviewScreenState extends State<TossPaymentWebviewScreen> {
     _isPaymentFinished = true;
 
     try {
-      final uri = Uri.parse(url);
+    final uri = Uri.parse(url);
       final result = <String, dynamic>{
-        'success': isSuccess,
-        'orderId': uri.queryParameters['orderId'],
-        'paymentKey': uri.queryParameters['paymentKey'],
-        'amount': uri.queryParameters['amount'],
-        'errorCode': uri.queryParameters['code'],
-        'errorMessage': uri.queryParameters['message'],
-      };
+      'success': isSuccess,
+      'orderId': uri.queryParameters['orderId'],
+      'paymentKey': uri.queryParameters['paymentKey'],
+      'amount': uri.queryParameters['amount'],
+      'errorCode': uri.queryParameters['code'],
+      'errorMessage': uri.queryParameters['message'],
+    };
 
       // 필수 데이터 검증 (성공 시에만)
       if (isSuccess) {
@@ -133,7 +133,7 @@ class _TossPaymentWebviewScreenState extends State<TossPaymentWebviewScreen> {
         }
       }
 
-      Navigator.of(context).pop(result);
+    Navigator.of(context).pop(result);
     } catch (e) {
       Navigator.of(context).pop({
         'success': false,
@@ -231,10 +231,10 @@ class _TossPaymentWebviewScreenState extends State<TossPaymentWebviewScreen> {
                 children: [
                   Expanded(
                     child: OutlinedButton(
-                      onPressed: () => Navigator.of(context).pop(),
+          onPressed: () => Navigator.of(context).pop(),
                       child: const Text('취소'),
-                    ),
-                  ),
+        ),
+      ),
                   const SizedBox(width: 16),
                   Expanded(
                     child: ElevatedButton(
@@ -317,27 +317,27 @@ class _TossPaymentWebviewScreenState extends State<TossPaymentWebviewScreen> {
       
       <script>
         try {
-          var tossPayments = TossPayments('$clientKey');
+        var tossPayments = TossPayments('$clientKey');
           
           // 결제 요청
-          tossPayments.requestPayment('카드', {
-            amount: $amount,
-            orderId: '$orderId',
-            orderName: '$orderName',
-            customerName: '$customerName',
-            customerEmail: '$customerEmail',
-            successUrl: '$successUrl',
-            failUrl: '$failUrl'
-          }).catch(function (error) {
+        tossPayments.requestPayment('카드', {
+          amount: $amount,
+          orderId: '$orderId',
+          orderName: '$orderName',
+          customerName: '$customerName',
+          customerEmail: '$customerEmail',
+          successUrl: '$successUrl',
+          failUrl: '$failUrl'
+        }).catch(function (error) {
             console.error('Payment error:', error);
             
             var errorUrl = '$failUrl?code=' + encodeURIComponent(error.code || 'UNKNOWN_ERROR') + 
                           '&message=' + encodeURIComponent(error.message || '알 수 없는 오류가 발생했습니다.');
             
             // 에러 처리
-            if (error.code === 'USER_CANCEL') {
+          if (error.code === 'USER_CANCEL') {
               window.location.href = errorUrl;
-            } else {
+          } else {
               // 기타 에러
               document.body.innerHTML = '<div class="container"><div class="error">결제 중 오류가 발생했습니다: ' + 
                                        (error.message || '알 수 없는 오류') + '</div></div>';

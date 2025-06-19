@@ -47,7 +47,7 @@ export const createPayment = onCall(async (request) => {
 
     if (!amount || !creditAmount || amount <= 0 || creditAmount <= 0) {
       throw new Error("유효하지 않은 금액입니다.");
-    }
+  }
 
     const orderId = uuidv4();
     const paymentData: PaymentData = {
@@ -89,7 +89,7 @@ export const approvePayment = onCall(async (request) => {
 
     if (!orderId || !paymentKey || !amount) {
       throw new Error("필수 결제 정보가 누락되었습니다.");
-    }
+  }
 
     // Firestore에서 결제 정보 조회
     const paymentDoc = await admin.firestore()
@@ -121,10 +121,10 @@ export const approvePayment = onCall(async (request) => {
 
     const tossResponse = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
       method: "POST",
-      headers: {
+        headers: {
         "Authorization": `Basic ${authHeader}`,
-        "Content-Type": "application/json",
-      },
+          "Content-Type": "application/json",
+        },
       body: JSON.stringify({
         paymentKey,
         orderId,
@@ -167,18 +167,18 @@ export const approvePayment = onCall(async (request) => {
       const newCredits = currentCredits + paymentData.creditAmount;
 
       // 사용자 크레딧 업데이트
-      transaction.update(userRef, {
+        transaction.update(userRef, {
         credits: newCredits,
         updatedAt: admin.firestore.Timestamp.now(),
-      });
+        });
 
       // 결제 정보 업데이트
       transaction.update(paymentDoc.ref, {
-        status: "completed",
+          status: "completed",
         paymentKey,
         updatedAt: admin.firestore.Timestamp.now(),
+        });
       });
-    });
 
     logger.info("Payment approved successfully", {orderId, userId, amount, paymentKey});
 
@@ -197,9 +197,9 @@ export const handleTossWebhook = onRequest(async (req, res) => {
   try {
     if (req.method !== "POST") {
       res.status(405).send("Method Not Allowed");
-      return;
-    }
-
+                        return;
+                    }
+                    
     const webhookData = req.body;
     logger.info("Toss webhook received", webhookData);
 
@@ -220,17 +220,17 @@ export const handleTossWebhook = onRequest(async (req, res) => {
             errorCode: "CANCELED",
             errorMessage: "결제가 취소되었습니다.",
             updatedAt: admin.firestore.Timestamp.now(),
-          });
+                    });
 
         logger.info("Payment canceled via webhook", {orderId, paymentKey});
       }
     }
 
     res.status(200).send("OK");
-  } catch (error) {
+            } catch (error) {
     logger.error("Error handling Toss webhook", error);
-    res.status(500).send("Internal Server Error");
-  }
+                res.status(500).send("Internal Server Error");
+            }
 });
 
 export {

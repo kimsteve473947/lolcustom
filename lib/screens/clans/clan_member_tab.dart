@@ -84,7 +84,7 @@ class _ClanMemberTabState extends State<ClanMemberTab> {
               children: [
                 _buildSectionTitle('클랜원', _membersFuture),
                 const SizedBox(height: 20),
-                _buildMembersList(),
+          _buildMembersList(),
               ],
             ),
           ),
@@ -137,7 +137,7 @@ class _ClanMemberTabState extends State<ClanMemberTab> {
                     ],
                   ),
                   const SizedBox(height: 20),
-                  _buildApplicationsList(),
+            _buildApplicationsList(),
                 ],
               ),
             ),
@@ -163,7 +163,7 @@ class _ClanMemberTabState extends State<ClanMemberTab> {
           future: future,
           builder: (context, snapshot) {
             final count = snapshot.data?.length ?? 0;
-            return Text(
+    return Text(
               '$count명',
               style: TextStyle(
                 fontSize: 16,
@@ -259,10 +259,10 @@ class _ClanMemberTabState extends State<ClanMemberTab> {
                   ),
                   child: CircleAvatar(
                     backgroundColor: AppColors.backgroundCard,
-                    backgroundImage: member['photoURL'] != null
-                        ? NetworkImage(member['photoURL'])
-                        : null,
-                    child: member['photoURL'] == null
+                backgroundImage: member['photoURL'] != null
+                    ? NetworkImage(member['photoURL'])
+                    : null,
+                child: member['photoURL'] == null
                         ? Icon(
                             Icons.person,
                             color: AppColors.textTertiary,
@@ -292,10 +292,10 @@ class _ClanMemberTabState extends State<ClanMemberTab> {
                   Icons.chevron_right_rounded,
                   color: AppColors.textTertiary,
                   size: 20,
-                ),
-                onTap: () {
-                  context.push('/profile/${member['uid']}');
-                },
+              ),
+              onTap: () {
+                context.push('/profile/${member['uid']}');
+              },
               ),
             );
           }).toList(),
@@ -407,16 +407,16 @@ class _ClanMemberTabState extends State<ClanMemberTab> {
                           ),
                           child: CircleAvatar(
                             backgroundColor: AppColors.backgroundGrey,
-                            backgroundImage: application.userProfileImageUrl != null
-                                ? NetworkImage(application.userProfileImageUrl!)
-                                : null,
-                            child: application.userProfileImageUrl == null
+                        backgroundImage: application.userProfileImageUrl != null
+                            ? NetworkImage(application.userProfileImageUrl!)
+                            : null,
+                        child: application.userProfileImageUrl == null
                                 ? Icon(
                                     Icons.person,
                                     color: AppColors.textTertiary,
                                   )
-                                : null,
-                          ),
+                            : null,
+                      ),
                         ),
                         const SizedBox(width: 16),
                         Expanded(
@@ -482,7 +482,7 @@ class _ClanMemberTabState extends State<ClanMemberTab> {
                                       fontSize: 13,
                                       color: AppColors.textSecondary,
                                     ),
-                                  ),
+                    ),
                                 ],
                               ),
                               if (application.experience != null)
