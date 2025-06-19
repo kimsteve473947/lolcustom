@@ -10,6 +10,10 @@ import 'package:lol_custom_game_manager/services/firebase_service.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:provider/provider.dart';
 import 'package:intl/intl.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+
+// 앱 로고 경로 상수 (효율적인 단일 파일 재사용)
+const String kAppLogo = 'assets/images/app_logo.png';
 
 class DirectMessageScreen extends StatefulWidget {
   final String roomId;
@@ -308,7 +312,7 @@ class _DirectMessageScreenState extends State<DirectMessageScreen> {
               radius: 16,
               backgroundImage: _room!.getOtherUserProfileUrl(_currentUser!.uid) != null
                   ? NetworkImage(_room!.getOtherUserProfileUrl(_currentUser!.uid)!) as ImageProvider
-                  : const AssetImage('assets/images/default_profile.png') as ImageProvider,
+                  : const AssetImage('assets/images/profile_placeholder.png') as ImageProvider,
             ),
             const SizedBox(width: 8),
             Text(otherUserName),
@@ -502,7 +506,7 @@ class _DirectMessageScreenState extends State<DirectMessageScreen> {
               radius: 16,
               backgroundImage: message.senderProfileUrl != null
                   ? NetworkImage(message.senderProfileUrl!) as ImageProvider
-                  : const AssetImage('assets/images/default_profile.png') as ImageProvider,
+                  : const AssetImage('assets/images/profile_placeholder.png') as ImageProvider,
             ),
             const SizedBox(width: 8),
           ],

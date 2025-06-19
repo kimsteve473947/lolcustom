@@ -1,6 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:lol_custom_game_manager/models/tournament_model.dart';
 
+// 앱 공통 이미지 경로 (효율적인 단일 파일 사용)
+class AppImages {
+  // 메인 로고 - 하나의 파일로 모든 곳에서 재사용
+  static const String logo = 'assets/images/app_logo.png';
+  
+  // 기본 프로필 이미지 (로고 재사용으로 저장공간 절약)
+  static const String defaultProfile = logo;
+  
+  // 플레이스홀더 이미지 (로고 재사용)
+  static const String placeholder = logo;
+  
+  // 에러 시 대체 이미지 (로고 재사용)
+  static const String fallback = logo;
+}
+
 // 롤 라인 정보
 enum LolLane {
   top,

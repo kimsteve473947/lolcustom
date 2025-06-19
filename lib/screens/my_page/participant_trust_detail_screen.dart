@@ -2,10 +2,13 @@ import 'package:flutter/material.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/services/participant_trust_score_manager.dart';
 import 'package:lol_custom_game_manager/widgets/participant_trust_score_widget.dart';
+import 'package:lol_custom_game_manager/widgets/host_trust_score_widget.dart';
 import 'package:lol_custom_game_manager/models/participant_evaluation_model.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:go_router/go_router.dart';
 
-/// 참가자 신뢰도 상세 화면
+/// 신뢰도 상세 화면 (참가자/주최자 탭 형태)
 class ParticipantTrustDetailScreen extends StatefulWidget {
   const ParticipantTrustDetailScreen({Key? key}) : super(key: key);
   
@@ -13,25 +16,49 @@ class ParticipantTrustDetailScreen extends StatefulWidget {
   State<ParticipantTrustDetailScreen> createState() => _ParticipantTrustDetailScreenState();
 }
 
-class _ParticipantTrustDetailScreenState extends State<ParticipantTrustDetailScreen> {
+class _ParticipantTrustDetailScreenState extends State<ParticipantTrustDetailScreen>
+    with TickerProviderStateMixin {
+  late TabController _tabController;
   final ParticipantTrustScoreManager _scoreManager = ParticipantTrustScoreManager();
-  ParticipantTrustInfo? _trustInfo;
+  
+  ParticipantTrustInfo? _participantTrustInfo;
+  double _hostTrustScore = 80.0;
   bool _isLoading = true;
   
   @override
   void initState() {
     super.initState();
-    _loadTrustInfo();
+    _tabController = TabController(length: 2, vsync: this);
+    _loadTrustData();
   }
   
-  Future<void> _loadTrustInfo() async {
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+  
+  Future<void> _loadTrustData() async {
     final userId = FirebaseAuth.instance.currentUser?.uid;
     if (userId == null) return;
     
     try {
-      final info = await _scoreManager.getParticipantTrustInfo(userId);
+      // 참가자 신뢰도 정보 로드
+      final participantInfo = await _scoreManager.getParticipantTrustInfo(userId);
+      
+      // 주최자 신뢰도 정보 로드
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(userId)
+          .get();
+      
+      final hostScore = userDoc.exists 
+          ? (userDoc.data()?['hostScore'] as num?)?.toDouble() ?? 80.0
+          : 80.0;
+      
       setState(() {
-        _trustInfo = info;
+        _participantTrustInfo = participantInfo;
+        _hostTrustScore = hostScore;
         _isLoading = false;
       });
     } catch (e) {
@@ -46,456 +73,462 @@ class _ParticipantTrustDetailScreenState extends State<ParticipantTrustDetailScr
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('참가자 신뢰도'),
-        backgroundColor: AppColors.white,
+        backgroundColor: AppColors.backgroundCard,
         elevation: 0,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_rounded,
+            color: AppColors.textPrimary,
+          ),
+          onPressed: () => context.pop(),
+        ),
+        title: Text(
+          '신뢰도',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        centerTitle: true,
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: '참가자 신뢰도'),
+            Tab(text: '주최자 신뢰도'),
+          ],
+          labelColor: AppColors.primary,
+          unselectedLabelColor: AppColors.textSecondary,
+          labelStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w600,
+          ),
+          unselectedLabelStyle: const TextStyle(
+            fontSize: 14,
+            fontWeight: FontWeight.w500,
+          ),
+          indicatorColor: AppColors.primary,
+          indicatorWeight: 2,
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : _trustInfo == null
-              ? const Center(child: Text('정보를 불러올 수 없습니다.'))
-              : Column(
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _buildParticipantTrustTab(),
+                _buildHostTrustTab(),
+              ],
+            ),
+    );
+  }
+  
+  Widget _buildParticipantTrustTab() {
+    if (_participantTrustInfo == null) {
+      return _buildErrorState('참가자 신뢰도 정보를 불러올 수 없습니다.');
+    }
+    
+    return Column(
+      children: [
+        // 상단 점수 요약
+        Container(
+          padding: const EdgeInsets.all(20),
+          color: AppColors.backgroundCard,
+          child: Row(
+            children: [
+              // 점수
+              Expanded(
+                child: Column(
                   children: [
-                    // 상단 점수 요약
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      color: AppColors.white,
-                      child: Row(
-                        children: [
-                          // 점수
-                          Expanded(
-                            child: Column(
-                              children: [
-                                Text(
-                                  '${_trustInfo!.score.toInt()}',
-                                  style: TextStyle(
-                                    fontSize: 48,
-                                    fontWeight: FontWeight.bold,
-                                    color: _getScoreColor(_trustInfo!.score),
-                                  ),
-                                ),
-                                Text(
-                                  _getScoreStatus(_trustInfo!.score),
-                                  style: TextStyle(
-                                    fontSize: 14,
-                                    color: _getScoreColor(_trustInfo!.score),
-                                    fontWeight: FontWeight.w600,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          // 구분선
-                          Container(
-                            width: 1,
-                            height: 60,
-                            color: Colors.grey[300],
-                          ),
-                          // 연속 클린 참여
-                          Expanded(
-                            child: Column(
-                              children: [
-                                Row(
-                                  mainAxisAlignment: MainAxisAlignment.center,
-                                  children: [
-                                    Icon(
-                                      Icons.local_fire_department,
-                                      color: _trustInfo!.cleanStreak > 0 
-                                          ? Colors.orange 
-                                          : Colors.grey[400],
-                                      size: 24,
-                                    ),
-                                    const SizedBox(width: 4),
-                                    Text(
-                                      '${_trustInfo!.cleanStreak}',
-                                      style: TextStyle(
-                                        fontSize: 32,
-                                        fontWeight: FontWeight.bold,
-                                        color: _trustInfo!.cleanStreak > 0 
-                                            ? Colors.orange 
-                                            : Colors.grey[400],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                                Text(
-                                  '연속 클린 참여',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey[600],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ],
+                    Text(
+                      '${_participantTrustInfo!.score.toInt()}',
+                      style: TextStyle(
+                        fontSize: 48,
+                        fontWeight: FontWeight.w800,
+                        color: _getScoreColor(_participantTrustInfo!.score),
                       ),
                     ),
-                    
-                    // 점수 범위 가이드 (가로 스크롤)
-                    Container(
-                      height: 80,
-                      padding: const EdgeInsets.symmetric(vertical: 12),
-                      child: ListView(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        children: [
-                          _buildCompactScoreRange('90-100', Colors.green, '우수'),
-                          _buildCompactScoreRange('70-89', Colors.yellow[700]!, '일반'),
-                          _buildCompactScoreRange('50-69', Colors.orange, '주의'),
-                          _buildCompactScoreRange('0-49', Colors.red, '위험'),
-                        ],
-                      ),
-                    ),
-                    
-                    // 최근 기록
-                    Expanded(
-                      child: Container(
-                        color: AppColors.white,
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Row(
-                                children: [
-                                  Icon(Icons.history, size: 20, color: AppColors.textPrimary),
-                                  const SizedBox(width: 8),
-                                  Text(
-                                    '최근 참가 기록',
-                                    style: TextStyle(
-                                      fontSize: 16,
-                                      fontWeight: FontWeight.bold,
-                                      color: AppColors.textPrimary,
-                                    ),
-                                  ),
-                                  const Spacer(),
-                                  Text(
-                                    '최근 10개',
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: AppColors.textSecondary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            const Divider(height: 1),
-                            Expanded(
-                              child: _trustInfo!.history.isEmpty
-                                  ? Center(
-                                      child: Column(
-                                        mainAxisAlignment: MainAxisAlignment.center,
-                                        children: [
-                                          Icon(
-                                            Icons.history,
-                                            size: 48,
-                                            color: Colors.grey[300],
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Text(
-                                            '아직 참가 기록이 없어요',
-                                            style: TextStyle(
-                                              color: AppColors.textSecondary,
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    )
-                                  : ListView.separated(
-                                      padding: EdgeInsets.zero,
-                                      itemCount: _trustInfo!.history.take(10).length,
-                                      separatorBuilder: (_, __) => const Divider(height: 1),
-                                      itemBuilder: (context, index) {
-                                        final record = _trustInfo!.history[index];
-                                        return _buildCompactHistoryItem(record);
-                                      },
-                                    ),
-                            ),
-                          ],
-                        ),
+                    Text(
+                      _getScoreStatus(_participantTrustInfo!.score),
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: _getScoreColor(_participantTrustInfo!.score),
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ],
                 ),
-    );
-  }
-  
-  Widget _buildScoreGuide() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.textSecondary.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.info_outline,
-                color: AppColors.primary,
-                size: 20,
               ),
-              const SizedBox(width: 8),
-              Text(
-                '점수 가이드',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
+              // 구분선
+              Container(
+                width: 1,
+                height: 60,
+                color: AppColors.border,
+              ),
+              // 연속 클린 참여
+              Expanded(
+                child: Column(
+                  children: [
+                    Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(
+                          Icons.local_fire_department,
+                          color: _participantTrustInfo!.cleanStreak > 0 
+                              ? Colors.orange 
+                              : AppColors.textTertiary,
+                          size: 24,
+                        ),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${_participantTrustInfo!.cleanStreak}',
+                          style: TextStyle(
+                            fontSize: 32,
+                            fontWeight: FontWeight.w800,
+                            color: _participantTrustInfo!.cleanStreak > 0 
+                                ? Colors.orange 
+                                : AppColors.textTertiary,
+                          ),
+                        ),
+                      ],
+                    ),
+                    Text(
+                      '연속 클린 참여',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 16),
-          _buildScoreRange(
-            range: '90~100점',
-            color: Colors.green,
-            icon: Icons.verified_user,
-            description: '매우 신뢰할 수 있는 참가자',
-            benefit: '명예 뱃지 획득',
-          ),
-          const SizedBox(height: 12),
-          _buildScoreRange(
-            range: '70~89점',
-            color: Colors.yellow[700]!,
-            icon: Icons.person,
-            description: '일반적인 참가자',
-            benefit: '모든 토너먼트 참가 가능',
-          ),
-          const SizedBox(height: 12),
-          _buildScoreRange(
-            range: '50~69점',
-            color: Colors.orange,
-            icon: Icons.warning_amber,
-            description: '최근 평가가 낮아요',
-            benefit: '일부 토너먼트 제한 가능',
-          ),
-          const SizedBox(height: 12),
-          _buildScoreRange(
-            range: '49점 이하',
-            color: Colors.red,
-            icon: Icons.error_outline,
-            description: '주의가 필요한 유저',
-            benefit: '토너먼트 참가 제한',
-          ),
-        ],
-      ),
-    );
-  }
-  
-  Widget _buildScoreRange({
-    required String range,
-    required Color color,
-    required IconData icon,
-    required String description,
-    required String benefit,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
+        ),
+        
+        // 점수 범위 가이드
         Container(
-          width: 40,
-          height: 40,
-          decoration: BoxDecoration(
-            color: color.withOpacity(0.1),
-            shape: BoxShape.circle,
-          ),
-          child: Icon(
-            icon,
-            color: color,
-            size: 20,
+          height: 80,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          color: AppColors.backgroundCard,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              _buildCompactScoreRange('90-100', Colors.green, '우수'),
+              _buildCompactScoreRange('70-89', Colors.yellow[700]!, '일반'),
+              _buildCompactScoreRange('50-69', Colors.orange, '주의'),
+              _buildCompactScoreRange('0-49', Colors.red, '위험'),
+            ],
           ),
         ),
-        const SizedBox(width: 12),
+        
+        const SizedBox(height: 8),
+        
+        // 최근 기록
         Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Text(
-                    range,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    description,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: AppColors.textPrimary,
-                    ),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 4),
-              Text(
-                benefit,
-                style: TextStyle(
-                  fontSize: 12,
-                  color: AppColors.textSecondary,
-                ),
-              ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildCalculationExplanation() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: AppColors.white,
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: AppColors.textSecondary.withOpacity(0.2),
-          width: 1,
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Icon(
-                Icons.calculate,
-                color: AppColors.primary,
-                size: 20,
-              ),
-              const SizedBox(width: 8),
-              Text(
-                '점수 계산 방식',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.textPrimary,
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 16),
-          _buildCalculationItem(
-            title: '기본 점수',
-            description: '모든 참가자는 70점으로 시작합니다.',
-          ),
-          const SizedBox(height: 12),
-          _buildCalculationItem(
-            title: '최근 10경기 반영',
-            description: '최근 경기일수록 더 큰 비중으로 점수에 반영됩니다.',
-          ),
-          const SizedBox(height: 12),
-          _buildCalculationItem(
-            title: '가중 평균 계산',
-            description: '가장 최근 경기는 100%, 이전 경기는 90%씩 감소하는 비중으로 계산됩니다.',
-          ),
-          const SizedBox(height: 16),
-          Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: AppColors.primary.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Row(
+          child: Container(
+            color: AppColors.backgroundCard,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Icon(
-                  Icons.tips_and_updates,
-                  color: AppColors.primary,
-                  size: 16,
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: Text(
-                    '꾸준한 정상 참여로 신뢰도를 높여보세요!',
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: AppColors.primary,
-                      fontWeight: FontWeight.w500,
-                    ),
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.history, size: 20, color: AppColors.textPrimary),
+                      const SizedBox(width: 8),
+                      Text(
+                        '최근 참가 기록',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '최근 10개',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
                   ),
+                ),
+                Divider(height: 1, color: AppColors.border),
+                Expanded(
+                  child: _participantTrustInfo!.history.isEmpty
+                      ? _buildEmptyState('아직 참가 기록이 없어요')
+                      : ListView.separated(
+                          padding: EdgeInsets.zero,
+                          itemCount: _participantTrustInfo!.history.take(10).length,
+                          separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+                          itemBuilder: (context, index) {
+                            final record = _participantTrustInfo!.history[index];
+                            return _buildCompactHistoryItem(record);
+                          },
+                        ),
                 ),
               ],
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
   
-  Widget _buildCalculationItem({
-    required String title,
-    required String description,
-  }) {
-    return Row(
-      crossAxisAlignment: CrossAxisAlignment.start,
+  Widget _buildHostTrustTab() {
+    return Column(
       children: [
+        // 상단 점수 요약
         Container(
-          width: 6,
-          height: 6,
-          margin: const EdgeInsets.only(top: 6),
-          decoration: BoxDecoration(
-            color: AppColors.primary,
-            shape: BoxShape.circle,
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
+          padding: const EdgeInsets.all(20),
+          color: AppColors.backgroundCard,
           child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               Text(
-                title,
+                '${_hostTrustScore.toInt()}',
                 style: TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.w600,
-                  color: AppColors.textPrimary,
+                  fontSize: 48,
+                  fontWeight: FontWeight.w800,
+                  color: _getScoreColor(_hostTrustScore),
                 ),
               ),
-              const SizedBox(height: 2),
+              const SizedBox(height: 8),
               Text(
-                description,
+                _getHostScoreStatus(_hostTrustScore),
                 style: TextStyle(
-                  fontSize: 13,
-                  color: AppColors.textSecondary,
+                  fontSize: 14,
+                  color: _getScoreColor(_hostTrustScore),
+                  fontWeight: FontWeight.w600,
                 ),
               ),
             ],
+          ),
+        ),
+        
+        // 점수 범위 가이드
+        Container(
+          height: 80,
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          color: AppColors.backgroundCard,
+          child: ListView(
+            scrollDirection: Axis.horizontal,
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            children: [
+              _buildCompactScoreRange('90-100', Colors.green, '우수'),
+              _buildCompactScoreRange('70-89', Colors.yellow[700]!, '일반'),
+              _buildCompactScoreRange('50-69', Colors.orange, '주의'),
+              _buildCompactScoreRange('0-49', Colors.red, '위험'),
+            ],
+          ),
+        ),
+        
+        const SizedBox(height: 8),
+        
+        // 최근 평가 기록
+        Expanded(
+          child: Container(
+            color: AppColors.backgroundCard,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Icon(Icons.assessment, size: 20, color: AppColors.textPrimary),
+                      const SizedBox(width: 8),
+                      Text(
+                        '최근 주최 기록',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: AppColors.textPrimary,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '최근 10개',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Divider(height: 1, color: AppColors.border),
+                Expanded(
+                  child: _buildHostEvaluationHistory(),
+                ),
+              ],
+            ),
           ),
         ),
       ],
     );
   }
   
-  Color _getScoreColor(double score) {
-    if (score >= 90) return Colors.green;
-    if (score >= 70) return Colors.yellow[700]!;
-    if (score >= 50) return Colors.orange;
-    return Colors.red;
+  Widget _buildHostEvaluationHistory() {
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+    if (userId == null) return _buildEmptyState('사용자 정보를 불러올 수 없습니다');
+    
+    return StreamBuilder<QuerySnapshot>(
+      stream: FirebaseFirestore.instance
+          .collection('evaluations')
+          .where('targetUserId', isEqualTo: userId)
+          .where('isHost', isEqualTo: true)
+          .orderBy('createdAt', descending: true)
+          .limit(10)
+          .snapshots(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+        
+        if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+          return _buildEmptyState('아직 주최 기록이 없어요');
+        }
+        
+        final evaluations = snapshot.data!.docs;
+        return ListView.separated(
+          padding: EdgeInsets.zero,
+          itemCount: evaluations.length,
+          separatorBuilder: (_, __) => Divider(height: 1, color: AppColors.border),
+          itemBuilder: (context, index) {
+            final eval = evaluations[index].data() as Map<String, dynamic>;
+            return _buildHostEvaluationItem(eval);
+          },
+        );
+      },
+    );
   }
   
-  String _getScoreStatus(double score) {
-    if (score >= 90) return '매우 신뢰할 수 있는 참가자';
-    if (score >= 70) return '일반적인 참가자';
-    if (score >= 50) return '최근 평가가 낮아요';
-    return '주의가 필요한 유저';
+  Widget _buildHostEvaluationItem(Map<String, dynamic> evaluation) {
+    final rating = (evaluation['rating'] as num?)?.toDouble() ?? 5.0;
+    final tournamentTitle = evaluation['tournamentTitle'] as String? ?? '토너먼트';
+    final comment = evaluation['comment'] as String? ?? '';
+    
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        children: [
+          Container(
+            width: 36,
+            height: 36,
+            decoration: BoxDecoration(
+              color: _getRatingColor(rating).withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Center(
+              child: Text(
+                '${rating.toInt()}',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w700,
+                  color: _getRatingColor(rating),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  tournamentTitle,
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                if (comment.isNotEmpty) ...[
+                  const SizedBox(height: 2),
+                  Text(
+                    comment,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppColors.textSecondary,
+                    ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+              ],
+            ),
+          ),
+          Row(
+            mainAxisSize: MainAxisSize.min,
+            children: List.generate(5, (index) {
+              return Icon(
+                index < rating ? Icons.star : Icons.star_border,
+                size: 14,
+                color: index < rating ? Colors.amber : AppColors.textTertiary,
+              );
+            }),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildErrorState(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.error_outline,
+            size: 48,
+            color: AppColors.textTertiary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildEmptyState(String message) {
+    return Center(
+      child: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Icon(
+            Icons.history,
+            size: 48,
+            color: AppColors.textTertiary,
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: TextStyle(
+              fontSize: 16,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
   }
   
   Widget _buildCompactScoreRange(String range, Color color, String status) {
     return Container(
-      width: 100,
+      width: 90,
       margin: const EdgeInsets.only(right: 8),
-      padding: const EdgeInsets.all(12),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
         borderRadius: BorderRadius.circular(12),
@@ -506,20 +539,22 @@ class _ParticipantTrustDetailScreenState extends State<ParticipantTrustDetailScr
       ),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
         children: [
           Text(
             range,
             style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.bold,
+              fontSize: 13,
+              fontWeight: FontWeight.w700,
               color: color,
             ),
           ),
-          const SizedBox(height: 4),
+          const SizedBox(height: 2),
           Text(
             status,
             style: TextStyle(
-              fontSize: 12,
+              fontSize: 11,
+              fontWeight: FontWeight.w500,
               color: color,
             ),
           ),
@@ -530,7 +565,7 @@ class _ParticipantTrustDetailScreenState extends State<ParticipantTrustDetailScr
   
   Widget _buildCompactHistoryItem(ParticipantTrustHistory record) {
     final isPositive = record.scoreChange >= 0;
-    final color = isPositive ? Colors.green : Colors.red;
+    final color = isPositive ? AppColors.success : AppColors.error;
     
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -550,7 +585,7 @@ class _ParticipantTrustDetailScreenState extends State<ParticipantTrustDetailScr
                   record.tournamentTitle,
                   style: const TextStyle(
                     fontSize: 14,
-                    fontWeight: FontWeight.w500,
+                    fontWeight: FontWeight.w600,
                   ),
                   maxLines: 1,
                   overflow: TextOverflow.ellipsis,
@@ -572,12 +607,40 @@ class _ParticipantTrustDetailScreenState extends State<ParticipantTrustDetailScr
             '${isPositive ? '+' : ''}${record.scoreChange}',
             style: TextStyle(
               fontSize: 16,
-              fontWeight: FontWeight.bold,
+              fontWeight: FontWeight.w700,
               color: color,
             ),
           ),
         ],
       ),
     );
+  }
+  
+  Color _getScoreColor(double score) {
+    if (score >= 90) return AppColors.success;
+    if (score >= 70) return Colors.yellow[700]!;
+    if (score >= 50) return Colors.orange;
+    return AppColors.error;
+  }
+  
+  String _getScoreStatus(double score) {
+    if (score >= 90) return '일반적인 참가자';
+    if (score >= 70) return '일반적인 참가자';
+    if (score >= 50) return '최근 평가가 낮아요';
+    return '주의가 필요한 유저';
+  }
+  
+  String _getHostScoreStatus(double score) {
+    if (score >= 90) return '매우 신뢰할 수 있는 주최자';
+    if (score >= 70) return '일반적인 수준의 주최자';
+    if (score >= 50) return '최근 운영 평가가 낮아요';
+    return '신뢰도가 낮아 주의가 필요해요';
+  }
+  
+  Color _getRatingColor(double rating) {
+    if (rating >= 4.0) return AppColors.success;
+    if (rating >= 3.0) return Colors.yellow[700]!;
+    if (rating >= 2.0) return Colors.orange;
+    return AppColors.error;
   }
 } 

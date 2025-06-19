@@ -8,6 +8,7 @@ import 'package:lol_custom_game_manager/services/firebase_service.dart';
 import 'package:lol_custom_game_manager/widgets/error_view.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:provider/provider.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 class MercenarySearchScreen extends StatefulWidget {
   const MercenarySearchScreen({Key? key}) : super(key: key);
@@ -413,12 +414,26 @@ class _MercenarySearchScreenState extends State<MercenarySearchScreen> {
               // 프로필 이미지와 티어 배지
               Stack(
                 children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundImage: mercenary.profileImageUrl != null
-                        ? NetworkImage(mercenary.profileImageUrl!) as ImageProvider
-                        : const AssetImage('assets/images/default_profile.png') as ImageProvider,
-                  ),
+                  mercenary.profileImageUrl != null && mercenary.profileImageUrl!.isNotEmpty
+                      ? CachedNetworkImage(
+                          imageUrl: mercenary.profileImageUrl!,
+                          imageBuilder: (context, imageProvider) => CircleAvatar(
+                            radius: 32,
+                            backgroundImage: imageProvider,
+                          ),
+                          placeholder: (context, url) => const CircleAvatar(
+                            radius: 32,
+                            child: CircularProgressIndicator(),
+                          ),
+                          errorWidget: (context, url, error) => const CircleAvatar(
+                            radius: 32,
+                            backgroundImage: AssetImage('assets/images/profile_placeholder.png'),
+                          ),
+                        )
+                      : const CircleAvatar(
+                          radius: 32,
+                          backgroundImage: AssetImage('assets/images/profile_placeholder.png'),
+                        ),
                   Positioned(
                     bottom: 0,
                     right: 0,

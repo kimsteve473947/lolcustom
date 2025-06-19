@@ -6,6 +6,8 @@ import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:provider/provider.dart';
 import 'package:lol_custom_game_manager/providers/auth_provider.dart';
 import 'package:lol_custom_game_manager/constants/lol_constants.dart';
+import 'package:lol_custom_game_manager/constants/app_theme.dart';
+import 'package:go_router/go_router.dart';
 
 class ClanPublicProfileScreen extends StatefulWidget {
   final String clanId;
@@ -19,7 +21,8 @@ class ClanPublicProfileScreen extends StatefulWidget {
 class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
   final ClanService _clanService = ClanService();
   late Future<ClanModel?> _clanFuture;
-  String _averageTier = '계산 중...';
+  String _averageTier = 'Unranked';
+  bool _isLoading = false;
 
   @override
   void initState() {
@@ -39,7 +42,7 @@ class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _averageTier = '정보 없음';
+          _averageTier = 'Unranked';
         });
       }
     }
@@ -48,31 +51,71 @@ class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
   void _applyToClan(ClanModel clan) async {
     final user = context.read<AuthProvider>().user;
     if (user == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그인이 필요합니다.')),
-      );
+      _showSnackBar('로그인이 필요합니다', isError: true);
       return;
     }
 
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       await _clanService.applyClanWithDetails(clanId: clan.id, message: "클랜 가입을 신청합니다!");
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('클랜 가입 신청이 완료되었습니다.')),
-      );
+      _showSnackBar('클랜 가입 신청이 완료되었습니다', isError: false);
+      await Future.delayed(const Duration(seconds: 1));
+      context.pop();
     } catch (e) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('오류: ${e.toString()}')),
-      );
+      _showSnackBar('가입 신청 중 오류가 발생했습니다', isError: true);
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
     }
+  }
+
+  void _showSnackBar(String message, {required bool isError}) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(
+        content: Text(
+          message,
+          style: const TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        backgroundColor: isError ? AppColors.error : AppColors.success,
+        behavior: SnackBarBehavior.floating,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+        ),
+        margin: const EdgeInsets.all(16),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('클랜 정보'),
+        backgroundColor: AppColors.backgroundCard,
         elevation: 0,
-        backgroundColor: Colors.transparent,
+        leading: IconButton(
+          icon: const Icon(
+            Icons.arrow_back_ios_rounded,
+            color: AppColors.textPrimary,
+          ),
+          onPressed: () => context.pop(),
+        ),
+        title: Text(
+          '클랜 정보',
+          style: TextStyle(
+            color: AppColors.textPrimary,
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        centerTitle: true,
       ),
       body: FutureBuilder<ClanModel?>(
         future: _clanFuture,
@@ -81,7 +124,7 @@ class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
             return const Center(child: LoadingIndicator());
           }
           if (snapshot.hasError || !snapshot.hasData || snapshot.data == null) {
-            return const Center(child: Text('클랜 정보를 불러올 수 없습니다.'));
+            return _buildErrorState();
           }
 
           final clan = snapshot.data!;
@@ -91,34 +134,21 @@ class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
           return Stack(
             children: [
               SingleChildScrollView(
-                padding: const EdgeInsets.fromLTRB(16.0, 16.0, 16.0, 80.0), // Button space
+                padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 120.0),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    const SizedBox(height: 8),
                     _buildHeader(clan),
                     const SizedBox(height: 24),
                     _buildDescriptionCard(clan),
                     const SizedBox(height: 16),
                     _buildPreferenceCard(clan),
-                     const SizedBox(height: 16),
+                    const SizedBox(height: 16),
                     _buildActivityCard(clan),
                   ],
                 ),
               ),
-              if (!isMember)
-                Align(
-                  alignment: Alignment.bottomCenter,
-                  child: Padding(
-                    padding: const EdgeInsets.all(16.0),
-                    child: ElevatedButton(
-                      onPressed: () => _applyToClan(clan),
-                      child: const Text('가입 신청하기'),
-                      style: ElevatedButton.styleFrom(
-                        minimumSize: const Size(double.infinity, 50),
-                      ),
-                    ),
-                  ),
-                ),
+              if (!isMember) _buildBottomButton(clan),
             ],
           );
         },
@@ -126,132 +156,90 @@ class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
     );
   }
 
-  Widget _buildHeader(ClanModel clan) {
-    return Row(
-      children: [
-        ClanEmblemWidget(emblemData: clan.emblem, size: 80),
-        const SizedBox(width: 16),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(clan.name, style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 4),
-              Text('레벨 ${clan.level} | 멤버 ${clan.memberCount}/${clan.maxMembers}', style: TextStyle(fontSize: 16, color: Colors.grey.shade600)),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildDescriptionCard(ClanModel clan) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionTitle('클랜 소개'),
-            const SizedBox(height: 8),
-            Text(clan.description ?? '클랜 설명이 없습니다.', style: const TextStyle(fontSize: 16, height: 1.5)),
-          ],
-        ),
-      ),
-    );
-  }
-  
-  Widget _buildPreferenceCard(ClanModel clan) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-             _buildSectionTitle('클랜 성향'),
-             const SizedBox(height: 16),
-            _infoRow(Icons.shield_outlined, '평균 티어', _averageTier),
-            _infoRow(Icons.wc_outlined, '선호 성별', _genderPreferenceToString(clan.genderPreference)),
-            _infoRow(Icons.people_outline, '선호 연령대', clan.ageGroups.isNotEmpty ? clan.ageGroups.map(_ageGroupToString).join(', ') : '모든 연령'),
-            const SizedBox(height: 8),
-            _buildFocusRatingBar(clan.focusRating),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildActivityCard(ClanModel clan) {
-    return Card(
-      elevation: 2,
-      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-      child: Padding(
-        padding: const EdgeInsets.all(16.0),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSectionTitle('활동 정보'),
-            const SizedBox(height: 16),
-            _infoRow(Icons.calendar_today_outlined, '활동 요일', clan.activityDays.isNotEmpty ? clan.activityDays.join(', ') : '미정'),
-            _infoRow(Icons.access_time_outlined, '활동 시간', clan.activityTimes.isNotEmpty ? clan.activityTimes.map(_playTimeToString).join(', ') : '미정'),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Text(
-      title,
-      style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String label, String value) {
+  Widget _buildErrorState() {
     return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.grey.shade600, size: 22),
-          const SizedBox(width: 16),
-          Text(label, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500)),
-          const Spacer(),
-          Text(value, style: const TextStyle(fontSize: 16, color: Colors.black87)),
+      padding: const EdgeInsets.all(24),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.textTertiary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.error_outline_rounded,
+                size: 40,
+                color: AppColors.textTertiary,
+              ),
+            ),
+            const SizedBox(height: 24),
+            Text(
+              '클랜 정보를 불러올 수 없습니다',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '네트워크 상태를 확인해주세요',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildHeader(ClanModel clan) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundCard,
+        borderRadius: BorderRadius.circular(20),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowLight,
+            blurRadius: 12,
+            offset: const Offset(0, 4),
+          ),
         ],
       ),
-    );
-  }
-
-  Widget _buildFocusRatingBar(int rating) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
+      child: Column(
         children: [
-          const Icon(Icons.balance, color: Colors.grey),
-          const SizedBox(width: 16),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                LinearProgressIndicator(
-                  value: rating / 10.0,
-                  backgroundColor: Colors.grey.shade300,
-                  color: Color.lerp(Colors.blue, Colors.red, rating / 10.0),
-                  minHeight: 6,
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text('친목', style: TextStyle(fontSize: 12)),
-                    Text('실력', style: TextStyle(fontSize: 12)),
-                  ],
-                )
-              ],
+          ClanEmblemWidget(emblemData: clan.emblem, size: 88),
+          const SizedBox(height: 20),
+          Text(
+            clan.name,
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.w800,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Text(
+              '레벨 ${clan.level} | 멤버 ${clan.memberCount}/${clan.maxMembers}',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.primary,
+              ),
             ),
           ),
         ],
@@ -259,32 +247,403 @@ class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
     );
   }
 
+  Widget _buildDescriptionCard(ClanModel clan) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowLight,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '클랜 소개',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            clan.description ?? '클랜 설명이 없습니다.',
+            style: TextStyle(
+              fontSize: 15,
+              height: 1.6,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildPreferenceCard(ClanModel clan) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowLight,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '클랜 성향',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildInfoRow(
+            Icons.shield_outlined,
+            '평균 티어',
+            _averageTier,
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow(
+            Icons.wc_outlined,
+            '선호 성별',
+            _genderPreferenceToString(clan.genderPreference),
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow(
+            Icons.people_outline,
+            '선호 연령대',
+            clan.ageGroups.isNotEmpty
+                ? clan.ageGroups.map(_ageGroupToString).join(', ')
+                : '모든 연령',
+          ),
+          const SizedBox(height: 20),
+          _buildFocusRatingBar(clan.focusRating),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildActivityCard(ClanModel clan) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowLight,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            '활동 정보',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          _buildInfoRow(
+            Icons.calendar_today_outlined,
+            '활동 요일',
+            clan.activityDays.isNotEmpty ? clan.activityDays.join(', ') : '수, 일, 목, 금, 화, 월, 토',
+          ),
+          const SizedBox(height: 16),
+          _buildInfoRow(
+            Icons.access_time_outlined,
+            '활동 시간',
+            clan.activityTimes.isNotEmpty
+                ? clan.activityTimes.map(_playTimeToString).join(', ')
+                : '낮, 저녁, 심야',
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoRow(IconData icon, String label, String value) {
+    return Row(
+      children: [
+        Container(
+          width: 36,
+          height: 36,
+          decoration: BoxDecoration(
+            color: AppColors.primary.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Icon(
+            icon,
+            color: AppColors.primary,
+            size: 18,
+          ),
+        ),
+        const SizedBox(width: 16),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 2),
+              Text(
+                value,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildFocusRatingBar(int rating) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 36,
+              height: 36,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Icon(
+                Icons.balance,
+                color: AppColors.primary,
+                size: 18,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '진력',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    rating >= 7 ? '실력' : rating >= 4 ? '밸런스' : '친목',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 16),
+        Container(
+          height: 8,
+          decoration: BoxDecoration(
+            color: AppColors.backgroundGrey,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Stack(
+            children: [
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [Color(0xFF3B82F6), Color(0xFFEF4444)],
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              Positioned(
+                left: (rating / 10.0) * MediaQuery.of(context).size.width * 0.7,
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  transform: Matrix4.translationValues(-8, -4, 0),
+                  decoration: BoxDecoration(
+                    color: AppColors.backgroundCard,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.primary, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: AppColors.shadowLight,
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '친목',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textTertiary,
+              ),
+            ),
+            Text(
+              '실력',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textTertiary,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildBottomButton(ClanModel clan) {
+    return Positioned(
+      bottom: 0,
+      left: 0,
+      right: 0,
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(16, 24, 16, 32),
+        decoration: BoxDecoration(
+          color: AppColors.backgroundCard,
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(24)),
+          boxShadow: [
+            BoxShadow(
+              color: AppColors.shadowLight.withOpacity(0.3),
+              blurRadius: 20,
+              offset: const Offset(0, -4),
+            ),
+          ],
+        ),
+        child: SafeArea(
+          top: false,
+          child: SizedBox(
+            width: double.infinity,
+            height: 56,
+            child: ElevatedButton(
+              onPressed: _isLoading ? null : () => _applyToClan(clan),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                elevation: 0,
+                shadowColor: Colors.transparent,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                disabledBackgroundColor: AppColors.textTertiary,
+              ),
+              child: _isLoading
+                  ? SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : Text(
+                      '가입 신청하기',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
   String _playTimeToString(PlayTimeType type) {
     switch (type) {
-      case PlayTimeType.morning: return '아침';
-      case PlayTimeType.daytime: return '낮';
-      case PlayTimeType.evening: return '저녁';
-      case PlayTimeType.night: return '심야';
-      default: return '';
+      case PlayTimeType.morning:
+        return '아침';
+      case PlayTimeType.daytime:
+        return '낮';
+      case PlayTimeType.evening:
+        return '저녁';
+      case PlayTimeType.night:
+        return '심야';
+      default:
+        return '';
     }
   }
 
   String _ageGroupToString(AgeGroup group) {
     switch (group) {
-      case AgeGroup.teens: return '10대';
-      case AgeGroup.twenties: return '20대';
-      case AgeGroup.thirties: return '30대';
-      case AgeGroup.fortyPlus: return '40대 이상';
-      default: return '';
+      case AgeGroup.teens:
+        return '10대';
+      case AgeGroup.twenties:
+        return '20대';
+      case AgeGroup.thirties:
+        return '30대';
+      case AgeGroup.fortyPlus:
+        return '40대 이상';
+      default:
+        return '';
     }
   }
 
   String _genderPreferenceToString(GenderPreference preference) {
     switch (preference) {
-      case GenderPreference.male: return '남성';
-      case GenderPreference.female: return '여성';
-      case GenderPreference.any: return '남녀 모두';
-      default: return '';
+      case GenderPreference.male:
+        return '남성';
+      case GenderPreference.female:
+        return '여성';
+      case GenderPreference.any:
+        return '남녀 모두';
+      default:
+        return '';
     }
   }
 }
