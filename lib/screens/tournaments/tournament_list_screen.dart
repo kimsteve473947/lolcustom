@@ -104,33 +104,37 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
 
   // 무료 내전 로드
   Future<void> _loadFreeTournaments() async {
-    if (_isLoading) return;
-    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
     
     try {
-      // 날짜 필터 적용
-      Map<String, dynamic> filterMap = {..._filters, 'isPaid': false, 'showOnlyFuture': true};
-      if (_startDate != null && _endDate != null) {
-        filterMap['startDate'] = _startDate;
-        filterMap['endDate'] = _endDate;
+      // 선택된 날짜가 있으면 날짜 필터 추가
+      Map<String, dynamic> dateFilters = {};
+      if (_selectedDate != null) {
+        // 선택된 날짜의 시작과 끝 시간 설정
+        final startOfDay = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day);
+        final endOfDay = startOfDay.add(const Duration(days: 1));
+        
+        dateFilters['startDate'] = startOfDay;
+        dateFilters['endDate'] = endOfDay;
       }
       
-      final tournaments = await _tournamentService.getTournaments(
+      final result = await _tournamentService.getTournaments(
         limit: 20,
-        filters: filterMap,
+        filters: {
+          ..._filters,
+          ...dateFilters,
+          'isPaid': false,
+          'showOnlyFuture': true,
+        },
       );
       
-      DocumentSnapshot? lastDoc;
-      if (tournaments.isNotEmpty) {
-        lastDoc = await FirebaseFirestore.instance
-            .collection('tournaments')
-            .doc(tournaments.last.id)
-            .get();
-      }
+      // 안전한 타입 캐스팅
+      final tournamentsData = result['tournaments'];
+      final tournaments = tournamentsData as List<TournamentModel>? ?? <TournamentModel>[];
+      final lastDoc = result['lastDoc'] as DocumentSnapshot?;
       
       setState(() {
         _freeTournaments = tournaments;
@@ -138,15 +142,17 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
         _hasMoreFreeTournaments = tournaments.length == 20;
         _lastFreeDocument = lastDoc;
       });
+      
+      // 디버깅 로그 추가
+      debugPrint('=== 무료 토너먼트 로드 완료 ===');
+      debugPrint('로드된 토너먼트 수: ${tournaments.length}');
+      for (var t in tournaments) {
+        debugPrint('- ${t.title} (${t.startsAt.toDate()})');
+      }
     } catch (e) {
       setState(() {
         _isLoading = false;
-        // 에러 메시지 개선
-        if (e.toString().contains('index') && e.toString().contains('failed-precondition')) {
-          _errorMessage = '필터링에 필요한 인덱스가 생성 중입니다. 잠시 후 다시 시도해주세요.';
-        } else {
-          _errorMessage = '내전 목록을 불러오는 중 오류가 발생했습니다: ${e.toString().split(']').last.trim()}';
-        }
+        _errorMessage = 'Failed to load tournaments: $e';
       });
       
       // 에러 처리
@@ -169,33 +175,37 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
   
   // 유료 내전 로드
   Future<void> _loadPaidTournaments() async {
-    if (_isLoading) return;
-    
     setState(() {
       _isLoading = true;
       _errorMessage = null;
     });
     
     try {
-      // 날짜 필터 적용
-      Map<String, dynamic> filterMap = {..._filters, 'isPaid': true, 'showOnlyFuture': true};
-      if (_startDate != null && _endDate != null) {
-        filterMap['startDate'] = _startDate;
-        filterMap['endDate'] = _endDate;
+      // 선택된 날짜가 있으면 날짜 필터 추가
+      Map<String, dynamic> dateFilters = {};
+      if (_selectedDate != null) {
+        // 선택된 날짜의 시작과 끝 시간 설정
+        final startOfDay = DateTime(_selectedDate!.year, _selectedDate!.month, _selectedDate!.day);
+        final endOfDay = startOfDay.add(const Duration(days: 1));
+        
+        dateFilters['startDate'] = startOfDay;
+        dateFilters['endDate'] = endOfDay;
       }
       
-      final tournaments = await _tournamentService.getTournaments(
+      final result = await _tournamentService.getTournaments(
         limit: 20,
-        filters: filterMap,
+        filters: {
+          ..._filters,
+          ...dateFilters,
+          'isPaid': true,
+          'showOnlyFuture': true,
+        },
       );
       
-      DocumentSnapshot? lastDoc;
-      if (tournaments.isNotEmpty) {
-        lastDoc = await FirebaseFirestore.instance
-            .collection('tournaments')
-            .doc(tournaments.last.id)
-            .get();
-      }
+      // 안전한 타입 캐스팅
+      final tournamentsData = result['tournaments'];
+      final tournaments = tournamentsData as List<TournamentModel>? ?? <TournamentModel>[];
+      final lastDoc = result['lastDoc'] as DocumentSnapshot?;
       
       setState(() {
         _paidTournaments = tournaments;
@@ -206,12 +216,7 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
     } catch (e) {
       setState(() {
         _isLoading = false;
-        // 에러 메시지 개선
-        if (e.toString().contains('index') && e.toString().contains('failed-precondition')) {
-          _errorMessage = '필터링에 필요한 인덱스가 생성 중입니다. 잠시 후 다시 시도해주세요.';
-        } else {
-          _errorMessage = '내전 목록을 불러오는 중 오류가 발생했습니다: ${e.toString().split(']').last.trim()}';
-        }
+        _errorMessage = 'Failed to load tournaments: $e';
       });
       
       // 에러 처리
@@ -241,19 +246,16 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
     });
     
     try {
-      final tournaments = await _tournamentService.getTournaments(
+      final result = await _tournamentService.getTournaments(
         limit: 20,
         startAfter: _lastFreeDocument,
         filters: {..._filters, 'isPaid': false, 'showOnlyFuture': true},
       );
       
-      DocumentSnapshot? lastDoc;
-      if (tournaments.isNotEmpty) {
-        lastDoc = await FirebaseFirestore.instance
-            .collection('tournaments')
-            .doc(tournaments.last.id)
-            .get();
-      }
+      // 안전한 타입 캐스팅
+      final tournamentsData = result['tournaments'];
+      final tournaments = tournamentsData as List<TournamentModel>? ?? <TournamentModel>[];
+      final lastDoc = result['lastDoc'] as DocumentSnapshot?;
       
       setState(() {
         _freeTournaments.addAll(tournaments);
@@ -278,19 +280,16 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
     });
     
     try {
-      final tournaments = await _tournamentService.getTournaments(
+      final result = await _tournamentService.getTournaments(
         limit: 20,
         startAfter: _lastPaidDocument,
         filters: {..._filters, 'isPaid': true, 'showOnlyFuture': true},
       );
       
-      DocumentSnapshot? lastDoc;
-      if (tournaments.isNotEmpty) {
-        lastDoc = await FirebaseFirestore.instance
-            .collection('tournaments')
-            .doc(tournaments.last.id)
-            .get();
-      }
+      // 안전한 타입 캐스팅
+      final tournamentsData = result['tournaments'];
+      final tournaments = tournamentsData as List<TournamentModel>? ?? <TournamentModel>[];
+      final lastDoc = result['lastDoc'] as DocumentSnapshot?;
       
       setState(() {
         _paidTournaments.addAll(tournaments);
@@ -400,8 +399,14 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
           ],
         ),
         floatingActionButton: FloatingActionButton(
-          onPressed: () {
-            context.push('/tournaments/create');
+          onPressed: () async {
+            final result = await context.push('/tournaments/create');
+            if (result == true) {
+              // 토너먼트가 생성되었으면 목록 새로고침
+              setState(() => _isLoading = true);
+              _loadFreeTournaments();
+              _loadPaidTournaments();
+            }
           },
           backgroundColor: AppColors.primary,
           child: const Icon(Icons.add),
@@ -612,8 +617,14 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
           ),
           const SizedBox(height: 24),
           ElevatedButton.icon(
-            onPressed: () {
-              context.push('/tournaments/create');
+            onPressed: () async {
+              final result = await context.push('/tournaments/create');
+              if (result == true) {
+                // 토너먼트가 생성되었으면 목록 새로고침
+                setState(() => _isLoading = true);
+                _loadFreeTournaments();
+                _loadPaidTournaments();
+              }
             },
             icon: const Icon(Icons.add),
             label: const Text('내전 만들기'),

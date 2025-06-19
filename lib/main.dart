@@ -7,6 +7,7 @@ import 'package:lol_custom_game_manager/navigation/app_router.dart';
 import 'package:provider/provider.dart';
 import 'package:lol_custom_game_manager/providers/auth_provider.dart' as CustomAuth;
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
+import 'package:lol_custom_game_manager/providers/tournament_provider.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
 import 'package:lol_custom_game_manager/models/chat_model.dart';
 import 'package:lol_custom_game_manager/services/chat_service.dart';
@@ -199,6 +200,11 @@ class MyApp extends StatelessWidget {
         Provider<FirebaseMessagingService>(create: (_) => messagingService),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => ClanCreationProvider()),
+        ChangeNotifierProvider<TournamentProvider>(
+          create: (context) => TournamentProvider(
+            Provider.of<TournamentService>(context, listen: false),
+          ),
+        ),
       ],
       child: Consumer<AppStateProvider>(
         builder: (context, appState, child) {

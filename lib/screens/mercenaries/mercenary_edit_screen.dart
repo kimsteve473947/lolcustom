@@ -228,10 +228,14 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
         final userId = currentUser.uid;
         final path = 'mercenaries/$userId/profile.jpg';
         
-        profileImageUrl = await _firebaseService.uploadImage(
+        final newImageUrl = await _firebaseService.uploadImage(
           path, 
           bytes,
         );
+
+        if (newImageUrl != null) {
+          profileImageUrl = newImageUrl;
+        }
         debugPrint('프로필 이미지 업로드 완료: $profileImageUrl');
       }
       
@@ -301,8 +305,8 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
       
       // 화면 전환
       if (mounted) {
-        debugPrint('화면 전환 - 용병 프로필 화면으로 이동');
-        Navigator.of(context).pop(mercenaryId);
+        debugPrint('화면 전환 - 이전 화면으로 돌아가며 성공 여부 전달');
+        Navigator.of(context).pop(true);
       }
     } catch (e) {
       debugPrint('!!! 용병 프로필 저장 실패: $e !!!');
@@ -1067,4 +1071,4 @@ class _MercenaryEditScreenState extends State<MercenaryEditScreen> {
       ),
     );
   }
-} 
+}

@@ -55,6 +55,7 @@ class ClanModel extends Equatable {
   final int level;
   final int xp;
   final int xpToNextLevel;
+  final Map<String, dynamic>? stats; // 클랜 통계 (totalPoints, weeklyPoints 등)
 
   const ClanModel({
     required this.id,
@@ -81,6 +82,7 @@ class ClanModel extends Equatable {
     this.level = 1,
     this.xp = 0,
     this.xpToNextLevel = 100,
+    this.stats,
   });
 
   ClanModel copyWith({
@@ -108,6 +110,7 @@ class ClanModel extends Equatable {
     int? level,
     int? xp,
     int? xpToNextLevel,
+    Map<String, dynamic>? stats,
   }) {
     return ClanModel(
       id: id ?? this.id,
@@ -134,6 +137,7 @@ class ClanModel extends Equatable {
       level: level ?? this.level,
       xp: xp ?? this.xp,
       xpToNextLevel: xpToNextLevel ?? this.xpToNextLevel,
+      stats: stats ?? this.stats,
     );
   }
 
@@ -162,6 +166,7 @@ class ClanModel extends Equatable {
       'level': level,
       'xp': xp,
       'xpToNextLevel': xpToNextLevel,
+      'stats': stats,
     };
     
     // 엠블럼 데이터 처리
@@ -245,6 +250,7 @@ class ClanModel extends Equatable {
       level: _dynamicToInt(map['level'], defaultValue: 1),
       xp: _dynamicToInt(map['xp'], defaultValue: 0),
       xpToNextLevel: _dynamicToInt(map['xpToNextLevel'], defaultValue: 100),
+      stats: map['stats'] as Map<String, dynamic>?,
     );
   }
   
@@ -263,6 +269,6 @@ class ClanModel extends Equatable {
     activityDays, activityTimes, ageGroups, genderPreference,
     focus, focusRating, discordUrl, createdAt,
     maxMembers, members, pendingMembers, areMembersPublic, isRecruiting,
-    level, xp, xpToNextLevel
+    level, xp, xpToNextLevel, stats
   ];
 }

@@ -203,10 +203,13 @@ class _MercenaryRegistrationScreenState extends State<MercenaryRegistrationScree
         final userId = currentUser.uid;
         final path = 'mercenaries/$userId/profile.jpg';
         
-        profileImageUrl = await _firebaseService.uploadImage(
+        final newImageUrl = await _firebaseService.uploadImage(
           path, 
           bytes,
         );
+        if (newImageUrl != null) {
+          profileImageUrl = newImageUrl;
+        }
       }
       
       // 각 포지션의 평균 능력치 계산
@@ -245,13 +248,13 @@ class _MercenaryRegistrationScreenState extends State<MercenaryRegistrationScree
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('용병 프로필이 등록되었습니다')),
         );
-        context.pop(id);
+        context.pop(true);
       } else {
         await _firebaseService.updateMercenaryProfile(mercenary);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('용병 프로필이 업데이트되었습니다')),
         );
-        context.pop(mercenary.id);
+        context.pop(true);
       }
     } catch (e) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -752,4 +755,4 @@ class _MercenaryRegistrationScreenState extends State<MercenaryRegistrationScree
       case PlayerTier.unranked: return '언랭크';
     }
   }
-} 
+}

@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/models/clan_model.dart';
 import 'package:lol_custom_game_manager/services/clan_service.dart';
-import 'package:go_router/go_router.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:provider/provider.dart';
+import 'package:lol_custom_game_manager/providers/auth_provider.dart' as CustomAuth;
 
 class ClanSearchScreen extends StatefulWidget {
   const ClanSearchScreen({Key? key}) : super(key: key);
@@ -16,501 +16,430 @@ class ClanSearchScreen extends StatefulWidget {
 class _ClanSearchScreenState extends State<ClanSearchScreen> {
   final ClanService _clanService = ClanService();
   final TextEditingController _searchController = TextEditingController();
-  List<ClanModel> _clans = [];
+  final FocusNode _searchFocusNode = FocusNode();
+  
+  List<ClanModel> _searchResults = [];
+  List<ClanModel> _allClans = [];
   bool _isLoading = false;
-  String? _selectedCategory;
-  AgeGroup? _selectedAgeGroup;
-  String? _selectedGender;
-  bool _onlyRecruiting = true;
+  bool _hasSearched = false;
 
   @override
   void initState() {
     super.initState();
-    _loadClans();
+    _loadAllClans();
+    // 화면 진입 시 자동으로 검색창에 포커스
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _searchFocusNode.requestFocus();
+    });
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    _searchFocusNode.dispose();
     super.dispose();
   }
 
-  Future<void> _loadClans() async {
+  Future<void> _loadAllClans() async {
     setState(() {
       _isLoading = true;
     });
 
     try {
-      final clans = await _clanService.getRecruitingClans(limit: 50);
-      setState(() {
-        _clans = clans;
-        _isLoading = false;
+      _clanService.getClans().listen((clans) {
+        if (mounted) {
+          setState(() {
+            _allClans = clans;
+            _isLoading = false;
+          });
+        }
       });
     } catch (e) {
-      setState(() {
-        _isLoading = false;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('클랜 정보를 불러오는 중 오류가 발생했습니다: $e')),
-      );
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
-  List<ClanModel> get filteredClans {
-    List<ClanModel> result = List.from(_clans);
-    
-    // 검색어로 필터링
-    if (_searchController.text.isNotEmpty) {
-      final query = _searchController.text.toLowerCase();
-      result = result.where((clan) => 
-        clan.name.toLowerCase().contains(query) || 
-        (clan.description?.toLowerCase().contains(query) ?? false)
-      ).toList();
+  void _performSearch(String query) {
+    if (query.trim().isEmpty) {
+      setState(() {
+        _searchResults = [];
+        _hasSearched = false;
+      });
+      return;
     }
-    
-    // 카테고리로 필터링
-    if (_selectedCategory != null) {
-      if (_selectedCategory == '플랜 팀 리그') {
-        result = result.where((clan) => clan.focus == ClanFocus.competitive).toList();
-      } else if (_selectedCategory == '자체전') {
-        result = result.where((clan) => clan.activityDays.isNotEmpty).toList();
-      } else if (_selectedCategory == '대회 준비') {
-        result = result.where((clan) => clan.focus == ClanFocus.balanced || clan.focus == ClanFocus.competitive).toList();
-      } else if (_selectedCategory == '팀 매칭') {
-        result = result.where((clan) => clan.areMembersPublic).toList();
-      } else if (_selectedCategory == '5vs5 풀살') {
-        result = result.where((clan) => clan.description?.contains('5vs5') ?? false).toList();
-      } else if (_selectedCategory == '전문 코치') {
-        result = result.where((clan) => clan.description?.contains('코치') ?? false).toList();
-      } else if (_selectedCategory == '함께 성장') {
-        result = result.where((clan) => clan.focus == ClanFocus.casual).toList();
-      }
-    }
-    
-    // 나이대로 필터링
-    if (_selectedAgeGroup != null) {
-      result = result.where((clan) => clan.ageGroups.contains(_selectedAgeGroup)).toList();
-    }
-    
-    // 성별로 필터링
-    if (_selectedGender != null) {
-      if (_selectedGender == '남자') {
-        result = result.where((clan) => 
-          clan.genderPreference == GenderPreference.male || 
-          clan.genderPreference == GenderPreference.any
-        ).toList();
-      } else if (_selectedGender == '여자') {
-        result = result.where((clan) => 
-          clan.genderPreference == GenderPreference.female || 
-          clan.genderPreference == GenderPreference.any
-        ).toList();
-      }
-    }
-    
-    // 모집중인 클랜만 필터링
-    if (_onlyRecruiting) {
-      result = result.where((clan) => clan.isRecruiting).toList();
-    }
-    
-    return result;
+
+    setState(() {
+      _hasSearched = true;
+      _searchResults = _allClans.where((clan) {
+        final searchQuery = query.toLowerCase();
+        return clan.name.toLowerCase().contains(searchQuery) ||
+               clan.description.toLowerCase().contains(searchQuery);
+      }).toList();
+    });
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
+      backgroundColor: AppColors.background,
       appBar: AppBar(
-        title: const Text('원하는 유형의 팀을 찾아보세요'),
+        backgroundColor: AppColors.backgroundCard,
+        elevation: 0,
+        title: Container(
+          height: 44,
+          decoration: BoxDecoration(
+            color: AppColors.backgroundGrey,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          child: TextField(
+            controller: _searchController,
+            focusNode: _searchFocusNode,
+            onChanged: _performSearch,
+            decoration: InputDecoration(
+              hintText: '클랜 이름을 검색해보세요',
+              hintStyle: TextStyle(
+                color: AppColors.textTertiary,
+                fontSize: 16,
+              ),
+              prefixIcon: Icon(
+                Icons.search,
+                color: AppColors.textTertiary,
+                size: 20,
+              ),
+              border: InputBorder.none,
+              contentPadding: const EdgeInsets.symmetric(
+                horizontal: 16,
+                vertical: 12,
+              ),
+            ),
+            style: const TextStyle(
+              fontSize: 16,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
         leading: IconButton(
-          icon: const Icon(Icons.arrow_back),
+          icon: const Icon(
+            Icons.arrow_back_ios_rounded,
+            color: AppColors.textPrimary,
+          ),
           onPressed: () => context.pop(),
         ),
       ),
-      body: Column(
-        children: [
-          _buildCategoryFilters(),
-          _buildSearchBar(),
-          _buildFilterBar(),
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _buildClanList(),
-          ),
-        ],
-      ),
+      body: _buildBody(),
     );
   }
 
-  Widget _buildCategoryFilters() {
-    final categories = [
-      '플랜 팀 리그',
-      '자체전',
-      '대회 준비',
-      '팀 매칭',
-      '5vs5 풀살',
-      '전문 코치',
-      '함께 성장',
-    ];
-
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 16.0),
-      height: 80,
-      child: ListView(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 16.0),
-        children: categories.map((category) {
-          final isSelected = _selectedCategory == category;
-          
-          return GestureDetector(
-            onTap: () {
-              setState(() {
-                if (isSelected) {
-                  _selectedCategory = null;
-                } else {
-                  _selectedCategory = category;
-                }
-              });
-            },
-            child: Container(
-              margin: const EdgeInsets.only(right: 8.0),
-              padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
-              decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : Colors.grey[200],
-                borderRadius: BorderRadius.circular(20),
-              ),
-              alignment: Alignment.center,
-              child: Text(
-                category,
-                style: TextStyle(
-                  color: isSelected ? Colors.white : Colors.black,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-            ),
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  Widget _buildSearchBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
-      child: TextField(
-        controller: _searchController,
-        decoration: InputDecoration(
-          hintText: '클랜 이름 검색',
-          prefixIcon: const Icon(Icons.search),
-          border: OutlineInputBorder(
-            borderRadius: BorderRadius.circular(10),
-            borderSide: BorderSide.none,
-          ),
-          filled: true,
-          fillColor: Colors.grey[200],
-          contentPadding: EdgeInsets.zero,
-        ),
-        onChanged: (value) {
-          setState(() {
-            // 검색어가 변경되면 UI 갱신
-          });
-        },
-      ),
-    );
-  }
-
-  Widget _buildFilterBar() {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16.0, 0, 16.0, 16.0),
-      child: Row(
-        children: [
-          _buildFilterButton('인기순', Icons.trending_up),
-          const SizedBox(width: 8),
-          _buildFilterButton('종목', Icons.category_outlined),
-          const SizedBox(width: 8),
-          _buildFilterButton('성별', Icons.people_outline),
-          const SizedBox(width: 8),
-          _buildFilterButton('레벨', Icons.sort),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildFilterButton(String label, IconData icon) {
-    bool isSelected = false;
-    
-    if (label == '성별' && _selectedGender != null) {
-      isSelected = true;
-    } else if (label == '종목' && _selectedCategory != null) {
-      isSelected = true;
+  Widget _buildBody() {
+    if (_isLoading) {
+      return const Center(
+        child: CircularProgressIndicator(strokeWidth: 2),
+      );
     }
-    
-    return Expanded(
-      child: GestureDetector(
-        onTap: () {
-          if (label == '성별') {
-            _showGenderFilterDialog();
-          } else if (label == '종목') {
-            // 이미 상단에 표시됨
-          }
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8.0),
-          decoration: BoxDecoration(
-            border: Border.all(color: isSelected ? AppColors.primary : Colors.grey[300]!),
-            borderRadius: BorderRadius.circular(8),
-            color: isSelected ? AppColors.primary.withOpacity(0.1) : Colors.white,
+
+    if (!_hasSearched) {
+      return _buildInitialState();
+    }
+
+    if (_searchResults.isEmpty) {
+      return _buildEmptyResults();
+    }
+
+    return _buildSearchResults();
+  }
+
+  Widget _buildInitialState() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Column(
+        children: [
+          const SizedBox(height: 40),
+          Container(
+            width: 80,
+            height: 80,
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.search_rounded,
+              size: 40,
+              color: AppColors.primary,
+            ),
           ),
-          alignment: Alignment.center,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 16, color: isSelected ? AppColors.primary : Colors.grey[700]),
-              const SizedBox(width: 4),
-              Text(
-                label,
-                style: TextStyle(
-                  color: isSelected ? AppColors.primary : Colors.grey[700],
-                  fontWeight: FontWeight.w500,
-                  fontSize: 12,
-                ),
-              ),
-            ],
+          const SizedBox(height: 24),
+          Text(
+            '클랜을 찾아보세요',
+            style: TextStyle(
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
+            ),
           ),
-        ),
+          const SizedBox(height: 8),
+          Text(
+            '클랜 이름이나 설명을 검색하여\n원하는 클랜을 찾을 수 있습니다',
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+              height: 1.5,
+            ),
+          ),
+        ],
       ),
     );
   }
 
-  void _showGenderFilterDialog() {
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          title: const Text('성별 필터'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              ListTile(
-                title: const Text('모두'),
-                leading: Radio<String?>(
-                  value: null,
-                  groupValue: _selectedGender,
-                  onChanged: (value) {
-                    Navigator.pop(context);
-                    setState(() {
-                      _selectedGender = value;
-                    });
-                  },
-                ),
-              ),
-              ListTile(
-                title: const Text('남자'),
-                leading: Radio<String?>(
-                  value: '남자',
-                  groupValue: _selectedGender,
-                  onChanged: (value) {
-                    Navigator.pop(context);
-                    setState(() {
-                      _selectedGender = value;
-                    });
-                  },
-                ),
-              ),
-              ListTile(
-                title: const Text('여자'),
-                leading: Radio<String?>(
-                  value: '여자',
-                  groupValue: _selectedGender,
-                  onChanged: (value) {
-                    Navigator.pop(context);
-                    setState(() {
-                      _selectedGender = value;
-                    });
-                  },
-                ),
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  Widget _buildClanList() {
-    final clans = filteredClans;
-    
-    if (clans.isEmpty) {
-      return Center(
+  Widget _buildEmptyResults() {
+    return Padding(
+      padding: const EdgeInsets.all(24.0),
+      child: Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(
-              Icons.search_off,
-              size: 64,
-              color: Colors.grey[400],
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.textTertiary.withOpacity(0.1),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(
+                Icons.search_off_rounded,
+                size: 40,
+                color: AppColors.textTertiary,
+              ),
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 24),
             Text(
               '검색 결과가 없습니다',
               style: TextStyle(
                 fontSize: 18,
-                color: Colors.grey[700],
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              '다른 검색어로 시도해보세요',
+              style: TextStyle(
+                fontSize: 14,
+                color: AppColors.textSecondary,
               ),
             ),
           ],
         ),
-      );
-    }
-    
+      ),
+    );
+  }
+
+  Widget _buildSearchResults() {
     return ListView.builder(
       padding: const EdgeInsets.all(16),
-      itemCount: clans.length,
+      itemCount: _searchResults.length,
       itemBuilder: (context, index) {
-        return _buildClanItem(clans[index]);
+        final clan = _searchResults[index];
+        return _buildClanItem(clan);
       },
     );
   }
 
   Widget _buildClanItem(ClanModel clan) {
-    String memberText = '${clan.memberCount}/${clan.maxMembers}명';
-    String activityText = clan.activityDays.isEmpty ? '활동일 미지정' : clan.activityDays.join(', ');
-    
-    // 나이대 텍스트 생성
-    String ageGroupText = '';
-    if (clan.ageGroups.contains(AgeGroup.teens)) ageGroupText += '10대';
-    if (clan.ageGroups.contains(AgeGroup.twenties)) {
-      if (ageGroupText.isNotEmpty) ageGroupText += '~';
-      ageGroupText += '20대';
-    }
-    if (clan.ageGroups.contains(AgeGroup.thirties)) {
-      if (ageGroupText.isNotEmpty) ageGroupText += '~';
-      ageGroupText += '30대';
-    }
-    if (clan.ageGroups.contains(AgeGroup.fortyPlus)) {
-      if (ageGroupText.isNotEmpty) ageGroupText += '~';
-      ageGroupText += '40대+';
-    }
-    if (ageGroupText.isEmpty) ageGroupText = '제한 없음';
-    
-    // 성별 텍스트 생성
-    String genderText = '';
-    switch (clan.genderPreference) {
-      case GenderPreference.male:
-        genderText = '남자';
-        break;
-      case GenderPreference.female:
-        genderText = '여자';
-        break;
-      case GenderPreference.any:
-        genderText = '남녀 모두';
-        break;
-    }
-    
-    // 활동 시간대 텍스트 생성
-    List<String> timeTexts = [];
-    if (clan.activityTimes.contains(PlayTimeType.morning)) timeTexts.add('아침');
-    if (clan.activityTimes.contains(PlayTimeType.daytime)) timeTexts.add('낮');
-    if (clan.activityTimes.contains(PlayTimeType.evening)) timeTexts.add('저녁');
-    if (clan.activityTimes.contains(PlayTimeType.night)) timeTexts.add('심야');
-    String timeText = timeTexts.join('+') + (timeTexts.isNotEmpty ? ' 시간대' : '제한 없음');
-    
-    // 클랜 로고
-    Widget clanLogo;
-    if (clan.emblem != null) {
-      if (clan.emblem is String) {
-        // URL
-        clanLogo = CircleAvatar(
-          radius: 30,
-          backgroundImage: NetworkImage(clan.emblem as String),
-        );
-      } else {
-        // 기본 아이콘
-        clanLogo = CircleAvatar(
-          radius: 30,
-          backgroundColor: Colors.grey[200],
-          child: const Icon(Icons.group, size: 30, color: Colors.grey),
-        );
-      }
-    } else {
-      clanLogo = CircleAvatar(
-        radius: 30,
-        backgroundColor: Colors.grey[200],
-        child: const Icon(Icons.group, size: 30, color: Colors.grey),
-      );
-    }
-    
-    return Card(
-      margin: const EdgeInsets.symmetric(vertical: 8, horizontal: 16),
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+    final authProvider = Provider.of<CustomAuth.AuthProvider>(context, listen: false);
+    final currentUser = authProvider.user;
+    final isMember = currentUser != null && clan.members.contains(currentUser.uid);
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundCard,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppColors.border, width: 1),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadowLight,
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      child: InkWell(
-        onTap: () {
-          final clanId = clan.id;
-          debugPrint('검색 화면에서 클랜 상세로 이동: $clanId');
-          context.push('/clans/detail/$clanId');
-        },
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              clanLogo,
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Text(
-                          clan.name,
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            fontSize: 18,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: Colors.blue.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          child: Text(
-                            '멤버 모집',
-                            style: TextStyle(
-                              color: Colors.blue[700],
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(16),
+          onTap: () {
+            if (isMember) {
+              context.push('/clans/${clan.id}');
+            } else {
+              context.push('/clans/public/${clan.id}');
+            }
+          },
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                // 클랜 엠블럼
+                Container(
+                  width: 56,
+                  height: 56,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.border, width: 1),
+                  ),
+                  child: _buildClanEmblem(clan),
+                ),
+                const SizedBox(width: 16),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              clan.name,
+                              style: const TextStyle(
+                                fontWeight: FontWeight.w700,
+                                fontSize: 16,
+                                color: AppColors.textPrimary,
+                              ),
                             ),
                           ),
+                          if (clan.isRecruiting)
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                              decoration: BoxDecoration(
+                                color: AppColors.success.withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(8),
+                              ),
+                              child: Text(
+                                '모집중',
+                                style: TextStyle(
+                                  color: AppColors.success,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        clan.description,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: AppColors.textSecondary,
                         ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '$activityText · $memberText',
-                      style: TextStyle(
-                        color: Colors.grey[600],
-                        fontSize: 12,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
                       ),
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      '남녀 모두 · $ageGroupText · $timeText',
-                      style: TextStyle(
-                        color: Colors.grey[700],
-                        fontSize: 12,
+                      const SizedBox(height: 8),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.people_outline,
+                            size: 14,
+                            color: AppColors.textTertiary,
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${clan.memberCount}/${clan.maxMembers}',
+                            style: TextStyle(
+                              fontSize: 13,
+                              color: AppColors.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-            ],
+                Icon(Icons.chevron_right_rounded, color: AppColors.textTertiary, size: 20),
+              ],
+            ),
           ),
         ),
       ),
     );
   }
-} 
+
+  Widget _buildClanEmblem(ClanModel clan) {
+    if (clan.emblem is String && (clan.emblem as String).startsWith('http')) {
+      return ClipOval(
+        child: Image.network(
+          clan.emblem as String,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) => _buildDefaultEmblem(),
+        ),
+      );
+    } else if (clan.emblem is Map) {
+      final emblem = clan.emblem as Map;
+      final Color backgroundColor = emblem['backgroundColor'] as Color? ?? AppColors.primary;
+      final String symbol = emblem['symbol'] as String? ?? 'sports_soccer';
+      
+      return Container(
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Icon(
+            _getIconData(symbol),
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+      );
+    }
+    
+    return _buildDefaultEmblem();
+  }
+
+  Widget _buildDefaultEmblem() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Icon(
+          Icons.groups,
+          color: AppColors.primary,
+          size: 24,
+        ),
+      ),
+    );
+  }
+
+  IconData _getIconData(String symbol) {
+    final Map<String, IconData> iconMap = {
+      'shield': Icons.shield,
+      'star': Icons.star,
+      'sports_soccer': Icons.sports_soccer,
+      'sports_basketball': Icons.sports_basketball,
+      'sports_baseball': Icons.sports_baseball,
+      'sports_football': Icons.sports_football,
+      'sports_volleyball': Icons.sports_volleyball,
+      'sports_tennis': Icons.sports_tennis,
+      'whatshot': Icons.whatshot,
+      'bolt': Icons.bolt,
+      'pets': Icons.pets,
+      'favorite': Icons.favorite,
+      'stars': Icons.stars,
+      'military_tech': Icons.military_tech,
+      'emoji_events': Icons.emoji_events,
+      'local_fire_department': Icons.local_fire_department,
+      'public': Icons.public,
+      'cruelty_free': Icons.cruelty_free,
+      'emoji_nature': Icons.emoji_nature,
+      'rocket_launch': Icons.rocket_launch,
+    };
+    
+    return iconMap[symbol] ?? Icons.star;
+  }
+}

@@ -5,6 +5,7 @@ import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/constants/lol_constants.dart';
 import 'package:lol_custom_game_manager/models/tournament_model.dart';
 import 'package:lol_custom_game_manager/widgets/lane_icon_widget.dart';
+import 'package:lol_custom_game_manager/widgets/host_trust_score_widget.dart';
 
 class TournamentCard extends StatelessWidget {
   final TournamentModel tournament;
@@ -18,28 +19,51 @@ class TournamentCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      shape: RoundedRectangleBorder(
-        borderRadius: BorderRadius.circular(12),
+    return Container(
+      margin: const EdgeInsets.only(bottom: 12),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundCard,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: AppColors.shadow,
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
       ),
-      elevation: 2,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              _buildHeader(),
-              const SizedBox(height: 12),
-              _buildGameInfo(),
-              const SizedBox(height: 12),
-              _buildDivider(),
-              const SizedBox(height: 12),
-              _buildFooter(),
-            ],
-          ),
+        borderRadius: BorderRadius.circular(16),
+        child: Column(
+          children: [
+            // 상단 헤더 섹션
+            Container(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildHeader(),
+                  const SizedBox(height: 12),
+                  _buildHostInfo(),
+                  const SizedBox(height: 12),
+                  _buildGameInfo(),
+                ],
+              ),
+            ),
+            // 하단 포지션 정보 섹션
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.backgroundGrey,
+                borderRadius: const BorderRadius.only(
+                  bottomLeft: Radius.circular(16),
+                  bottomRight: Radius.circular(16),
+                ),
+              ),
+              child: _buildPositionInfo(),
+            ),
+          ],
         ),
       ),
     );
@@ -67,71 +91,143 @@ class TournamentCard extends StatelessWidget {
     checkAndAddTier('에메랄드', 'assets/images/tiers/에메랄드로고.png');
     checkAndAddTier('마스터', 'assets/images/tiers/마스터로고.png');
     
-    return Row(
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 더 큰 시간 표시
-              Text(
-                DateFormat('M월 d일 (E) HH:mm', 'ko_KR').format(tournament.startsAt.toDate()),
-                style: const TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: AppColors.primary,
-                ),
-              ),
-              const SizedBox(height: 4),
-              Text(
+        // 제목과 배지
+        Row(
+          children: [
+            Expanded(
+              child: Text(
                 tournament.title,
                 style: const TextStyle(
                   fontSize: 18,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
               ),
-            ],
-          ),
-        ),
-        // 티어 아이콘 표시
-        if (tierIconPaths.isNotEmpty)
-          Row(
-            mainAxisSize: MainAxisSize.min,
-            children: tierIconPaths.map((path) => 
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 2),
-                child: Image.asset(
-                  path,
-                  width: 24,
-                  height: 24,
+            ),
+            const SizedBox(width: 8),
+            // 티어 아이콘 또는 배지
+            if (tierIconPaths.isNotEmpty)
+              Row(
+                mainAxisSize: MainAxisSize.min,
+                children: tierIconPaths.take(2).map((path) => 
+                  Padding(
+                    padding: const EdgeInsets.only(left: 4),
+                    child: Image.asset(
+                      path,
+                      width: 24,
+                      height: 24,
+                    ),
+                  )
+                ).toList(),
+              )
+            else if (tournament.title.toLowerCase().contains('랜덤'))
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFE8E0FF),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  '🎲 랜덤',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFF6B47DC),
+                  ),
                 ),
               )
-            ).toList(),
-          )
-        else if (tournament.title.toLowerCase().contains('랜덤'))
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-            decoration: BoxDecoration(
-              color: Colors.purple.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(12),
+            else if (tournament.premiumBadge)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF4E0),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  '⭐ 프리미엄',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFFF9500),
+                  ),
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        // 시간 정보
+        Row(
+          children: [
+            Icon(
+              Icons.access_time,
+              size: 16,
+              color: AppColors.textTertiary,
             ),
-            child: const Text(
-              '랜덤',
+            const SizedBox(width: 4),
+            Text(
+              DateFormat('M월 d일 (E) HH:mm', 'ko_KR').format(tournament.startsAt.toDate()),
               style: TextStyle(
                 fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.purple,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textSecondary,
               ),
             ),
-          )
-        else if (tournament.premiumBadge)
-          Icon(
-            Icons.verified,
-            size: 24,
-            color: Colors.amber.shade600,
+            const Spacer(),
+            _buildStatusBadge(),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildHostInfo() {
+    return Row(
+      children: [
+        // 주최자 프로필 이미지
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.backgroundGrey,
+            image: tournament.hostProfileImageUrl.isNotEmpty
+                ? DecorationImage(
+                    image: NetworkImage(tournament.hostProfileImageUrl),
+                    fit: BoxFit.cover,
+                  )
+                : null,
           ),
+          child: tournament.hostProfileImageUrl.isEmpty
+              ? Icon(
+                  Icons.person,
+                  size: 20,
+                  color: AppColors.textTertiary,
+                )
+              : null,
+        ),
+        const SizedBox(width: 8),
+        // 주최자 이름
+        Expanded(
+          child: Text(
+            tournament.hostName,
+            style: const TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textPrimary,
+            ),
+          ),
+        ),
+        // 운영 신뢰도
+        HostTrustScoreLoader(
+          hostId: tournament.hostId,
+          isCompact: true,
+          showDetails: true,
+        ),
       ],
     );
   }
@@ -139,88 +235,84 @@ class TournamentCard extends StatelessWidget {
   Widget _buildGameInfo() {
     return Row(
       children: [
-        // 게임 서버 정보
-        Expanded(
-          child: Row(
-            children: [
-              const Icon(
-                Icons.public,
-                size: 16,
-                color: AppColors.textSecondary,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                LolGameServers.names[tournament.gameServer] ?? '한국 서버',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
+        // 게임 서버
+        _buildInfoChip(
+          icon: Icons.public,
+          text: LolGameServers.names[tournament.gameServer] ?? '한국 서버',
         ),
-        
-        // 경기 방식 정보
-        Expanded(
-          child: Row(
-            children: [
-              const Icon(
-                Icons.format_list_numbered,
-                size: 16,
-                color: AppColors.textSecondary,
-              ),
-              const SizedBox(width: 4),
-              Text(
-                LolGameFormats.names[tournament.gameFormat] ?? '단판',
-                style: const TextStyle(
-                  color: AppColors.textSecondary,
-                  fontSize: 14,
-                ),
-              ),
-            ],
-          ),
+        const SizedBox(width: 8),
+        // 경기 방식
+        _buildInfoChip(
+          icon: Icons.sports_esports,
+          text: LolGameFormats.names[tournament.gameFormat] ?? '단판',
         ),
-        
+        const Spacer(),
         // 참가비 정보
         if (tournament.isPaid)
           Container(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
             decoration: BoxDecoration(
-              color: AppColors.warning.withOpacity(0.2),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              '${NumberFormat('#,###').format(tournament.price ?? 0)}원',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: AppColors.warning,
+              gradient: LinearGradient(
+                colors: [
+                  AppColors.warning.withOpacity(0.9),
+                  AppColors.warning,
+                ],
               ),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(
+                  Icons.attach_money,
+                  size: 16,
+                  color: Colors.white,
+                ),
+                Text(
+                  NumberFormat('#,###').format(tournament.price ?? 0),
+                  style: const TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ],
             ),
           ),
       ],
     );
   }
-  
-  Widget _buildDivider() {
+
+  Widget _buildInfoChip({required IconData icon, required String text}) {
     return Container(
-      height: 1,
-      color: Colors.grey.shade200,
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundGrey,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 14,
+            color: AppColors.textTertiary,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w500,
+              color: AppColors.textSecondary,
+            ),
+          ),
+        ],
+      ),
     );
   }
 
-  Widget _buildFooter() {
-    return Row(
-      children: [
-        _buildLaneInfo(),
-        const Spacer(),
-        _buildStatusBadge(),
-      ],
-    );
-  }
-
-  Widget _buildLaneInfo() {
-    // Define lane data
+  Widget _buildPositionInfo() {
     final lanes = [
       LolLane.top,
       LolLane.jungle, 
@@ -230,88 +322,129 @@ class TournamentCard extends StatelessWidget {
     ];
 
     return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceAround,
       children: lanes.map((lane) {
         final key = lane.toString().split('.').last;
         final filled = tournament.filledSlotsByRole[key] ?? 0;
         final total = tournament.slotsByRole[key] ?? 2;
+        final isFull = filled >= total;
 
-        return Container(
-          margin: const EdgeInsets.only(right: 8),
-          child: Column(
-            children: [
-              LaneIconWidget(
-                lane: key,
-                size: 24,
+        return Expanded(
+          child: Container(
+            margin: const EdgeInsets.symmetric(horizontal: 4),
+            padding: const EdgeInsets.symmetric(vertical: 8),
+            decoration: BoxDecoration(
+              color: isFull 
+                  ? AppColors.error.withOpacity(0.1)
+                  : AppColors.backgroundCard,
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: isFull 
+                    ? AppColors.error.withOpacity(0.3)
+                    : AppColors.border,
+                width: 1,
               ),
-              const SizedBox(height: 2),
-              Text(
-                '$filled/$total',
-                style: TextStyle(
-                  fontSize: 10,
-                  fontWeight: FontWeight.bold,
-                  color: _getParticipantCountColor(filled, total),
+            ),
+            child: Column(
+              children: [
+                LaneIconWidget(
+                  lane: key,
+                  size: 24,
+                  color: isFull ? AppColors.error : null,
                 ),
-              ),
-            ],
+                const SizedBox(height: 4),
+                Text(
+                  '$filled/$total',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: isFull 
+                        ? AppColors.error
+                        : filled > 0 
+                            ? AppColors.warning
+                            : AppColors.textSecondary,
+                  ),
+                ),
+              ],
+            ),
           ),
         );
       }).toList(),
     );
   }
 
-  // 참가자 수에 따른 색상 변경
-  Color _getParticipantCountColor(int filled, int total) {
-    if (filled == 0) return Colors.black;  // 0/2: 검정색
-    if (filled < total) return Colors.amber.shade700;  // 1/2: 노란색
-    return Colors.red;  // 2/2: 빨간색
-  }
-
   Widget _buildStatusBadge() {
-    Color color;
+    Color backgroundColor;
+    Color textColor;
     String text;
+    IconData? icon;
 
     switch (tournament.status) {
       case TournamentStatus.draft:
-        color = Colors.grey;
+        backgroundColor = AppColors.textDisabled.withOpacity(0.1);
+        textColor = AppColors.textSecondary;
         text = '초안';
+        icon = Icons.edit_outlined;
         break;
       case TournamentStatus.open:
-        color = AppColors.success;
+        backgroundColor = AppColors.success.withOpacity(0.1);
+        textColor = AppColors.success;
         text = '모집중';
+        icon = Icons.group_add;
         break;
       case TournamentStatus.full:
-        color = AppColors.primary;
+        backgroundColor = AppColors.primary.withOpacity(0.1);
+        textColor = AppColors.primary;
         text = '모집완료';
+        icon = Icons.check_circle_outline;
         break;
       case TournamentStatus.inProgress:
       case TournamentStatus.ongoing:
-        color = AppColors.warning;
+        backgroundColor = AppColors.warning.withOpacity(0.1);
+        textColor = AppColors.warning;
         text = '진행중';
+        icon = Icons.play_circle_outline;
         break;
       case TournamentStatus.completed:
-        color = AppColors.textSecondary;
+        backgroundColor = AppColors.textDisabled.withOpacity(0.1);
+        textColor = AppColors.textSecondary;
         text = '완료';
+        icon = Icons.done_all;
         break;
       case TournamentStatus.cancelled:
-        color = AppColors.error;
+        backgroundColor = AppColors.error.withOpacity(0.1);
+        textColor = AppColors.error;
         text = '취소됨';
+        icon = Icons.cancel_outlined;
         break;
     }
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: color, width: 1),
+        color: backgroundColor,
+        borderRadius: BorderRadius.circular(12),
       ),
-      child: Text(
-        text,
-        style: TextStyle(
-          fontSize: 12,
-          fontWeight: FontWeight.bold,
-          color: color,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (icon != null) ...[
+            Icon(
+              icon,
+              size: 14,
+              color: textColor,
+            ),
+            const SizedBox(width: 4),
+          ],
+          Text(
+            text,
+            style: TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+              color: textColor,
+            ),
+          ),
+        ],
       ),
     );
   }

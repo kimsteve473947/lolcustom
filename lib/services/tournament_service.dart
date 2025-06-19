@@ -99,10 +99,10 @@ class TournamentService {
   }
 
   // 토너먼트 목록 가져오기 - 필터링 지원
-  Future<List<TournamentModel>> getTournaments({
-    Map<String, dynamic>? filters,
+  Future<Map<String, dynamic>> getTournaments({
     int limit = 20,
     DocumentSnapshot? startAfter,
+    Map<String, dynamic>? filters,
   }) async {
     try {
       // 쿼리 생성
@@ -173,7 +173,7 @@ class TournamentService {
       // 결과가 없는 경우
       if (querySnapshot.docs.isEmpty) {
         debugPrint('No tournaments found matching the criteria');
-        return [];
+        return {'tournaments': <TournamentModel>[], 'lastDoc': null};
       }
 
       // 모델 변환
@@ -270,12 +270,18 @@ class TournamentService {
         tournaments =
             tournaments.where((t) => t.startsAt.toDate().isAfter(now)).toList();
       }
-
-      return tournaments;
+ 
+      // 명시적으로 타입을 보장하여 반환
+      final List<TournamentModel> typedTournaments = List<TournamentModel>.from(tournaments);
+      
+      return {
+        'tournaments': typedTournaments,
+        'lastDoc': querySnapshot.docs.isNotEmpty ? querySnapshot.docs.last : null,
+      };
     } catch (e) {
       debugPrint('Error getting tournaments: $e');
       // 에러 발생 시 빈 배열 반환 (앱 동작 유지를 위해)
-      return [];
+      return {'tournaments': <TournamentModel>[], 'lastDoc': null};
     }
   }
 

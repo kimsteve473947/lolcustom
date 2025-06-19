@@ -183,6 +183,18 @@ class _DirectMessageScreenState extends State<DirectMessageScreen> {
         
         imageUrl = await _firebaseService.uploadImage(path, bytes);
         
+        if (imageUrl == null && text.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('이미지 업로드에 실패했습니다.')),
+          );
+          setState(() {
+            _isUploading = false;
+            _isSendingMessage = false;
+            _imageFile = null;
+          });
+          return;
+        }
+
         setState(() {
           _isUploading = false;
           _imageFile = null;
@@ -584,4 +596,4 @@ class _DirectMessageScreenState extends State<DirectMessageScreen> {
       ),
     );
   }
-} 
+}

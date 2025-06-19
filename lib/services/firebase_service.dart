@@ -417,6 +417,34 @@ class FirebaseService {
     }
   }
 
+  // Duo Post methods
+  Future<void> createDuoPost(DuoPostModel post) async {
+    try {
+      await _firestore.collection('duo_posts').add(post.toFirestore());
+    } catch (e) {
+      debugPrint('Error creating duo post: $e');
+      rethrow;
+    }
+  }
+
+  Stream<List<DuoPostModel>> getDuoPostsStream() {
+    try {
+      return _firestore
+          .collection('duo_posts')
+          .where('expiresAt', isGreaterThan: Timestamp.now())
+          .orderBy('expiresAt', descending: true)
+          .snapshots()
+          .map((snapshot) {
+        return snapshot.docs
+            .map((doc) => DuoPostModel.fromFirestore(doc))
+            .toList();
+      });
+    } catch (e) {
+      debugPrint('Error getting duo posts stream: $e');
+      return Stream.value([]);
+    }
+  }
+
   Future<UserModel?> getUserById(String userId) async {
     try {
       DocumentSnapshot doc =
@@ -597,7 +625,7 @@ class FirebaseService {
   }
 
   // Storage methods
-  Future<String> uploadImage(String path, Uint8List bytes) async {
+  Future<String?> uploadImage(String path, Uint8List bytes) async {
     try {
       debugPrint('=== 이미지 업로드 시작 ===');
       debugPrint('경로: $path');
@@ -637,13 +665,13 @@ class FirebaseService {
       } catch (e) {
         debugPrint('!!! 이미지 업로드 중 오류 발생: $e !!!');
         
-        // 대체 이미지 URL 반환 (기본 프로필 이미지 URL)
-        return 'https://lol-custom-game-manager.web.app/assets/images/default_profile.png';
+        // 업로드 실패 시 null 반환
+        return null;
       }
     } catch (e) {
       debugPrint('!!! 이미지 업로드 메서드 오류: $e !!!');
-      // 대체 이미지 URL 반환 (기본 프로필 이미지 URL)
-      return 'https://lol-custom-game-manager.web.app/assets/images/default_profile.png';
+      // 업로드 실패 시 null 반환
+      return null;
     }
   }
 

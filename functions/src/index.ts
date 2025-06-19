@@ -1,188 +1,241 @@
-import * as functions from "firebase-functions";
+/**
+ * Import function triggers from their respective submodules:
+ *
+ * import {onCall} from "firebase-functions/v2/https";
+ * import {onDocumentWritten} from "firebase-functions/v2/firestore";
+ *
+ * See a full list of supported triggers at https://firebase.google.com/docs/functions
+ */
+
+import {onCall, onRequest} from "firebase-functions/v2/https";
+import * as logger from "firebase-functions/logger";
 import * as admin from "firebase-admin";
-import axios from "axios";
-import { v4 as uuidv4 } from "uuid";
+const {v4: uuidv4} = require("uuid");
 
 admin.initializeApp();
-const db = admin.firestore();
 
-// Toss Payments Secret Key - Firebase 환경 변수에 저장해야 합니다.
-// ex) firebase functions:config:set toss.secret_key="YOUR_SECRET_KEY"
-const TOSS_SECRET_KEY = functions.config().toss.secret_key;
+// Start writing functions
+// https://firebase.google.com/docs/functions/typescript
 
-// 1. 결제 생성 (Callable Function)
-export const createPayment = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      "unauthenticated",
-      "The function must be called while authenticated."
-    );
-  }
+// export const helloWorld = onRequest((request, response) => {
+//   logger.info("Hello logs!", {structuredData: true});
+//   response.send("Hello from Firebase!");
+// });
 
-  const userId = context.auth.uid;
-  const amount = data.amount; // ex: 5000
-  const creditAmount = data.creditAmount; // ex: 5000
+// Toss Payments 관련 인터페이스 정의
+interface PaymentData {
+  orderId: string;
+  userId: string;
+  amount: number;
+  creditAmount: number;
+  status: "pending" | "completed" | "failed";
+  createdAt: admin.firestore.Timestamp;
+  paymentKey?: string;
+  errorCode?: string;
+  errorMessage?: string;
+}
 
-  if (!amount || !creditAmount || amount <= 0) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "The function must be called with a valid 'amount' and 'creditAmount'."
-    );
-  }
-
-  const orderId = `credit_${uuidv4()}`;
-
+// 결제 정보 생성 함수
+export const createPayment = onCall(async (request) => {
   try {
-    await db.collection("payments").doc(orderId).set({
+    const {amount, creditAmount} = request.data;
+    const userId = request.auth?.uid;
+
+    if (!userId) {
+      throw new Error("인증되지 않은 사용자입니다.");
+    }
+
+    if (!amount || !creditAmount || amount <= 0 || creditAmount <= 0) {
+      throw new Error("유효하지 않은 금액입니다.");
+    }
+
+    const orderId = uuidv4();
+    const paymentData: PaymentData = {
+      orderId,
       userId,
       amount,
       creditAmount,
-      orderId,
-      status: "initiated",
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      provider: "toss_payments",
-    });
+      status: "pending",
+      createdAt: admin.firestore.Timestamp.now(),
+    };
 
-    return { orderId };
+    // Firestore에 결제 정보 저장
+    await admin.firestore()
+      .collection("payments")
+      .doc(orderId)
+      .set(paymentData);
+
+    logger.info("Payment created", {orderId, userId, amount, creditAmount});
+
+    return {
+      success: true,
+      orderId,
+    };
   } catch (error) {
-    console.error("Payment creation failed", error);
-    throw new functions.https.HttpsError(
-      "internal",
-      "Could not create payment."
-    );
+    logger.error("Error creating payment", error);
+    throw new Error(`결제 정보 생성 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`);
   }
 });
 
-// 2. 결제 승인 (Callable Function)
-export const approvePayment = functions.https.onCall(async (data, context) => {
-  if (!context.auth) {
-    throw new functions.https.HttpsError(
-      "unauthenticated",
-      "The function must be called while authenticated."
-    );
-  }
-
-  const { orderId, paymentKey } = data;
-
-  if (!orderId || !paymentKey) {
-    throw new functions.https.HttpsError(
-      "invalid-argument",
-      "Missing 'orderId' or 'paymentKey'."
-    );
-  }
-
+// 결제 승인 함수
+export const approvePayment = onCall(async (request) => {
   try {
-    const paymentDocRef = db.collection("payments").doc(orderId);
-    const paymentDoc = await paymentDocRef.get();
+    const {orderId, paymentKey, amount} = request.data;
+    const userId = request.auth?.uid;
+
+    if (!userId) {
+      throw new Error("인증되지 않은 사용자입니다.");
+    }
+
+    if (!orderId || !paymentKey || !amount) {
+      throw new Error("필수 결제 정보가 누락되었습니다.");
+    }
+
+    // Firestore에서 결제 정보 조회
+    const paymentDoc = await admin.firestore()
+      .collection("payments")
+      .doc(orderId)
+      .get();
 
     if (!paymentDoc.exists) {
-      throw new functions.https.HttpsError("not-found", "Payment not found.");
+      throw new Error("결제 정보를 찾을 수 없습니다.");
     }
 
-    const paymentData = paymentDoc.data()!;
+    const paymentData = paymentDoc.data() as PaymentData;
 
-    if (paymentData.status !== "initiated") {
-      throw new functions.https.HttpsError(
-        "failed-precondition",
-        "Payment has already been processed."
-      );
+    if (paymentData.userId !== userId) {
+      throw new Error("권한이 없습니다.");
     }
 
-    // Toss Payments 결제 승인 API 호출
-    const response = await axios.post(
-      `https://api.tosspayments.com/v1/payments/${paymentKey}`,
-      {
-        orderId: orderId,
-        amount: paymentData.amount,
+    if (paymentData.status !== "pending") {
+      throw new Error("이미 처리된 결제입니다.");
+    }
+
+    if (paymentData.amount !== amount) {
+      throw new Error("결제 금액이 일치하지 않습니다.");
+    }
+
+    // Toss Payments API 호출 (실제 결제 승인)
+    const tossSecretKey = "test_sk_zXLkKEypNArWmo50nX3lmeaxYG5R"; // 테스트 키
+    const authHeader = Buffer.from(`${tossSecretKey}:`).toString("base64");
+
+    const tossResponse = await fetch("https://api.tosspayments.com/v1/payments/confirm", {
+      method: "POST",
+      headers: {
+        "Authorization": `Basic ${authHeader}`,
+        "Content-Type": "application/json",
       },
-      {
-        headers: {
-          Authorization: `Basic ${Buffer.from(TOSS_SECRET_KEY + ":").toString("base64")}`,
-          "Content-Type": "application/json",
-        },
-      }
-    );
+      body: JSON.stringify({
+        paymentKey,
+        orderId,
+        amount,
+      }),
+    });
 
-    if (response.data.status === "DONE") {
-      // 결제 성공, 트랜잭션으로 크레딧 지급 및 상태 업데이트
-      await db.runTransaction(async (transaction) => {
-        const userRef = db.collection("users").doc(paymentData.userId);
-        transaction.update(userRef, {
-          credits: admin.firestore.FieldValue.increment(paymentData.creditAmount),
-        });
-        transaction.update(paymentDocRef, {
-          status: "completed",
-          paymentKey: paymentKey,
-          completedAt: admin.firestore.FieldValue.serverTimestamp(),
-        });
-      });
-      return { success: true, message: "Payment approved and credits added." };
-    } else {
-      // 결제 실패
-      await paymentDocRef.update({
-        status: "failed",
-        errorCode: response.data.code,
-        errorMessage: response.data.message,
-      });
-      throw new functions.https.HttpsError("aborted", "Payment approval failed.");
+    const tossResult = await tossResponse.json();
+
+    if (!tossResponse.ok) {
+      logger.error("Toss payment approval failed", tossResult);
+      
+      // 결제 실패 정보 업데이트
+              await admin.firestore()
+          .collection("payments")
+          .doc(orderId)
+          .update({
+            status: "failed",
+            errorCode: tossResult.code,
+            errorMessage: tossResult.message,
+            paymentKey,
+            updatedAt: admin.firestore.Timestamp.now(),
+          });
+
+      throw new Error(`결제 승인 실패: ${tossResult.message}`);
     }
+
+    // 결제 성공 처리
+    await admin.firestore().runTransaction(async (transaction) => {
+      // 사용자 정보 조회
+      const userRef = admin.firestore().collection("users").doc(userId);
+      const userDoc = await transaction.get(userRef);
+
+      if (!userDoc.exists) {
+        throw new Error("사용자 정보를 찾을 수 없습니다.");
+      }
+
+      const userData = userDoc.data();
+      const currentCredits = userData?.credits || 0;
+      const newCredits = currentCredits + paymentData.creditAmount;
+
+      // 사용자 크레딧 업데이트
+      transaction.update(userRef, {
+        credits: newCredits,
+        updatedAt: admin.firestore.Timestamp.now(),
+      });
+
+      // 결제 정보 업데이트
+      transaction.update(paymentDoc.ref, {
+        status: "completed",
+        paymentKey,
+        updatedAt: admin.firestore.Timestamp.now(),
+      });
+    });
+
+    logger.info("Payment approved successfully", {orderId, userId, amount, paymentKey});
+
+    return {
+      success: true,
+      message: "결제가 성공적으로 완료되었습니다.",
+    };
   } catch (error) {
-    console.error("Approve payment failed", error);
-    // 실패 상태 업데이트
-    await db.collection("payments").doc(orderId).update({
-        status: "failed",
-        errorMessage: (error as Error).message,
-      }).catch();
-    throw new functions.https.HttpsError(
-      "internal",
-      "An error occurred while approving the payment."
-    );
+    logger.error("Error approving payment", error);
+    throw new Error(`결제 승인 실패: ${error instanceof Error ? error.message : "알 수 없는 오류"}`);
   }
 });
 
-// 3. 토스페이먼츠 웹훅 처리 (HTTP-triggered Function)
-export const handleTossWebhook = functions.https.onRequest(async (req, res) => {
-    // TODO: Implement Toss Payments webhook signature verification for security
-    // const signature = req.headers["tosspayments-signature"];
-    // ... verification logic ...
-
-    const event = req.body;
-
-    if (event.eventType === "PAYMENT_STATUS_CHANGED") {
-        const { orderId, status } = event.data;
-
-        if (status === "DONE") {
-            try {
-                const paymentDocRef = db.collection("payments").doc(orderId);
-                
-                await db.runTransaction(async (transaction) => {
-                    const paymentDoc = await transaction.get(paymentDocRef);
-                    if (!paymentDoc.exists || paymentDoc.data()!.status !== 'initiated') {
-                        // 이미 처리되었거나 존재하지 않는 결제
-                        return;
-                    }
-                    
-                    const paymentData = paymentDoc.data()!;
-                    const userRef = db.collection("users").doc(paymentData.userId);
-
-                    // 크레딧 지급 및 상태 업데이트
-                    transaction.update(userRef, {
-                        credits: admin.firestore.FieldValue.increment(paymentData.creditAmount),
-                    });
-                    transaction.update(paymentDocRef, {
-                        status: "completed",
-                        paymentKey: event.data.paymentKey, // 웹훅에서 받은 paymentKey 사용
-                        completedAt: admin.firestore.FieldValue.serverTimestamp(),
-                    });
-                });
-                console.log(`Webhook: Payment ${orderId} processed successfully.`);
-            } catch (error) {
-                console.error(`Webhook: Error processing payment ${orderId}`, error);
-                res.status(500).send("Internal Server Error");
-                return;
-            }
-        }
+// Toss Payments 웹훅 처리 함수
+export const handleTossWebhook = onRequest(async (req, res) => {
+  try {
+    if (req.method !== "POST") {
+      res.status(405).send("Method Not Allowed");
+      return;
     }
 
-    res.status(200).send("Webhook received");
+    const webhookData = req.body;
+    logger.info("Toss webhook received", webhookData);
+
+    // 웹훅 데이터 검증 및 처리 로직
+    if (webhookData.eventType === "PAYMENT_STATUS_CHANGED") {
+      const {orderId, status, paymentKey} = webhookData.data;
+
+      if (status === "DONE") {
+        // 결제 완료 처리 (이미 approvePayment에서 처리되므로 로그만 남김)
+        logger.info("Payment completed via webhook", {orderId, paymentKey});
+      } else if (status === "CANCELED" || status === "PARTIAL_CANCELED") {
+        // 결제 취소 처리
+        await admin.firestore()
+          .collection("payments")
+          .doc(orderId)
+          .update({
+            status: "failed",
+            errorCode: "CANCELED",
+            errorMessage: "결제가 취소되었습니다.",
+            updatedAt: admin.firestore.Timestamp.now(),
+          });
+
+        logger.info("Payment canceled via webhook", {orderId, paymentKey});
+      }
+    }
+
+    res.status(200).send("OK");
+  } catch (error) {
+    logger.error("Error handling Toss webhook", error);
+    res.status(500).send("Internal Server Error");
+  }
 });
+
+export {
+  sendFCMMessage,
+  sendScheduledEvaluationNotifications,
+  processExpiredEvaluations,
+  updateFCMToken
+} from './fcm';

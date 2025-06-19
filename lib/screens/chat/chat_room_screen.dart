@@ -7,6 +7,7 @@ import 'package:lol_custom_game_manager/models/models.dart';
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 import 'package:lol_custom_game_manager/providers/chat_provider.dart';
 import 'package:lol_custom_game_manager/services/chat_service.dart';
+import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:lol_custom_game_manager/widgets/error_view.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:lol_custom_game_manager/services/firebase_service.dart';
@@ -86,8 +87,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       _scrollToBottom();
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('메시지 전송 실패: $e')),
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('전송 실패'),
+            content: Text('메시지 전송에 실패했습니다: $e'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('확인'),
+              ),
+            ],
+          ),
         );
       }
     } finally {
@@ -116,40 +127,90 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     final currentUser = Provider.of<AppStateProvider>(context, listen: false).currentUser;
     if (currentUser == null) return;
 
+    final chatRoom = await _chatRoomFuture;
+    final tournament = chatRoom.tournamentId != null
+        ? await FirebaseService().getTournament(chatRoom.tournamentId!)
+        : null;
+
+    bool isHost = tournament != null && tournament.hostId == currentUser.uid;
+
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('채팅방 나가기'),
-        content: const Text('채팅방을 나가면 채팅 목록에서 사라집니다. 정말 나가시겠습니까?'),
+        title: Text(isHost ? '토너먼트 삭제' : '채팅방 나가기'),
+        content: Text(isHost
+            ? '주최자는 토너먼트를 삭제 후 채팅방을 나갈 수 있습니다. 토너먼트를 삭제하시겠습니까?'
+            : '채팅방을 나가면 채팅 목록에서 사라집니다. 정말 나가시겠습니까?'),
         actions: [
           TextButton(onPressed: () => Navigator.of(context).pop(false), child: const Text('취소')),
           TextButton(
             onPressed: () => Navigator.of(context).pop(true),
-            child: const Text('나가기', style: TextStyle(color: Colors.red)),
+            child: Text(isHost ? '삭제' : '나가기', style: const TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
 
     if (confirmed == true && mounted) {
-      final chatRoom = await _chatRoomFuture;
-      if (chatRoom.type == ChatRoomType.tournamentRecruitment && chatRoom.tournamentId != null) {
-        // 토너먼트 채팅방이면 토너먼트 나가기 로직 호출
+      try {
         final appState = Provider.of<AppStateProvider>(context, listen: false);
-        final tournament = await FirebaseService().getTournament(chatRoom.tournamentId!);
-        if (tournament != null) {
+        if (isHost && tournament != null) {
+          // 주최자인 경우 토너먼트 삭제
+          await appState.deleteTournament(tournament.id);
+          if (mounted) {
+            // 성공 메시지는 AlertDialog보다는 SnackBar가 더 적합할 수 있으나, 일관성을 위해 변경
+            showDialog(
+              context: context,
+              builder: (context) => AlertDialog(
+                title: const Text('알림'),
+                content: const Text('토너먼트가 성공적으로 취소되었습니다.'),
+                actions: [
+                  TextButton(
+                    onPressed: () => Navigator.of(context).pop(),
+                    child: const Text('확인'),
+                  ),
+                ],
+              ),
+            );
+            context.go('/main'); // 삭제 완료 후 메인 화면으로 이동
+          }
+        } else if (chatRoom.type == ChatRoomType.tournamentRecruitment && tournament != null) {
+          // 일반 참가자인 경우 토너먼트에서 나가기
           final userRole = tournament.participantsByRole.entries
               .firstWhere((entry) => entry.value.contains(currentUser.uid), orElse: () => const MapEntry('', <String>[]))
               .key;
           if (userRole.isNotEmpty) {
-            await appState.leaveTournamentByRole(tournamentId: tournament.id, role: userRole);
+            // 토너먼트 채팅방에서 나가기 처리 (채팅방 + 토너먼트 모두 처리)
+            await _chatService.leaveTournamentChatRoom(
+              widget.chatRoomId,
+              tournament.id,
+              currentUser,
+              userRole
+            );
           }
+          context.pop(); // 현재 채팅방 화면 닫기
+        } else {
+          // 일반 채팅방 나가기
+          await _chatService.leaveChatRoom(widget.chatRoomId, currentUser.uid);
+          context.pop(); // 현재 채팅방 화면 닫기
         }
-      } else {
-        // 일반 채팅방 나가기
-        await _chatService.leaveChatRoom(widget.chatRoomId, currentUser.uid);
+      } catch (e) {
+        if (mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              title: const Text('오류'),
+              content: Text('처리 중 오류가 발생했습니다: $e'),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  child: const Text('확인'),
+                ),
+              ],
+            ),
+          );
+        }
       }
-      context.pop(); // 현재 채팅방 화면 닫기
     }
   }
   
@@ -866,4 +927,4 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         return Colors.grey;
     }
   }
-} 
+}

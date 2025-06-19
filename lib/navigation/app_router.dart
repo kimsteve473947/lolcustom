@@ -15,22 +15,27 @@ import 'package:lol_custom_game_manager/screens/clans/clan_public_profile_screen
 import 'package:lol_custom_game_manager/screens/clans/clan_management_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_recruitment_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_recruitment_list_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_search_screen.dart';
 import 'package:lol_custom_game_manager/providers/clan_recruitment_provider.dart';
 import 'package:lol_custom_game_manager/screens/main_screen.dart';
 import 'package:provider/provider.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_detail_screen.dart';
 import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_edit_screen.dart';
+import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_register_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/my_page_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/edit_profile_screen.dart';
 import 'package:lol_custom_game_manager/screens/rankings/rankings_screen.dart';
 import 'package:lol_custom_game_manager/screens/settings/fcm_test_screen.dart';
 import 'package:lol_custom_game_manager/screens/splash_screen.dart';
+import 'package:lol_custom_game_manager/screens/my_page/credit_charge_screen.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/tournament_detail_screen.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_screen.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/create_tournament_screen.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
 import 'package:lol_custom_game_manager/widgets/admin_tools.dart';
 import 'package:lol_custom_game_manager/screens/profile/user_profile_screen.dart';
+import 'package:lol_custom_game_manager/screens/evaluation/evaluation_screen.dart';
+import 'package:lol_custom_game_manager/screens/my_page/participant_trust_detail_screen.dart';
 
 class AppRouter {
   final AuthService authService;
@@ -91,6 +96,19 @@ class AppRouter {
         },
       ),
       GoRoute(
+        path: '/mercenaries/register',
+        builder: (context, state) {
+          return const MercenaryRegisterScreen();
+        },
+      ),
+      GoRoute(
+        path: '/mercenaries/edit/:id',
+        builder: (context, state) {
+          final mercenaryId = state.pathParameters['id']!;
+          return MercenaryRegisterScreen(mercenaryId: mercenaryId);
+        },
+      ),
+      GoRoute(
         path: '/mercenaries/:id',
         builder: (context, state) {
           final userId = state.pathParameters['id']!;
@@ -117,6 +135,10 @@ class AppRouter {
       GoRoute(
         path: '/clans/recruitment-list',
         builder: (context, state) => const ClanRecruitmentListScreen(),
+      ),
+      GoRoute(
+        path: '/clans/search',
+        builder: (context, state) => const ClanSearchScreen(),
       ),
       GoRoute(
         path: '/clans/:id',
@@ -163,6 +185,14 @@ class AppRouter {
             path: 'edit-profile',
             builder: (context, state) => const EditProfileScreen(),
           ),
+          GoRoute(
+            path: 'credit-charge',
+            builder: (context, state) => const CreditChargeScreen(),
+          ),
+          GoRoute(
+            path: 'participant-trust',
+            builder: (context, state) => const ParticipantTrustDetailScreen(),
+          ),
         ]
       ),
       GoRoute(
@@ -178,6 +208,17 @@ class AppRouter {
         builder: (context, state) {
           final userId = state.pathParameters['userId']!;
           return UserProfileScreen(userId: userId);
+        },
+      ),
+      GoRoute(
+        path: '/evaluation/:tournamentId',
+        builder: (context, state) {
+          final tournamentId = state.pathParameters['tournamentId']!;
+          final isHost = state.uri.queryParameters['isHost'] == 'true';
+          return EvaluationScreen(
+            tournamentId: tournamentId,
+            isHost: isHost,
+          );
         },
       ),
     ],

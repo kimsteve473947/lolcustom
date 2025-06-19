@@ -42,6 +42,15 @@ class UserModel extends Equatable {
   final String? clanId;
   final List<String>? friends;
   final String? statusMessage;
+  
+  // Trust Score fields
+  final double hostScore;
+  final double playerScore;
+  final double evaluationRate;
+  final Timestamp? lastEvaluated;
+  
+  // Competitive Stats fields
+  final Map<String, dynamic>? competitiveStats;
 
   const UserModel({
     required this.uid,
@@ -64,6 +73,11 @@ class UserModel extends Equatable {
     this.clanId,
     this.friends,
     this.statusMessage,
+    this.hostScore = 80.0,
+    this.playerScore = 80.0,
+    this.evaluationRate = 0.0,
+    this.lastEvaluated,
+    this.competitiveStats,
   });
 
   // 파이어스토어에서 데이터 불러오기
@@ -103,6 +117,11 @@ class UserModel extends Equatable {
       clanId: data['clanId'] as String?,
       friends: List<String>.from(data['friends'] ?? []),
       statusMessage: data['statusMessage'] as String?,
+      hostScore: data['hostScore'] != null ? (data['hostScore'] as num).toDouble() : 80.0,
+      playerScore: data['playerScore'] != null ? (data['playerScore'] as num).toDouble() : 80.0,
+      evaluationRate: data['evaluationRate'] != null ? (data['evaluationRate'] as num).toDouble() : 0.0,
+      lastEvaluated: data['lastEvaluated'] as Timestamp?,
+      competitiveStats: data['competitiveStats'] as Map<String, dynamic>?,
     );
   }
 
@@ -128,6 +147,11 @@ class UserModel extends Equatable {
       'clanId': clanId,
       'friends': friends,
       'statusMessage': statusMessage,
+      'hostScore': hostScore,
+      'playerScore': playerScore,
+      'evaluationRate': evaluationRate,
+      'lastEvaluated': lastEvaluated,
+      'competitiveStats': competitiveStats,
     };
   }
   
@@ -211,6 +235,11 @@ class UserModel extends Equatable {
     String? clanId,
     List<String>? friends,
     String? statusMessage,
+    double? hostScore,
+    double? playerScore,
+    double? evaluationRate,
+    Timestamp? lastEvaluated,
+    Map<String, dynamic>? competitiveStats,
   }) {
     return UserModel(
       uid: uid ?? this.uid,
@@ -233,6 +262,11 @@ class UserModel extends Equatable {
       clanId: clanId ?? this.clanId,
       friends: friends ?? this.friends,
       statusMessage: statusMessage ?? this.statusMessage,
+      hostScore: hostScore ?? this.hostScore,
+      playerScore: playerScore ?? this.playerScore,
+      evaluationRate: evaluationRate ?? this.evaluationRate,
+      lastEvaluated: lastEvaluated ?? this.lastEvaluated,
+      competitiveStats: competitiveStats ?? this.competitiveStats,
     );
   }
 
@@ -258,5 +292,10 @@ class UserModel extends Equatable {
         clanId,
         friends,
         statusMessage,
+        hostScore,
+        playerScore,
+        evaluationRate,
+        lastEvaluated,
+        competitiveStats,
       ];
 }

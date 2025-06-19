@@ -5,6 +5,9 @@ export 'application_model.dart';
 export 'chat_model.dart';
 export 'rating_model.dart';
 export 'direct_message_model.dart';
+export 'duo_post_model.dart';
+export 'payment_model.dart';
+export 'evaluation_model.dart';
 
 // Simple model definitions for missing classes
 // ClanModel - 클랜 관련 모델
@@ -39,4 +42,4 @@ class NotificationModel {
     this.isRead = false,
     required this.createdAt,
   });
-} 
+}

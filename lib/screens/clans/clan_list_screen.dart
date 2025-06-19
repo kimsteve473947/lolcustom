@@ -135,142 +135,153 @@ class _ClanListScreenState extends State<ClanListScreen> {
   }
   
   Widget _buildHeroSection() {
-    return Stack(
-      children: [
-        // Background with gradient
-        Container(
-          height: 300,
-          width: double.infinity,
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                AppColors.primary,
-                AppColors.primary.withOpacity(0.7),
-              ],
-            ),
-          ),
-          // Dark overlay for better text visibility
-          child: Container(
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: [
-                  Colors.black.withOpacity(0.3),
-                  Colors.black.withOpacity(0.5),
-                ],
-              ),
-            ),
-          ),
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary,
+            AppColors.primaryLight,
+          ],
         ),
-        
-        // App bar elements
-        Positioned(
-          top: 40,
-          left: 0,
-          right: 0,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16.0),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                const Text(
-                  '팀',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Row(
+      ),
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.only(bottom: 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 상단 네비게이션
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20.0, vertical: 12.0),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
-                    // 임시 데이터 초기화 버튼
-                    IconButton(
-                      icon: const Icon(Icons.delete_forever, color: Colors.red),
-                      onPressed: () async {
-                        await _clanService.removeAllClanDataFromUsers();
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('모든 유저의 클랜 데이터가 초기화되었습니다.')),
-                        );
-                        _loadUserClan(); // UI 새로고침
-                      },
-                      tooltip: '모든 유저 클랜 데이터 삭제',
+                    const Text(
+                      '클랜',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.w700,
+                      ),
                     ),
-                    IconButton(
-                      icon: const Icon(Icons.search, color: Colors.white),
-                      onPressed: () {
-                        context.push('/clans/search');
-                      },
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.notifications_outlined, color: Colors.white),
-                      onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('알림 기능은 준비 중입니다')),
-                        );
-                      },
+                    Row(
+                      children: [
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(Icons.search, color: Colors.white, size: 22),
+                            onPressed: () {
+                              context.push('/clans/search');
+                            },
+                            padding: const EdgeInsets.all(8),
+                            constraints: const BoxConstraints(),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Container(
+                          decoration: BoxDecoration(
+                            color: Colors.white.withOpacity(0.2),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: IconButton(
+                            icon: const Icon(Icons.notifications_outlined, color: Colors.white, size: 22),
+                            onPressed: () {
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(
+                                  content: const Text('알림 기능은 준비 중입니다'),
+                                  backgroundColor: AppColors.info,
+                                  behavior: SnackBarBehavior.floating,
+                                  shape: RoundedRectangleBorder(
+                                    borderRadius: BorderRadius.circular(12),
+                                  ),
+                                ),
+                              );
+                            },
+                            padding: const EdgeInsets.all(8),
+                            constraints: const BoxConstraints(),
+                          ),
+                        ),
+                      ],
                     ),
                   ],
                 ),
-              ],
-            ),
-          ),
-        ),
-        
-        // Hero content
-        Positioned(
-          bottom: 40,
-          left: 24,
-          right: 24,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                _userClan != null
-                    ? _isUserClanOwner
-                        ? '내 클랜을 관리해보세요'
-                        : '클랜 활동을 즐겨보세요'
-                    : '우리 팀의 역사가 시작돼요',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
+              ),
+              
+              const SizedBox(height: 40),
+              
+              // Hero 콘텐츠
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      _userClan != null
+                          ? _isUserClanOwner
+                              ? '클랜을 성장시켜보세요'
+                              : '함께 성장하는 클랜'
+                          : '나만의 클랜을 만들어보세요',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 26,
+                        fontWeight: FontWeight.w700,
+                        height: 1.3,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      _userClan != null
+                          ? '멤버들과 함께 더 높은 곳으로'
+                          : '동료들과 함께 시작하는 여정',
+                      style: TextStyle(
+                        color: Colors.white.withOpacity(0.9),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: 24),
+                    if (_userClan == null)
+                      ElevatedButton(
+                        onPressed: () {
+                          context.push('/clans/create');
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          foregroundColor: AppColors.primary,
+                          elevation: 0,
+                          minimumSize: const Size(160, 48),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(24),
+                          ),
+                        ),
+                        child: const Text(
+                          '클랜 만들기',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ),
-              const SizedBox(height: 24),
-              if (_userClan == null)
-                ElevatedButton(
-                  onPressed: () {
-                    // 팀 생성의 첫 화면으로 이동 (기본 정보 입력 화면)
-                    context.push('/clans/create');
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.white,
-                    foregroundColor: AppColors.primary,
-                    minimumSize: const Size(150, 50),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(25),
-                    ),
-                  ),
-                  child: const Text(
-                    '클랜 만들기',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
             ],
           ),
         ),
-      ],
+      ),
     );
   }
   
   Widget _buildUserClanSection(ClanModel clan, bool isOwner) {
-    return Padding(
+    return Container(
+      color: AppColors.backgroundGrey,
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -282,15 +293,20 @@ class _ClanListScreenState extends State<ClanListScreen> {
                 '내 클랜',
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
                 ),
               ),
               if (isOwner)
-                TextButton(
+                TextButton.icon(
                   onPressed: () {
                     context.push('/clan/${clan.id}/manage');
                   },
-                  child: const Text('관리하기'),
+                  icon: const Icon(Icons.settings_rounded, size: 18),
+                  label: const Text('관리'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                  ),
                 ),
             ],
           ),
@@ -300,87 +316,161 @@ class _ClanListScreenState extends State<ClanListScreen> {
               debugPrint('클랜 상세 페이지로 이동: ${clan.id}');
               context.push('/clans/${clan.id}');
             },
+            borderRadius: BorderRadius.circular(20),
             child: Container(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: Colors.white,
-                borderRadius: BorderRadius.circular(16),
+                color: AppColors.backgroundCard,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(
+                  color: AppColors.border,
+                  width: 1,
+                ),
                 boxShadow: [
                   BoxShadow(
-                    color: Colors.grey.withOpacity(0.2),
-                    spreadRadius: 1,
-                    blurRadius: 4,
-                    offset: const Offset(0, 2),
+                    color: AppColors.shadowLight,
+                    blurRadius: 20,
+                    offset: const Offset(0, 4),
                   ),
                 ],
               ),
-              child: Row(
+              child: Column(
                 children: [
-                  _buildClanEmblem(clan),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          clan.name,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.bold,
+                  Row(
+                    children: [
+                      Container(
+                        width: 72,
+                        height: 72,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: AppColors.primary.withOpacity(0.2),
+                            width: 3,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Text(
-                          '멤버: ${clan.memberCount}/${clan.maxMembers}명',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
+                        child: _buildClanEmblem(clan),
+                      ),
+                      const SizedBox(width: 20),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: isOwner ? Colors.amber.withOpacity(0.2) : Colors.blue.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
-                              ),
-                              child: Text(
-                                isOwner ? '클랜장' : '클랜원',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: isOwner ? Colors.amber[800] : Colors.blue[800],
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    clan.name,
+                                    style: const TextStyle(
+                                      fontSize: 20,
+                                      fontWeight: FontWeight.w700,
+                                      color: AppColors.textPrimary,
+                                    ),
+                                  ),
                                 ),
-                              ),
+                                Icon(
+                                  Icons.chevron_right_rounded,
+                                  color: AppColors.textTertiary,
+                                ),
+                              ],
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                              decoration: BoxDecoration(
-                                color: Colors.green.withOpacity(0.2),
-                                borderRadius: BorderRadius.circular(12),
+                            const SizedBox(height: 6),
+                            Text(
+                              '${clan.description}',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: AppColors.textSecondary,
                               ),
-                              child: Text(
-                                '멤버 ${clan.memberCount}/${clan.maxMembers}명',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: Colors.green[800],
-                                ),
-                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
                             ),
                           ],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  // 통계 정보
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: AppColors.backgroundGrey,
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        _buildStatItem(
+                          icon: Icons.people_rounded,
+                          value: '${clan.memberCount}',
+                          label: '멤버',
+                          color: AppColors.primary,
+                        ),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: AppColors.divider,
+                        ),
+                        _buildStatItem(
+                          icon: Icons.military_tech_rounded,
+                          value: isOwner ? '클랜장' : '클랜원',
+                          label: '내 역할',
+                          color: isOwner ? AppColors.warning : AppColors.info,
+                        ),
+                        Container(
+                          width: 1,
+                          height: 40,
+                          color: AppColors.divider,
+                        ),
+                        _buildStatItem(
+                          icon: Icons.trending_up_rounded,
+                          value: clan.focus == ClanFocus.casual ? '친목' : 
+                                 clan.focus == ClanFocus.competitive ? '실력' : '균형',
+                          label: '성향',
+                          color: AppColors.success,
                         ),
                       ],
                     ),
                   ),
-                  const Icon(Icons.chevron_right),
                 ],
               ),
             ),
           ),
         ],
       ),
+    );
+  }
+  
+  Widget _buildStatItem({
+    required IconData icon,
+    required String value,
+    required String label,
+    required Color color,
+  }) {
+    return Column(
+      children: [
+        Icon(
+          icon,
+          color: color,
+          size: 24,
+        ),
+        const SizedBox(height: 8),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          label,
+          style: TextStyle(
+            fontSize: 12,
+            color: AppColors.textSecondary,
+          ),
+        ),
+      ],
     );
   }
   
@@ -516,88 +606,102 @@ class _ClanListScreenState extends State<ClanListScreen> {
       },
       child: Container(
         margin: const EdgeInsets.only(left: 8, right: 8, bottom: 8),
-        width: 160,
+        width: 180,
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
+          color: AppColors.backgroundCard,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: AppColors.border,
+            width: 1,
+          ),
           boxShadow: [
             BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 1,
-              blurRadius: 4,
-              offset: const Offset(0, 2),
+              color: AppColors.shadowLight,
+              blurRadius: 12,
+              offset: const Offset(0, 4),
             ),
           ],
         ),
         child: Column(
-          crossAxisAlignment: CrossAxisAlignment.center,
-          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            const SizedBox(height: 16),
-            _buildClanEmblem(clan),
-            const SizedBox(height: 12),
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 8.0),
-              child: Text(
-                clan.name,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+            // 상단 색상 배너
+            Container(
+              height: 8,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
                 ),
-                overflow: TextOverflow.ellipsis,
-                maxLines: 1,
               ),
             ),
-            const SizedBox(height: 4),
-            Text(
-              '멤버: ${clan.memberCount}/${clan.maxMembers}명',
-              style: TextStyle(
-                color: Colors.grey[600],
-                fontSize: 12,
-              ),
-              overflow: TextOverflow.ellipsis,
-              maxLines: 1,
-            ),
-            const SizedBox(height: 8),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildFocusBadge(clan.focus),
-                const SizedBox(width: 4),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: AppColors.primary.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(10),
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                children: [
+                  _buildClanEmblem(clan),
+                  const SizedBox(height: 12),
+                  Text(
+                    clan.name,
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w700,
+                      fontSize: 16,
+                      color: AppColors.textPrimary,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
                   ),
-                  child: Text(
-                    '${clan.memberCount}/${clan.maxMembers}명',
+                  const SizedBox(height: 4),
+                  Text(
+                    '멤버 ${clan.memberCount}/${clan.maxMembers}',
                     style: TextStyle(
-                      color: AppColors.primary,
-                      fontSize: 10,
-                      fontWeight: FontWeight.w500,
+                      color: AppColors.textSecondary,
+                      fontSize: 13,
                     ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-              decoration: BoxDecoration(
-                color: Colors.green.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(20),
+                  const SizedBox(height: 12),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      _buildFocusBadge(clan.focus),
+                      const SizedBox(width: 8),
+                      if (clan.isRecruiting)
+                        Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: AppColors.success.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Container(
+                                width: 5,
+                                height: 5,
+                                decoration: BoxDecoration(
+                                  color: AppColors.success,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '모집중',
+                                style: TextStyle(
+                                  color: AppColors.success,
+                                  fontSize: 11,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
-              child: const Text(
-                '클랜 가입',
-                style: TextStyle(
-                  color: Colors.green,
-                  fontSize: 12,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
             ),
-            const SizedBox(height: 4),
           ],
         ),
       ),
@@ -607,60 +711,106 @@ class _ClanListScreenState extends State<ClanListScreen> {
   Widget _buildFocusBadge(ClanFocus focus) {
     Color color;
     String label;
+    IconData icon;
     
     switch (focus) {
       case ClanFocus.casual:
-        color = Colors.green;
+        color = AppColors.success;
         label = '친목';
+        icon = Icons.favorite_rounded;
         break;
       case ClanFocus.competitive:
-        color = Colors.red;
+        color = AppColors.error;
         label = '실력';
+        icon = Icons.local_fire_department_rounded;
         break;
       case ClanFocus.balanced:
-        color = Colors.blue;
+        color = AppColors.info;
         label = '균형';
+        icon = Icons.balance_rounded;
         break;
     }
     
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
         color: color.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(10),
+        borderRadius: BorderRadius.circular(8),
       ),
-      child: Text(
-        label,
-        style: TextStyle(
-          color: color,
-          fontSize: 10,
-          fontWeight: FontWeight.w500,
-        ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            size: 12,
+            color: color,
+          ),
+          const SizedBox(width: 4),
+          Text(
+            label,
+            style: TextStyle(
+              color: color,
+              fontSize: 11,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
       ),
     );
   }
 
   Widget _buildClanTournamentsSection() {
-    return Padding(
+    return Container(
+      color: AppColors.backgroundGrey,
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            '팀 활동',
+            '클랜 활동',
             style: TextStyle(
               fontSize: 20,
-              fontWeight: FontWeight.bold,
-              ),
+              fontWeight: FontWeight.w700,
+              color: AppColors.textPrimary,
             ),
-            const SizedBox(height: 24),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '다양한 활동으로 클랜을 성장시켜보세요',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 24),
           Row(
             children: [
-              Expanded(child: _buildActivityCard('클랜 토너먼트', Icons.emoji_events, Colors.green)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildActivityCard('게스트 모집', Icons.person_add, Colors.blue)),
-              const SizedBox(width: 16),
-              Expanded(child: _buildActivityCard('클랜가입', Icons.group_add, Colors.purple)),
+              Expanded(
+                child: _buildActivityCard(
+                  '클랜 토너먼트',
+                  Icons.emoji_events_rounded,
+                  AppColors.warning,
+                  '준비중',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActivityCard(
+                  '게스트 모집',
+                  Icons.person_add_rounded,
+                  AppColors.info,
+                  '준비중',
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: _buildActivityCard(
+                  '클랜 찾기',
+                  Icons.group_add_rounded,
+                  AppColors.primary,
+                  null,
+                ),
+              ),
             ],
           ),
         ],
@@ -668,45 +818,81 @@ class _ClanListScreenState extends State<ClanListScreen> {
     );
   }
 
-  Widget _buildActivityCard(String title, IconData icon, Color color) {
+  Widget _buildActivityCard(String title, IconData icon, Color color, String? badge) {
     return GestureDetector(
       onTap: () {
-        if (title == '클랜가입') {
+        if (title == '클랜 찾기') {
           context.push('/clans/recruitment-list');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('$title 기능은 준비 중입니다')),
+            SnackBar(
+              content: Text('$title 기능은 준비 중입니다'),
+              backgroundColor: AppColors.info,
+              behavior: SnackBarBehavior.floating,
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+            ),
           );
         }
       },
       child: Container(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 12),
         decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(15),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.grey.withOpacity(0.2),
-              spreadRadius: 1,
-              blurRadius: 4,
-              offset: const Offset(0, 2),
-            ),
-          ],
+          color: AppColors.backgroundCard,
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: AppColors.border,
+            width: 1,
+          ),
         ),
         child: Column(
           children: [
-            Icon(
-              icon,
-              size: 40,
-              color: color,
+            Stack(
+              alignment: Alignment.topRight,
+              children: [
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: color.withOpacity(0.1),
+                    shape: BoxShape.circle,
+                  ),
+                  child: Icon(
+                    icon,
+                    size: 24,
+                    color: color,
+                  ),
+                ),
+                if (badge != null)
+                  Transform.translate(
+                    offset: const Offset(8, -8),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: AppColors.textTertiary,
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        badge,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             const SizedBox(height: 12),
             Text(
               title,
               textAlign: TextAlign.center,
               style: const TextStyle(
-                fontWeight: FontWeight.w500,
-                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+                color: AppColors.textPrimary,
               ),
             ),
           ],
@@ -716,84 +902,58 @@ class _ClanListScreenState extends State<ClanListScreen> {
   }
 
   Widget _buildApplicationHistorySection() {
-    return Padding(
+    return AnimatedContainer(
+      duration: const Duration(milliseconds: 300),
       padding: const EdgeInsets.all(24.0),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 토스 스타일의 섹션 헤더
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
               const Text(
-                '클랜신청 내역',
+                '진행중인 신청',
                 style: TextStyle(
                   fontSize: 20,
-                  fontWeight: FontWeight.bold,
+                  fontWeight: FontWeight.w700,
+                  color: AppColors.textPrimary,
                 ),
               ),
-              IconButton(
-                icon: const Icon(Icons.chevron_right),
-        onPressed: () {
-                  context.push('/applications');
-                },
-              ),
+              // 더보기 버튼 제거 (진행중인 것만 보여주므로 불필요)
             ],
           ),
-          const SizedBox(height: 16),
+          const SizedBox(height: 20),
           StreamBuilder<List<ClanApplicationModel>>(
             stream: _clanService.getUserApplications(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
-                  child: CircularProgressIndicator(),
+                  child: Padding(
+                    padding: EdgeInsets.all(32.0),
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.primary),
+                    ),
+                  ),
                 );
               }
               
               if (snapshot.hasError) {
-                return Center(
-                  child: Text('오류가 발생했습니다: ${snapshot.error}'),
-                );
-              }
-              
-              final applications = snapshot.data ?? [];
-              
-              if (applications.isEmpty) {
                 return Container(
                   padding: const EdgeInsets.all(24),
                   decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(15),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.grey.withOpacity(0.2),
-                        spreadRadius: 1,
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+                    color: AppColors.error.withOpacity(0.05),
+                    borderRadius: BorderRadius.circular(16),
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.center,
+                  child: Row(
                     children: [
-                      Icon(
-                        Icons.inbox,
-                        size: 48,
-                        color: Colors.grey[400],
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '아직 가입 신청 내역이 없습니다',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: Colors.grey[700],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '클랜에 가입 신청을 하면 여기에 표시됩니다',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: Colors.grey[500],
+                      Icon(Icons.error_outline, color: AppColors.error),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          '신청 내역을 불러오는 중 오류가 발생했습니다',
+                          style: TextStyle(color: AppColors.error),
                         ),
                       ),
                     ],
@@ -801,14 +961,31 @@ class _ClanListScreenState extends State<ClanListScreen> {
                 );
               }
               
-              // 최근 3개의 신청 내역만 표시
-              final recentApplications = applications.length > 3 
-                  ? applications.sublist(0, 3) 
-                  : applications;
+              // pending 상태인 신청만 필터링
+              final applications = snapshot.data ?? [];
+              final pendingApplications = applications
+                  .where((app) => app.status == ClanApplicationStatus.pending)
+                  .toList();
+              
+              if (pendingApplications.isEmpty) {
+                return _buildEmptyStateWidget();
+              }
               
               return Column(
-                children: recentApplications.map((application) {
-                  return _buildApplicationItem(application);
+                children: pendingApplications.map((application) {
+                  return TweenAnimationBuilder<double>(
+                    duration: const Duration(milliseconds: 300),
+                    tween: Tween(begin: 0.0, end: 1.0),
+                    builder: (context, value, child) {
+                      return Transform.translate(
+                        offset: Offset(0, 20 * (1 - value)),
+                        child: Opacity(
+                          opacity: value,
+                          child: _buildApplicationItem(application),
+                        ),
+                      );
+                    },
+                  );
                 }).toList(),
               );
             },
@@ -818,118 +995,235 @@ class _ClanListScreenState extends State<ClanListScreen> {
     );
   }
   
+  Widget _buildEmptyStateWidget() {
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 48, horizontal: 24),
+      decoration: BoxDecoration(
+        color: AppColors.backgroundGrey,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: AppColors.borderLight,
+          width: 1,
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.white,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: AppColors.shadow,
+                  blurRadius: 20,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: Icon(
+              Icons.group_add_outlined,
+              size: 32,
+              color: AppColors.textTertiary,
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            '진행중인 신청이 없어요',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '새로운 클랜을 찾아 신청해보세요',
+            style: TextStyle(
+              fontSize: 14,
+              color: AppColors.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 24),
+          OutlinedButton.icon(
+            onPressed: () {
+              // 클랜 찾기 화면으로 이동
+              context.push('/clans/recruitment-list');
+            },
+            icon: const Icon(Icons.search, size: 18),
+            label: const Text('클랜 찾아보기'),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.primary,
+              side: BorderSide(color: AppColors.primary, width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(12),
+              ),
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
   Widget _buildApplicationItem(ClanApplicationModel application) {
-    Color statusColor;
-    String statusText;
-    
-    switch (application.status) {
-      case ClanApplicationStatus.pending:
-        statusColor = Colors.amber;
-        statusText = '검토중';
-        break;
-      case ClanApplicationStatus.accepted:
-        statusColor = Colors.green;
-        statusText = '승인됨';
-        break;
-      case ClanApplicationStatus.rejected:
-        statusColor = Colors.red;
-        statusText = '거절됨';
-        break;
-      case ClanApplicationStatus.cancelled:
-        statusColor = Colors.grey;
-        statusText = '취소됨';
-        break;
-    }
-    
     return FutureBuilder<ClanModel?>(
       future: _clanService.getClan(application.clanId),
       builder: (context, snapshot) {
         final clan = snapshot.data;
         
-        return InkWell(
-          onTap: () {
-            if (application.status == ClanApplicationStatus.pending) {
-              _showCancelApplicationDialog(application);
-            }
-          },
-          child: Container(
-            margin: const EdgeInsets.only(bottom: 12),
-            padding: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: Colors.white,
-              borderRadius: BorderRadius.circular(12),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.grey.withOpacity(0.1),
-                  spreadRadius: 1,
-                  blurRadius: 3,
-                  offset: const Offset(0, 1),
-                ),
-              ],
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          decoration: BoxDecoration(
+            color: AppColors.backgroundCard,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.border,
+              width: 1,
             ),
-            child: Row(
-              children: [
-                if (clan != null)
-                  _buildClanEmblem(clan)
-                else
-                  Container(
-                    width: 50,
-                    height: 50,
-                    decoration: BoxDecoration(
-                      color: Colors.grey[200],
-                      shape: BoxShape.circle,
-                    ),
-                    child: const Center(
-                      child: Icon(
-                        Icons.sports_soccer,
-                        color: Colors.grey,
-                      ),
-                    ),
-                  ),
-                const SizedBox(width: 16),
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        clan?.name ?? '불러오는 중...',
-                        style: const TextStyle(
-                          fontWeight: FontWeight.bold,
-                          fontSize: 16,
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.shadowLight,
+                blurRadius: 10,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Material(
+            color: Colors.transparent,
+            child: InkWell(
+              borderRadius: BorderRadius.circular(16),
+              onTap: () {
+                // 클랜 상세 페이지로 이동
+                if (clan != null) {
+                  context.push('/clans/${clan.id}');
+                }
+              },
+              onLongPress: () {
+                // 길게 누르면 신청 취소 다이얼로그 표시
+                _showCancelApplicationDialog(application);
+              },
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  children: [
+                    // 클랜 엠블럼
+                    Container(
+                      width: 56,
+                      height: 56,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        color: AppColors.backgroundGrey,
+                        border: Border.all(
+                          color: AppColors.border,
+                          width: 1,
                         ),
                       ),
-                      const SizedBox(height: 4),
-                      Text(
-                        '신청일: ${_formatDate(application.appliedAt)}',
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: Colors.grey[600],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: statusColor.withOpacity(0.1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    statusText,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
+                      child: clan != null 
+                          ? _buildSmallClanEmblem(clan)
+                          : const Center(
+                              child: CircularProgressIndicator(
+                                strokeWidth: 2,
+                              ),
+                            ),
                     ),
-                  ),
+                    const SizedBox(width: 16),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  clan?.name ?? '불러오는 중...',
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 16,
+                                    color: AppColors.textPrimary,
+                                  ),
+                                ),
+                              ),
+                              // 상태 배지 - 진행중만 표시하므로 동일한 스타일
+                              Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
+                                decoration: BoxDecoration(
+                                  color: AppColors.warning.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(8),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Container(
+                                      width: 6,
+                                      height: 6,
+                                      decoration: BoxDecoration(
+                                        color: AppColors.warning,
+                                        shape: BoxShape.circle,
+                                      ),
+                                    ),
+                                    const SizedBox(width: 6),
+                                    Text(
+                                      '검토중',
+                                      style: TextStyle(
+                                        color: AppColors.warning,
+                                        fontWeight: FontWeight.w500,
+                                        fontSize: 12,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 6),
+                          Row(
+                            children: [
+                              Icon(
+                                Icons.access_time,
+                                size: 14,
+                                color: AppColors.textTertiary,
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                _formatDate(application.appliedAt),
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: AppColors.textSecondary,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              if (clan != null) ...[
+                                Icon(
+                                  Icons.people_outline,
+                                  size: 14,
+                                  color: AppColors.textTertiary,
+                                ),
+                                const SizedBox(width: 4),
+                                Text(
+                                  '${clan.memberCount}/${clan.maxMembers}',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: AppColors.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    // 액션 힌트
+                    Icon(
+                      Icons.chevron_right,
+                      color: AppColors.textTertiary,
+                      size: 20,
+                    ),
+                  ],
                 ),
-                if (application.status == ClanApplicationStatus.pending)
-                  const Padding(
-                    padding: EdgeInsets.only(left: 8.0),
-                    child: Icon(Icons.touch_app, color: Colors.grey, size: 20),
-                  ),
-              ],
+              ),
             ),
           ),
         );
@@ -937,33 +1231,124 @@ class _ClanListScreenState extends State<ClanListScreen> {
     );
   }
   
+  Widget _buildSmallClanEmblem(ClanModel clan) {
+    if (clan.emblem is String && (clan.emblem as String).startsWith('http')) {
+      return ClipOval(
+        child: Image.network(
+          clan.emblem as String,
+          fit: BoxFit.cover,
+          errorBuilder: (context, error, stackTrace) {
+            return _buildDefaultEmblem();
+          },
+        ),
+      );
+    } else if (clan.emblem is Map) {
+      final emblem = clan.emblem as Map;
+      final Color backgroundColor = emblem['backgroundColor'] as Color? ?? AppColors.primary;
+      final String symbol = emblem['symbol'] as String? ?? 'sports_soccer';
+      
+      return Container(
+        decoration: BoxDecoration(
+          color: backgroundColor,
+          shape: BoxShape.circle,
+        ),
+        child: Center(
+          child: Icon(
+            _getIconData(symbol),
+            color: Colors.white,
+            size: 24,
+          ),
+        ),
+      );
+    }
+    
+    return _buildDefaultEmblem();
+  }
+  
+  Widget _buildDefaultEmblem() {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        shape: BoxShape.circle,
+      ),
+      child: Center(
+        child: Icon(
+          Icons.groups,
+          color: AppColors.primary,
+          size: 24,
+        ),
+      ),
+    );
+  }
+  
   void _showCancelApplicationDialog(ClanApplicationModel application) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('신청 취소'),
-        content: Text('[${application.userName}] 클랜에 보낸 가입 신청을 취소하시겠습니까?'),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: const Text(
+          '신청 취소',
+          style: TextStyle(
+            fontWeight: FontWeight.w700,
+          ),
+        ),
+        content: const Text(
+          '클랜 가입 신청을 취소하시겠습니까?',
+          style: TextStyle(
+            color: AppColors.textSecondary,
+          ),
+        ),
         actions: [
           TextButton(
-            onPressed: () => Navigator.of(context).pop(),
-            child: const Text('닫기'),
+            onPressed: () => Navigator.pop(context),
+            child: const Text(
+              '아니요',
+              style: TextStyle(
+                color: AppColors.textSecondary,
+              ),
+            ),
           ),
           TextButton(
             onPressed: () async {
+              Navigator.pop(context);
               try {
                 await _clanService.cancelClanApplication(application.id);
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('클랜 가입 신청이 취소되었습니다.')),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: const Text('신청이 취소되었습니다'),
+                      backgroundColor: AppColors.success,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  );
+                }
               } catch (e) {
-                Navigator.of(context).pop();
-                ScaffoldMessenger.of(context).showSnackBar(
-                  SnackBar(content: Text('신청 취소 중 오류가 발생했습니다: $e')),
-                );
+                if (mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(
+                      content: Text('취소 실패: $e'),
+                      backgroundColor: AppColors.error,
+                      behavior: SnackBarBehavior.floating,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                    ),
+                  );
+                }
               }
             },
-            child: const Text('신청 취소', style: TextStyle(color: Colors.red)),
+            child: Text(
+              '네, 취소합니다',
+              style: TextStyle(
+                color: AppColors.error,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
           ),
         ],
       ),

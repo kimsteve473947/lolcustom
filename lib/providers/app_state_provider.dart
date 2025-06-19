@@ -24,6 +24,7 @@ class AppStateProvider with ChangeNotifier {
   ClanModel? _myClan;
   bool _isLoading = false;
   String? _errorMessage;
+  bool _tournamentsNeedRefresh = false;
   
   // 캐시 및 상태 관리를 위한 필드 정의
   final List<TournamentModel> _tournaments = [];
@@ -54,6 +55,8 @@ class AppStateProvider with ChangeNotifier {
   bool get isLoading => _isLoading;
   String? get errorMessage => _errorMessage;
   bool get isLoggedIn => _authService.isLoggedIn;
+  bool get tournamentsNeedRefresh => _tournamentsNeedRefresh;
+  List<TournamentModel> get allTournaments => _tournaments;
 
   // Expose services for direct access when needed
   CloudFunctionsService get cloudFunctionsService => _cloudFunctionsService;
@@ -288,7 +291,7 @@ class AppStateProvider with ChangeNotifier {
   }
   
   // Create tournament
-  Future<String?> createTournament({
+  Future<TournamentModel?> createTournament({
     required String title,
     required String location,
     required DateTime startsAt,
@@ -472,7 +475,9 @@ class AppStateProvider with ChangeNotifier {
         }
       }
       
-      return id;
+      // 생성된 토너먼트 정보를 다시 불러와서 반환
+      final newTournament = await _firebaseService.getTournament(id);
+      return newTournament;
     } catch (e) {
       _setError('Failed to create tournament: $e');
       debugPrint('Tournament creation error: $e');
@@ -972,4 +977,4 @@ class AppStateProvider with ChangeNotifier {
       debugPrint('AppStateProvider - Error syncing user data: $e');
     }
   }
-} 
+}

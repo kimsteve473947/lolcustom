@@ -3,11 +3,13 @@ import 'package:flutter/material.dart';
 import 'package:smooth_page_indicator/smooth_page_indicator.dart';
 import 'package:intl/intl.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
+import 'package:lol_custom_game_manager/models/models.dart';
+import 'package:lol_custom_game_manager/providers/tournament_provider.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/match_list_tab.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/mercenary_search_tab.dart';
-// Removed the import for clan_battles_tab.dart since it was deleted
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
+import 'package:lol_custom_game_manager/services/evaluation_service.dart';
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 
 // Adding a temporary ClanBattlesTab widget until it's properly implemented
@@ -16,33 +18,8 @@ class ClanBattlesTab extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(
-            Icons.group_work,
-            size: 64,
-            color: Colors.grey,
-          ),
-          const SizedBox(height: 16),
-          const Text(
-            '클랜전',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '준비 중입니다',
-            style: TextStyle(
-              fontSize: 16,
-              color: Colors.grey[600],
-            ),
-          ),
-        ],
-      ),
+    return const Center(
+      child: Text('클랜전 준비 중'),
     );
   }
 }
@@ -54,428 +31,731 @@ class TournamentMainScreen extends StatefulWidget {
   State<TournamentMainScreen> createState() => _TournamentMainScreenState();
 }
 
-class _TournamentMainScreenState extends State<TournamentMainScreen> with TickerProviderStateMixin {
-  late TabController _mainTabController;
-  late TabController _matchTypeTabController; // 일반전/경쟁전 탭 컨트롤러 추가
-  final PageController _pageController = PageController(initialPage: 0, viewportFraction: 0.95);
-  Timer? _autoSlideTimer;
-  int _currentCarouselIndex = 0;
-  int _selectedDateIndex = 0;
-  final List<DateTime> _dates = [];
-  DateTime? _selectedDate;
+class _TournamentMainScreenState extends State<TournamentMainScreen> {
+  final PageController _pageController = PageController(viewportFraction: 1.0);
+  int _currentPageIndex = 0;
+  final EvaluationService _evaluationService = EvaluationService();
+  List<Map<String, dynamic>> _pendingEvaluations = [];
   
-  // 현재 선택된 탭 인덱스
-  int _currentTabIndex = 0;
-  
-  // 더미 프로모션 카드 데이터
-  final List<Map<String, dynamic>> _promotionCards = [
+  // 메뉴 아이템 정의 - 토스 스타일
+  final List<Map<String, dynamic>> _menuItems = [
     {
-      'title': 'e스포츠 대회 2024',
-      'color': const Color(0xFFFF6B35),
-      'textColor': Colors.white,
-      'description': '국내 최대 e스포츠 대회에 참여하세요!'
+      'title': '개인전',
+      'subtitle': '일반전 · 경쟁전',
+      'icon': Icons.person,
+      'color': AppColors.primary,
     },
     {
-      'title': '용병 모집중',
-      'color': const Color(0xFF3566FF),
-      'textColor': Colors.white,
-      'description': '다양한 포지션의 용병을 모집합니다.'
+      'title': '클랜전',
+      'subtitle': '팀 vs 팀 매치',
+      'icon': Icons.groups,
+      'color': const Color(0xFF5C7CFA),
     },
     {
-      'title': '이벤트: 친구 초대',
-      'color': const Color(0xFF35FF83),
-      'textColor': Colors.black,
-      'description': '친구를 초대하고 특별 보상을 받으세요!'
+      'title': '용병 찾기',
+      'subtitle': '실력있는 플레이어 매칭',
+      'icon': Icons.shield,
+      'color': const Color(0xFFFF6B6B),
+    },
+    {
+      'title': '듀오 찾기',
+      'subtitle': '함께할 파트너 검색',
+      'icon': Icons.people,
+      'color': const Color(0xFF51CF66),
     },
   ];
   
   @override
   void initState() {
     super.initState();
-    _mainTabController = TabController(length: 3, vsync: this);
-    _matchTypeTabController = TabController(length: 2, vsync: this); // 일반전/경쟁전 탭 컨트롤러 초기화
-    _mainTabController.addListener(_handleTabChange);
-    _setupDates();
-    _startAutoSlide();
-    
-    // 앱 시작 시 오늘 날짜 선택
-    final now = DateTime.now();
-    _selectedDate = DateTime(now.year, now.month, now.day);
-    
-    // 오늘 날짜 인덱스 찾기
-    for (int i = 0; i < _dates.length; i++) {
-      if (_dates[i].day == _selectedDate!.day && 
-          _dates[i].month == _selectedDate!.month && 
-          _dates[i].year == _selectedDate!.year) {
-        _selectedDateIndex = i;
-        break;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final provider = Provider.of<TournamentProvider>(context, listen: false);
+      provider.selectDate(DateTime.now());
+      _loadPendingEvaluations();
+    });
+  }
+  
+  Future<void> _loadPendingEvaluations() async {
+    final currentUser = Provider.of<AppStateProvider>(context, listen: false).currentUser;
+    if (currentUser != null) {
+      final evaluations = await _evaluationService.getPendingEvaluations(currentUser.uid);
+      if (mounted) {
+        setState(() {
+          _pendingEvaluations = evaluations;
+        });
       }
     }
   }
   
   @override
   void dispose() {
-    _mainTabController.removeListener(_handleTabChange);
-    _mainTabController.dispose();
-    _matchTypeTabController.dispose(); // 일반전/경쟁전 탭 컨트롤러 해제
     _pageController.dispose();
-    _autoSlideTimer?.cancel();
     super.dispose();
   }
-  
-  // 탭 변경 리스너
-  void _handleTabChange() {
-    if (_mainTabController.indexIsChanging) {
-      setState(() {
-        _currentTabIndex = _mainTabController.index;
-      });
-    }
-  }
-  
-  // 날짜 리스트 초기화
-  void _setupDates() {
-    _dates.clear();
-    
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    
-    // 오늘부터 14일 후까지 날짜 생성
-    for (int i = 0; i <= 14; i++) {
-      _dates.add(today.add(Duration(days: i)));
-    }
-    
-    // 기본적으로 오늘 날짜 선택
-    _selectedDateIndex = 0;
-    _selectedDate = today;
-  }
-  
-  // 자동 슬라이드 타이머 설정
-  void _startAutoSlide() {
-    _autoSlideTimer?.cancel();
-    _autoSlideTimer = Timer.periodic(const Duration(milliseconds: 2500), (timer) {
-      if (_promotionCards.isNotEmpty && _pageController.hasClients) {
-        final nextIndex = (_currentCarouselIndex + 1) % _promotionCards.length;
-        _pageController.animateToPage(
-          nextIndex,
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeInOut,
-        );
-      }
-    });
-  }
-  
-  // 날짜 선택 시 호출되는 함수
-  void _onDateSelected(int index) {
+
+  void _navigateToPage(int index) {
     setState(() {
-      _selectedDateIndex = index;
-      _selectedDate = _dates[_selectedDateIndex];
+      _currentPageIndex = index;
     });
-    
-    // 날짜 선택 정보 출력
-    debugPrint('Selected date: ${DateFormat('yyyy-MM-dd').format(_selectedDate!)}');
   }
 
   @override
   Widget build(BuildContext context) {
-    // 매일 자정에 날짜 목록을 업데이트하기 위한 로직
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    if (_dates.isNotEmpty && _dates[0].day != today.day) {
-      // 날짜가 변경되었다면 날짜 목록 업데이트
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        _setupDates();
-      });
-    }
-    
     return Scaffold(
-      appBar: AppBar(
-        title: const Text(
-          '스크림져드',
-          style: TextStyle(
-            color: Color(0xFF1F1F1F),
-            fontWeight: FontWeight.bold,
-            fontSize: 20,
-          ),
-        ),
-        centerTitle: true,
-        backgroundColor: Colors.white,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.search, color: Color(0xFF1F1F1F)),
-            onPressed: () {},
-          ),
-          IconButton(
-            icon: const Icon(Icons.notifications_none, color: Color(0xFF1F1F1F)),
-            onPressed: () {},
-          ),
-        ],
+      backgroundColor: const Color(0xFFF8F9FA),
+      body: SafeArea(
+        child: _buildCurrentPage(),
       ),
-      body: NestedScrollView(
-        headerSliverBuilder: (context, innerBoxIsScrolled) {
-          return [
-            // 메인 탭 바 (개인전/클랜전/용병 찾기) - 스크롤 시 사라짐
-            SliverAppBar(
-              pinned: false, // 스크롤 시 사라짐
-              floating: true,
-              automaticallyImplyLeading: false,
-              backgroundColor: Colors.white,
-              elevation: 0,
-              toolbarHeight: 0,
-              bottom: PreferredSize(
-                preferredSize: const Size.fromHeight(kToolbarHeight),
-                child: Container(
-                    decoration: const BoxDecoration(
-                      color: Colors.white,
-                      border: Border(
-                        bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1),
-                      ),
-                    ),
-                    child: TabBar(
-                      controller: _mainTabController,
-                      indicatorColor: AppColors.primary,
-                      indicatorWeight: 3,
-                      labelColor: AppColors.primary,
-                      unselectedLabelColor: Colors.grey,
-                      tabs: const [
-                        Tab(text: '개인전'),
-                        Tab(text: '클랜전'),
-                        Tab(text: '용병 찾기'),
-                      ],
-                    ),
-                  ),
-              ),
-            ),
-                  
-            // 프로모션 카드 영역 (Carousel) - 스크롤 시 사라짐
-            SliverToBoxAdapter(
-              child: _buildPromotionCarousel(),
-            ),
-                  
-            // 날짜 선택기 - 용병 찾기 탭에서는 표시하지 않음 (고정)
-                  if (_currentTabIndex != 2)
-              SliverPersistentHeader(
-                delegate: _SliverAppBarDelegate(
-                  minHeight: 80,
-                  maxHeight: 80,
-                  child: _buildDateSelector(),
-                ),
-                pinned: true,
-              ),
-            
-            // 일반전/경쟁전 탭바 (날짜 선택기 아래에 고정)
-            if (_currentTabIndex != 2)
-              SliverPersistentHeader(
-                delegate: _SliverAppBarDelegate(
-                  minHeight: 48,
-                  maxHeight: 48,
-                  child: Container(
-                    color: Colors.white,
-                    child: _buildMatchTypeTabBar(),
-                  ),
-                ),
-                pinned: true,
-            ),
-          ];
-        },
-        body: TabBarView(
-                controller: _mainTabController,
-                children: [
-                  // 개인전 탭
-            _buildMatchListContent(),
-                  
-                  // 클랜전 탭
-                  const ClanBattlesTab(),
-                  
-                  // 용병 찾기 탭
-                  const MercenarySearchTab(),
-          ],
-        ),
-      ),
-      // 내전 생성 버튼 추가 - 용병 찾기 탭에서는 표시하지 않음
-      floatingActionButton: _currentTabIndex != 2 ? FloatingActionButton(
-        onPressed: () {
-          // 내전 생성 화면으로 이동 - 경로 수정
-          context.push('/tournaments/create');
-        },
-        backgroundColor: AppColors.primary,
-        child: const Icon(Icons.add),
-      ) : null,
+      floatingActionButton: _buildFloatingActionButton(),
     );
   }
   
-  // 일반전/경쟁전 탭바를 생성하는 메서드
-  Widget _buildMatchTypeTabBar() {
-    return MatchListTab.buildTabBar(_matchTypeTabController);
+  Widget _buildCurrentPage() {
+    switch (_currentPageIndex) {
+      case 0:
+        return _buildMainMenu();
+      case 1:
+        return _buildPersonalMatchPage();
+      case 2:
+        return _buildClanBattlePage();
+      case 3:
+        return _buildMercenaryFinderPage();
+      case 4:
+        return _buildDuoFinderPage();
+      default:
+        return _buildMainMenu();
+    }
   }
   
-  // 매치 리스트 내용을 표시하는 새로운 메서드
-  Widget _buildMatchListContent() {
-    return MatchListTab(
-      selectedDate: _selectedDate,
-      externalTabController: _matchTypeTabController,
-    );
-  }
-  
-  // 프로모션 카드 캐러셀
-  Widget _buildPromotionCarousel() {
+  Widget _buildMainMenu() {
     return Column(
       children: [
-        SizedBox(
-          height: 150,
-          child: PageView.builder(
-            controller: _pageController,
-            itemCount: _promotionCards.length,
-            onPageChanged: (index) {
-              setState(() {
-                _currentCarouselIndex = index;
-              });
-            },
-            itemBuilder: (context, index) {
-              final card = _promotionCards[index];
-              return Container(
-                width: MediaQuery.of(context).size.width,
-                margin: const EdgeInsets.symmetric(horizontal: 5.0),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(16),
-                  color: card['color'],
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      card['color'],
-                      card['color'].withOpacity(0.8),
-                    ],
+        _buildHeader('스크림져드', subtitle: 'LOL 스크림 매칭 플랫폼'),
+        Expanded(
+          child: SingleChildScrollView(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (_pendingEvaluations.isNotEmpty) _buildEvaluationBanner(),
+                _buildPromotionCard(),
+                const SizedBox(height: 24),
+                const Text(
+                  '어떤 매치를 찾으시나요?',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A1A),
                   ),
                 ),
-                child: Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.end,
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        card['title'],
-                        style: TextStyle(
-                          color: card['textColor'],
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        card['description'],
-                        style: TextStyle(
-                          color: card['textColor'],
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
+                const SizedBox(height: 16),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 2,
+                    crossAxisSpacing: 12,
+                    mainAxisSpacing: 12,
+                    childAspectRatio: 1.1,
                   ),
+                  itemCount: _menuItems.length,
+                  itemBuilder: (context, index) {
+                    final item = _menuItems[index];
+                    return _buildMenuItem(item, index + 1);
+                  },
                 ),
-              );
-            },
+                const SizedBox(height: 24),
+                _buildQuickActions(),
+              ],
+            ),
           ),
         ),
-        const SizedBox(height: 10),
-        
-        // Dot Indicator
-        AnimatedSmoothIndicator(
-          activeIndex: _currentCarouselIndex,
-          count: _promotionCards.length,
-          effect: const ExpandingDotsEffect(
-            dotHeight: 6,
-            dotWidth: 6,
-            activeDotColor: AppColors.primary,
-            dotColor: Colors.grey,
-          ),
-        ),
-        const SizedBox(height: 12),
       ],
     );
   }
   
-  // 날짜 선택기
-  Widget _buildDateSelector() {
+  Widget _buildPersonalMatchPage() {
+    return Column(
+      children: [
+        _buildHeader('개인전'),
+        Expanded(
+          child: DefaultTabController(
+            length: 2,
+            child: Column(
+              children: [
+                _buildDateSelector(),
+                Container(
+                  color: Colors.white,
+                  child: TabBar(
+                    indicatorColor: AppColors.primary,
+                    indicatorWeight: 3,
+                    labelColor: const Color(0xFF1A1A1A),
+                    unselectedLabelColor: const Color(0xFF999999),
+                    labelStyle: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                    tabs: const [
+                      Tab(text: '일반전'),
+                      Tab(text: '경쟁전'),
+                    ],
+                  ),
+                ),
+                const Expanded(
+                  child: TabBarView(
+                    children: [
+                      MatchListTab(tournamentType: TournamentType.casual),
+                      MatchListTab(tournamentType: TournamentType.competitive),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildClanBattlePage() {
+    return Column(
+      children: [
+        _buildHeader('클랜전'),
+        Expanded(
+          child: Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Container(
+                  width: 80,
+                  height: 80,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(20),
+                  ),
+                  child: const Center(
+                    child: Icon(
+                      Icons.groups,
+                      size: 40,
+                      color: Color(0xFFCCCCCC),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 24),
+                const Text(
+                  '클랜전 준비 중',
+                  style: TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  '곧 만나볼 수 있어요!',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Color(0xFF999999),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildMercenaryFinderPage() {
+    return Column(
+      children: [
+        _buildHeader('용병 찾기'),
+        const Expanded(
+          child: MercenaryFinderView(),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildDuoFinderPage() {
+    return Column(
+      children: [
+        _buildHeader('듀오 찾기'),
+        const Expanded(
+          child: DuoFinderView(),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildHeader(String title, {String? subtitle}) {
     return Container(
-      height: 80, // 높이 줄임
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 12),
       decoration: const BoxDecoration(
         color: Colors.white,
         border: Border(
-          top: BorderSide(color: Color(0xFFEEEEEE), width: 1),
-          bottom: BorderSide(color: Color(0xFFEEEEEE), width: 1),
+          bottom: BorderSide(
+            color: Color(0xFFF0F0F0),
+            width: 1,
+          ),
+        ),
+      ),
+      child: Row(
+        children: [
+          if (_currentPageIndex > 0)
+            GestureDetector(
+              onTap: () => _navigateToPage(0),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF5F5F5),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Icon(
+                  Icons.arrow_back,
+                  size: 20,
+                  color: Color(0xFF1A1A1A),
+                ),
+              ),
+            )
+          else
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Center(
+                child: Text(
+                  'S',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 20,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+                if (subtitle != null)
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF999999),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          GestureDetector(
+            onTap: () {},
+            child: Container(
+              padding: const EdgeInsets.all(8),
+              child: const Icon(
+                Icons.search,
+                size: 24,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Stack(
+            children: [
+              GestureDetector(
+                onTap: () {},
+                child: Container(
+                  padding: const EdgeInsets.all(8),
+                  child: const Icon(
+                    Icons.notifications_none,
+                    size: 24,
+                    color: Color(0xFF1A1A1A),
+                  ),
+                ),
+              ),
+              if (_pendingEvaluations.isNotEmpty)
+                Positioned(
+                  right: 6,
+                  top: 6,
+                  child: Container(
+                    width: 8,
+                    height: 8,
+                    decoration: const BoxDecoration(
+                      color: AppColors.error,
+                      shape: BoxShape.circle,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildMenuItem(Map<String, dynamic> item, int pageIndex) {
+    return GestureDetector(
+      onTap: () => _navigateToPage(pageIndex),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.04),
+              blurRadius: 10,
+              offset: const Offset(0, 2),
+            ),
+          ],
+        ),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Container(
+                width: 48,
+                height: 48,
+                decoration: BoxDecoration(
+                  color: item['color'].withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Center(
+                  child: Icon(
+                    item['icon'],
+                    color: item['color'],
+                    size: 24,
+                  ),
+                ),
+              ),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    item['title'],
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    item['subtitle'],
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFF999999),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildPromotionCard() {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary,
+            AppColors.primary.withOpacity(0.8),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.white.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(20),
+            ),
+            child: const Text(
+              '🔥 HOT',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          const Text(
+            '이번 주 인기 토너먼트',
+            style: TextStyle(
+              color: Colors.white,
+              fontSize: 20,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '총 상금 500만원 • 참가자 128명',
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.9),
+              fontSize: 14,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  '자세히 보기',
+                  style: TextStyle(
+                    color: AppColors.primary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 4),
+                Icon(
+                  Icons.arrow_forward,
+                  size: 16,
+                  color: AppColors.primary,
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+  
+  Widget _buildQuickActions() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        const Text(
+          '빠른 실행',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: Color(0xFF1A1A1A),
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+          ),
+          child: Column(
+            children: [
+              _buildQuickActionItem(
+                icon: Icons.add_circle_outline,
+                title: '매치 생성',
+                subtitle: '새로운 스크림 매치 만들기',
+                onTap: () => context.push('/tournaments/create'),
+              ),
+              const Divider(height: 24),
+              _buildQuickActionItem(
+                icon: Icons.history,
+                title: '최근 매치',
+                subtitle: '참가했던 매치 기록 보기',
+                onTap: () {},
+              ),
+              const Divider(height: 24),
+              _buildQuickActionItem(
+                icon: Icons.star_outline,
+                title: '즐겨찾기',
+                subtitle: '자주 참가하는 매치',
+                onTap: () {},
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+  
+  Widget _buildQuickActionItem({
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(8),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 4),
+        child: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Center(
+                child: Icon(
+                  icon,
+                  size: 20,
+                  color: const Color(0xFF666666),
+                ),
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    subtitle,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF999999),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              size: 20,
+              color: Color(0xFFCCCCCC),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+  
+  Widget _buildDateSelector() {
+    final provider = Provider.of<TournamentProvider>(context);
+    final selectedDate = provider.selectedDate;
+    
+    final dates = <DateTime>[];
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+    for (int i = 0; i <= 14; i++) {
+      dates.add(today.add(Duration(days: i)));
+    }
+    
+    int selectedIndex = dates.indexWhere((date) =>
+        date.year == selectedDate.year &&
+        date.month == selectedDate.month &&
+        date.day == selectedDate.day);
+    if (selectedIndex == -1) selectedIndex = 0;
+    
+    return Container(
+      height: 100,
+      decoration: const BoxDecoration(
+        color: Colors.white,
+        border: Border(
+          bottom: BorderSide(
+            color: Color(0xFFF0F0F0),
+            width: 1,
+          ),
         ),
       ),
       child: ListView.builder(
         scrollDirection: Axis.horizontal,
-        itemCount: _dates.length,
-        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+        itemCount: dates.length,
         itemBuilder: (context, index) {
-          final date = _dates[index];
+          final date = dates[index];
           final isToday = _isToday(date);
-          final isSelected = index == _selectedDateIndex;
-          
-          // 요일 포맷 (월, 화, 수...)
+          final isSelected = index == selectedIndex;
           final weekdayFormat = DateFormat('E', 'ko_KR');
           final dayFormat = DateFormat('d');
           
           return GestureDetector(
             onTap: () {
-              _onDateSelected(index);
+              provider.selectDate(date);
             },
             child: Container(
-              width: 58, // 너비 줄임
-              margin: const EdgeInsets.symmetric(horizontal: 3), // 마진 줄임
+              width: 64,
+              margin: const EdgeInsets.symmetric(horizontal: 4),
               decoration: BoxDecoration(
-                color: isSelected ? AppColors.primary : Colors.white,
-                borderRadius: BorderRadius.circular(10), // 라운딩 줄임
-                border: Border.all(
-                  color: isToday && !isSelected 
-                      ? AppColors.primary 
-                      : isSelected 
-                          ? AppColors.primary 
-                          : Colors.grey.shade300,
-                  width: 1, // 테두리 두께 줄임
-                ),
+                color: isSelected 
+                    ? AppColors.primary 
+                    : isToday 
+                        ? AppColors.primary.withOpacity(0.1)
+                        : const Color(0xFFF8F9FA),
+                borderRadius: BorderRadius.circular(16),
               ),
               child: Column(
-                mainAxisSize: MainAxisSize.min,
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Text(
-                    dayFormat.format(date),
-                    style: TextStyle(
-                      fontSize: 16, // 폰트 사이즈 줄임
-                      fontWeight: FontWeight.bold,
-                      color: isSelected 
-                          ? Colors.white 
-                          : isToday 
-                              ? AppColors.primary 
-                              : Colors.black,
-                    ),
-                  ),
-                  const SizedBox(height: 2),
                   Text(
                     weekdayFormat.format(date),
                     style: TextStyle(
                       fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                      color: isSelected 
+                          ? Colors.white.withOpacity(0.8)
+                          : isToday 
+                              ? AppColors.primary 
+                              : const Color(0xFF999999),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    dayFormat.format(date),
+                    style: TextStyle(
+                      fontSize: 20,
+                      fontWeight: FontWeight.w700,
                       color: isSelected 
                           ? Colors.white 
                           : isToday 
                               ? AppColors.primary 
-                              : Colors.grey,
+                              : const Color(0xFF1A1A1A),
                     ),
                   ),
-                  if (isToday && !isSelected)
+                  if (isToday && !isSelected) ...[
+                    const SizedBox(height: 4),
                     Container(
-                      width: 3,
-                      height: 3,
-                      margin: const EdgeInsets.only(top: 2),
-                      decoration: const BoxDecoration(
-                        shape: BoxShape.circle,
+                      width: 4,
+                      height: 4,
+                      decoration: BoxDecoration(
                         color: AppColors.primary,
+                        shape: BoxShape.circle,
                       ),
                     ),
+                  ],
                 ],
               ),
             ),
@@ -485,42 +765,119 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> with Ticker
     );
   }
   
-  // 오늘 날짜인지 확인하는 유틸리티 함수
   bool _isToday(DateTime date) {
     final now = DateTime.now();
     return date.year == now.year && 
            date.month == now.month && 
            date.day == now.day;
   }
-}
-
-// SliverPersistentHeader를 위한 Delegate 클래스 추가
-class _SliverAppBarDelegate extends SliverPersistentHeaderDelegate {
-  final double minHeight;
-  final double maxHeight;
-  final Widget child;
-
-  _SliverAppBarDelegate({
-    required this.minHeight,
-    required this.maxHeight,
-    required this.child,
-  });
-
-  @override
-  double get minExtent => minHeight;
-
-  @override
-  double get maxExtent => maxHeight;
-
-  @override
-  Widget build(BuildContext context, double shrinkOffset, bool overlapsContent) {
-    return SizedBox.expand(child: child);
+  
+  Widget? _buildFloatingActionButton() {
+    switch (_currentPageIndex) {
+      case 1: // 개인전
+      case 2: // 클랜전
+        return FloatingActionButton(
+          onPressed: () async {
+            final result = await context.push('/tournaments/create');
+            if (result is TournamentModel) {
+              final provider = Provider.of<TournamentProvider>(context, listen: false);
+              await Future.delayed(const Duration(milliseconds: 500));
+              await provider.selectDate(result.startsAt.toDate());
+            }
+          },
+          backgroundColor: AppColors.primary,
+          child: const Icon(Icons.add, color: Colors.white),
+        );
+      case 3: // 용병 찾기
+        return FloatingActionButton.extended(
+          onPressed: () => context.push('/mercenaries/register'),
+          backgroundColor: AppColors.primary,
+          icon: const Icon(Icons.add, color: Colors.white),
+          label: const Text(
+            '용병 등록',
+            style: TextStyle(
+              color: Colors.white,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        );
+      case 4: // 듀오 찾기
+        return null; // DuoFinderView에 자체 FAB가 있음
+      default:
+        return null;
+    }
   }
-
-  @override
-  bool shouldRebuild(_SliverAppBarDelegate oldDelegate) {
-    return maxHeight != oldDelegate.maxHeight ||
-        minHeight != oldDelegate.minHeight ||
-        child != oldDelegate.child;
+  
+  Widget _buildEvaluationBanner() {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 16),
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppColors.primary.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: AppColors.primary.withOpacity(0.2),
+          width: 1,
+        ),
+      ),
+      child: InkWell(
+        onTap: () {
+          if (_pendingEvaluations.isNotEmpty) {
+            final evaluation = _pendingEvaluations.first;
+            context.push(
+              '/evaluation/${evaluation['tournamentId']}?isHost=${evaluation['isHost']}',
+            ).then((_) {
+              _loadPendingEvaluations();
+            });
+          }
+        },
+        borderRadius: BorderRadius.circular(16),
+        child: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.2),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.rate_review,
+                color: AppColors.primary,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '평가 대기중인 경기가 ${_pendingEvaluations.length}개 있어요',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  const Text(
+                    '경기 평가를 완료하고 신뢰도를 높여보세요',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Color(0xFF666666),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.chevron_right,
+              color: AppColors.primary,
+              size: 20,
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }
