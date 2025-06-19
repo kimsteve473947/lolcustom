@@ -357,7 +357,7 @@ class _MercenaryRegistrationScreenState extends State<MercenaryRegistrationScree
                       ? FileImage(_profileImage!) as ImageProvider
                       : _profileImageUrl != null
                           ? NetworkImage(_profileImageUrl!) as ImageProvider
-                          : const AssetImage('assets/images/profile_placeholder.png') as ImageProvider,
+                          : const AssetImage('assets/images/app_logo.png') as ImageProvider,
                 ),
                 Positioned(
                   bottom: 0,

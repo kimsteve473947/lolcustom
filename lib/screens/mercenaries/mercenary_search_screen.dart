@@ -427,12 +427,12 @@ class _MercenarySearchScreenState extends State<MercenarySearchScreen> {
                           ),
                           errorWidget: (context, url, error) => const CircleAvatar(
                             radius: 32,
-                            backgroundImage: AssetImage('assets/images/profile_placeholder.png'),
+                            backgroundImage: AssetImage('assets/images/app_logo.png'),
                           ),
                         )
                       : const CircleAvatar(
                           radius: 32,
-                          backgroundImage: AssetImage('assets/images/profile_placeholder.png'),
+                          backgroundImage: AssetImage('assets/images/app_logo.png'),
                         ),
                   Positioned(
                     bottom: 0,

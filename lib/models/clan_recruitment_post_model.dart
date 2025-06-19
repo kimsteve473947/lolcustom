@@ -4,7 +4,8 @@ class ClanRecruitmentPostModel {
   final String id;
   final String clanId;
   final String clanName;
-  final String clanEmblem;
+  final dynamic clanEmblem;
+  final int clanMemberCount;
   final String title;
   final String description;
   final List<String> teamFeatures; // 팀 특징
@@ -26,6 +27,7 @@ class ClanRecruitmentPostModel {
     required this.clanId,
     required this.clanName,
     required this.clanEmblem,
+    required this.clanMemberCount,
     required this.title,
     required this.description,
     required this.teamFeatures,
@@ -49,7 +51,8 @@ class ClanRecruitmentPostModel {
       id: doc.id,
       clanId: data['clanId'] ?? '',
       clanName: data['clanName'] ?? '',
-      clanEmblem: data['clanEmblem'] ?? '',
+      clanEmblem: data['clanEmblem'],
+      clanMemberCount: data['clanMemberCount'] ?? 0,
       title: data['title'] ?? '',
       description: data['description'] ?? '',
       teamFeatures: List<String>.from(data['teamFeatures'] ?? []),
@@ -73,6 +76,7 @@ class ClanRecruitmentPostModel {
       'clanId': clanId,
       'clanName': clanName,
       'clanEmblem': clanEmblem,
+      'clanMemberCount': clanMemberCount,
       'title': title,
       'description': description,
       'teamFeatures': teamFeatures,

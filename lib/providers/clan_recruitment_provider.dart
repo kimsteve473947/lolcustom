@@ -111,26 +111,86 @@ class ClanRecruitmentProvider with ChangeNotifier {
       throw Exception('제목과 상세 설명을 모두 입력해주세요.');
     }
 
-    final post = ClanRecruitmentPostModel(
-      id: _uuid.v4(),
-      clanId: currentClan.id,
-      clanName: currentClan.name,
-      clanEmblem: currentClan.emblem.toString(), // Assuming emblem can be converted to string
-      title: _title,
-      description: _description,
-      teamFeatures: _teamFeatures.toList(),
-      preferredPositions: _preferredPositions.toList(),
-      preferredTiers: _preferredTiers.toList(),
-      preferredAgeGroups: _preferredAgeGroups.toList(),
-      preferredGender: _preferredGender ?? '무관',
-      activityDays: _activityDays.toList(),
-      activityTimes: _activityTimes.toList(),
-      authorId: currentUser.uid,
-      createdAt: Timestamp.now(),
-      updatedAt: Timestamp.now(),
-    );
+    print('=== 클랜 모집글 발행 디버깅 ===');
+    print('입력된 클랜 ID: ${currentClan.id}');
+    print('입력된 클랜 이름: ${currentClan.name}');
+    print('입력된 클랜 emblem: ${currentClan.emblem}');
 
-    await _clanService.publishRecruitmentPost(post);
+    // 최신 클랜 정보 조회 (emblem 데이터를 정확히 가져오기 위해)
+    final latestClan = await _clanService.getClan(currentClan.id);
+    if (latestClan == null) {
+      throw Exception('클랜 정보를 찾을 수 없습니다.');
+    }
+
+    print('최신 클랜 ID: ${latestClan.id}');
+    print('최신 클랜 이름: ${latestClan.name}');
+    print('최신 클랜 emblem: ${latestClan.emblem}');
+
+    // emblem 데이터를 Firestore에 저장 가능한 형태로 변환
+    dynamic processedEmblem = latestClan.emblem;
+    if (processedEmblem is Map) {
+      final Map<String, dynamic> emblemMap = Map<String, dynamic>.from(processedEmblem);
+      // Color 객체를 int로 변환
+      if (emblemMap.containsKey('backgroundColor') && emblemMap['backgroundColor'] is Color) {
+        emblemMap['backgroundColor'] = (emblemMap['backgroundColor'] as Color).value;
+      }
+      processedEmblem = emblemMap;
+    }
+
+    print('처리된 emblem: $processedEmblem');
+    print('========================');
+
+    // 기존 모집글이 있는지 확인
+    final existingPosts = await _clanService.getExistingRecruitmentPost(currentClan.id);
+    
+    if (existingPosts != null) {
+      print('기존 모집글 업데이트 중...');
+      // 기존 모집글 업데이트
+      await _clanService.updateRecruitmentPost(
+        existingPosts.id,
+        {
+          'title': _title,
+          'description': _description,
+          'clanMemberCount': latestClan.memberCount,
+          'teamFeatures': _teamFeatures.toList(),
+          'preferredPositions': _preferredPositions.toList(),
+          'preferredTiers': _preferredTiers.toList(),
+          'preferredAgeGroups': _preferredAgeGroups.toList(),
+          'preferredGender': _preferredGender ?? '무관',
+          'activityDays': _activityDays.toList(),
+          'activityTimes': _activityTimes.toList(),
+          'clanEmblem': processedEmblem, // 처리된 emblem 데이터 사용
+          'updatedAt': Timestamp.now(),
+          'isRecruiting': true,
+        },
+      );
+    } else {
+      print('새 모집글 생성 중...');
+      // 새 모집글 생성
+      final post = ClanRecruitmentPostModel(
+        id: _uuid.v4(),
+        clanId: currentClan.id,
+        clanName: currentClan.name,
+        clanEmblem: processedEmblem, // 처리된 emblem 데이터 사용
+        clanMemberCount: latestClan.memberCount, // 클랜 멤버 수 추가
+        title: _title,
+        description: _description,
+        teamFeatures: _teamFeatures.toList(),
+        preferredPositions: _preferredPositions.toList(),
+        preferredTiers: _preferredTiers.toList(),
+        preferredAgeGroups: _preferredAgeGroups.toList(),
+        preferredGender: _preferredGender ?? '무관',
+        activityDays: _activityDays.toList(),
+        activityTimes: _activityTimes.toList(),
+        authorId: currentUser.uid,
+        createdAt: Timestamp.now(),
+        updatedAt: Timestamp.now(),
+      );
+
+      print('생성할 모집글 clanEmblem: ${post.clanEmblem}');
+      await _clanService.publishRecruitmentPost(post);
+    }
+    
     clear(); // Clear the form after successful submission
   }
 }

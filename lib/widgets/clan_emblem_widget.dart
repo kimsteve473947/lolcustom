@@ -13,7 +13,17 @@ class ClanEmblemWidget extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    print('ClanEmblemWidget - emblemData: $emblemData');
+    print('ClanEmblemWidget - emblemData type: ${emblemData.runtimeType}');
+    
+    // null이나 빈 문자열인 경우 기본 emblem으로 처리
+    if (emblemData == null || (emblemData is String && (emblemData as String).isEmpty)) {
+      print('ClanEmblemWidget - Using default emblem (null or empty)');
+      return _buildDefaultEmblem();
+    }
+    
     if (emblemData is String) {
+      print('ClanEmblemWidget - Using network image: $emblemData');
       // Custom image from Firebase Storage
       return ClipOval(
         child: CachedNetworkImage(
@@ -26,35 +36,36 @@ class ClanEmblemWidget extends StatelessWidget {
             height: size,
             color: Colors.grey[300],
           ),
-          errorWidget: (context, url, error) => Container(
-            width: size,
-            height: size,
-            color: Colors.grey[300],
-            child: Icon(Icons.error, color: Colors.red, size: size * 0.5),
-          ),
+          errorWidget: (context, url, error) => _buildDefaultEmblem(),
         ),
       );
     } else if (emblemData is Map) {
+      print('ClanEmblemWidget - Using map emblem: $emblemData');
       // Default emblem
       final Map<String, dynamic> emblemMap = Map<String, dynamic>.from(emblemData);
       final String frame = emblemMap['frame'] ?? 'circle';
-      final String symbol = emblemMap['symbol'] ?? 'star';
+      final String symbol = emblemMap['symbol'] ?? 'shield';
       final Color backgroundColor = emblemMap['backgroundColor'] is Color
           ? emblemMap['backgroundColor']
-          : Color(emblemMap['backgroundColor'] ?? Colors.grey.value);
+          : Color(emblemMap['backgroundColor'] ?? Colors.orange.value);
 
       return _buildFramePreview(frame, size, backgroundColor, symbol);
     }
 
+    print('ClanEmblemWidget - Using fallback default emblem');
     // Fallback for invalid data
+    return _buildDefaultEmblem();
+  }
+
+  Widget _buildDefaultEmblem() {
     return Container(
       width: size,
       height: size,
       decoration: BoxDecoration(
-        color: Colors.grey[200],
+        color: Colors.orange,
         shape: BoxShape.circle,
       ),
-      child: Icon(Icons.shield, color: Colors.grey[400], size: size * 0.6),
+      child: Icon(Icons.shield, color: Colors.white, size: size * 0.6),
     );
   }
 

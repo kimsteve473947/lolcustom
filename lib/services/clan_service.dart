@@ -25,13 +25,34 @@ class ClanService {
   // --- Clan Recruitment ---
 
   Stream<List<ClanRecruitmentPostModel>> getRecruitmentPostsStream({String? filter}) {
-    // TODO: Add filter logic
-    return _recruitmentPostsCollection
-        .where('isRecruiting', isEqualTo: true)
-        .orderBy('createdAt', descending: true)
+    Query query = _recruitmentPostsCollection
+        .where('isRecruiting', isEqualTo: true);
+    
+    // 필터가 있으면 해당 팀 특징을 가진 포스트만 조회
+    if (filter != null && filter.isNotEmpty) {
+      query = query.where('teamFeatures', arrayContains: filter);
+    }
+    
+    // 임시로 orderBy 제거 (인덱스 문제 우회)
+    return query
         .snapshots()
         .map((snapshot) {
-      return snapshot.docs.map((doc) => ClanRecruitmentPostModel.fromFirestore(doc)).toList();
+      final posts = snapshot.docs.map((doc) => ClanRecruitmentPostModel.fromFirestore(doc)).toList();
+      // 메모리에서 정렬
+      posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return posts;
+    });
+  }
+
+  Stream<List<ClanRecruitmentPostModel>> getRecruitmentPostsByClansStream(String clanId) {
+    return _recruitmentPostsCollection
+        .where('clanId', isEqualTo: clanId)
+        .snapshots()
+        .map((snapshot) {
+      final posts = snapshot.docs.map((doc) => ClanRecruitmentPostModel.fromFirestore(doc)).toList();
+      // 메모리에서 정렬
+      posts.sort((a, b) => b.createdAt.compareTo(a.createdAt));
+      return posts;
     });
   }
 
@@ -40,6 +61,33 @@ class ClanService {
       await _recruitmentPostsCollection.add(post.toFirestore());
     } catch (e) {
       debugPrint('Error publishing recruitment post: $e');
+      rethrow;
+    }
+  }
+
+  Future<ClanRecruitmentPostModel?> getExistingRecruitmentPost(String clanId) async {
+    try {
+      final snapshot = await _recruitmentPostsCollection
+          .where('clanId', isEqualTo: clanId)
+          .where('isRecruiting', isEqualTo: true)
+          .limit(1)
+          .get();
+      
+      if (snapshot.docs.isNotEmpty) {
+        return ClanRecruitmentPostModel.fromFirestore(snapshot.docs.first);
+      }
+      return null;
+    } catch (e) {
+      debugPrint('Error getting existing recruitment post: $e');
+      return null;
+    }
+  }
+
+  Future<void> updateRecruitmentPost(String postId, Map<String, dynamic> updates) async {
+    try {
+      await _recruitmentPostsCollection.doc(postId).update(updates);
+    } catch (e) {
+      debugPrint('Error updating recruitment post: $e');
       rethrow;
     }
   }

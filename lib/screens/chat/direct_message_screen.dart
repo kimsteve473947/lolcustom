@@ -312,7 +312,7 @@ class _DirectMessageScreenState extends State<DirectMessageScreen> {
               radius: 16,
               backgroundImage: _room!.getOtherUserProfileUrl(_currentUser!.uid) != null
                   ? NetworkImage(_room!.getOtherUserProfileUrl(_currentUser!.uid)!) as ImageProvider
-                  : const AssetImage('assets/images/profile_placeholder.png') as ImageProvider,
+                  : const AssetImage('assets/images/app_logo.png') as ImageProvider,
             ),
             const SizedBox(width: 8),
             Text(otherUserName),
@@ -506,7 +506,7 @@ class _DirectMessageScreenState extends State<DirectMessageScreen> {
               radius: 16,
               backgroundImage: message.senderProfileUrl != null
                   ? NetworkImage(message.senderProfileUrl!) as ImageProvider
-                  : const AssetImage('assets/images/profile_placeholder.png') as ImageProvider,
+                  : const AssetImage('assets/images/app_logo.png') as ImageProvider,
             ),
             const SizedBox(width: 8),
           ],
