@@ -261,14 +261,28 @@ class TournamentService {
             filters['showOnlyFuture'] == true) {
           final now = DateTime.now();
           tournaments = tournaments
-              .where((t) => t.startsAt.toDate().isAfter(now))
+              .where((t) {
+                // 토너먼트 시작 시간이 현재 시간보다 미래인 경우만 표시
+                final tournamentTime = t.startsAt.toDate();
+                final isAfterNow = tournamentTime.isAfter(now);
+                
+                // 디버깅을 위한 로그
+                if (!isAfterNow) {
+                  debugPrint('필터링됨: ${t.title} - 시작시간: $tournamentTime, 현재시간: $now');
+                }
+                
+                return isAfterNow;
+              })
               .toList();
         }
       } else {
         // 기본적으로 현재 시간 이후 토너먼트만 표시 (폴백 쿼리에서 처리 못한 경우)
         final now = DateTime.now();
         tournaments =
-            tournaments.where((t) => t.startsAt.toDate().isAfter(now)).toList();
+            tournaments.where((t) {
+              final tournamentTime = t.startsAt.toDate();
+              return tournamentTime.isAfter(now);
+            }).toList();
       }
  
       // 명시적으로 타입을 보장하여 반환

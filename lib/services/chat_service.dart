@@ -479,13 +479,57 @@ class ChatService {
 
  // 특정 채팅방의 메시지 목록을 실시간으로 가져오기
  Stream<List<MessageModel>> getMessagesStream(String chatRoomId) {
+   debugPrint('🔍 [CHAT SERVICE] Loading messages for chatRoomId: $chatRoomId');
+   
    return _firestore
        .collection('messages')
        .where('chatRoomId', isEqualTo: chatRoomId)
        .orderBy('timestamp', descending: true)
        .snapshots()
-       .map((snapshot) => snapshot.docs
-           .map((doc) => MessageModel.fromFirestore(doc))
-           .toList());
+       .map((snapshot) {
+         final messages = snapshot.docs
+             .map((doc) => MessageModel.fromFirestore(doc))
+             .toList();
+         
+         debugPrint('🔍 [CHAT SERVICE] Loaded ${messages.length} messages for chatRoomId: $chatRoomId');
+         
+         // Discord 메시지 디버깅
+         for (final message in messages) {
+           // 모든 메시지 기본 정보 출력
+           debugPrint('🔍 [MESSAGE DEBUG] ID: ${message.id}, senderId: ${message.senderId}, hasMetadata: ${message.metadata != null}');
+           
+           if (message.senderId == 'system' && message.metadata != null && message.metadata!['type'] == 'discord_channels') {
+             debugPrint('🎯 [DISCORD MESSAGE FOUND] Message ID: ${message.id}');
+             debugPrint('🎯 [DISCORD MESSAGE FOUND] Content: ${message.text}');
+             debugPrint('🎯 [DISCORD MESSAGE FOUND] Metadata: ${message.metadata}');
+           }
+           
+           // 특정 메시지 ID 검색 (Firebase Functions에서 저장한 ID)
+           if (message.id == 'H8UVCw2VseCBNwMlQqp4') {
+             debugPrint('🎯 [FIREBASE MESSAGE FOUND] Found message with ID H8UVCw2VseCBNwMlQqp4');
+             debugPrint('🎯 [FIREBASE MESSAGE FOUND] SenderId: ${message.senderId}');
+             debugPrint('🎯 [FIREBASE MESSAGE FOUND] Text: ${message.text}');
+             debugPrint('🎯 [FIREBASE MESSAGE FOUND] Metadata: ${message.metadata}');
+           }
+           
+           // 최신 Firebase Functions 메시지 ID 검색
+           if (message.id == 'WWgg1Q4PS1MqfE3MUBdL') {
+             debugPrint('🎯 [LATEST DISCORD MESSAGE] Found latest message with ID WWgg1Q4PS1MqfE3MUBdL');
+             debugPrint('🎯 [LATEST DISCORD MESSAGE] SenderId: ${message.senderId}');
+             debugPrint('🎯 [LATEST DISCORD MESSAGE] Text: ${message.text}');
+             debugPrint('🎯 [LATEST DISCORD MESSAGE] Metadata: ${message.metadata}');
+           }
+           
+           // 가장 최신 Firebase Functions 메시지 ID 검색
+           if (message.id == 'v4Ucp1QHMc88KbAfsoWU') {
+             debugPrint('🎯 [NEWEST DISCORD MESSAGE] Found newest message with ID v4Ucp1QHMc88KbAfsoWU');
+             debugPrint('🎯 [NEWEST DISCORD MESSAGE] SenderId: ${message.senderId}');
+             debugPrint('🎯 [NEWEST DISCORD MESSAGE] Text: ${message.text}');
+             debugPrint('🎯 [NEWEST DISCORD MESSAGE] Metadata: ${message.metadata}');
+           }
+         }
+         
+         return messages;
+       });
  }
 }

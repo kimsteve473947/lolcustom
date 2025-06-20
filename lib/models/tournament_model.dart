@@ -61,6 +61,9 @@ class TournamentModel extends Equatable {
   final Map<String, dynamic>? results;
   final double? distance;
   
+  // Discord 채널 정보
+  final Map<String, dynamic>? discordChannels;
+  
   // 리그 오브 레전드 특화 필드
   final GameFormat gameFormat; // 경기 방식
   final GameServer gameServer; // 게임 서버
@@ -133,6 +136,7 @@ class TournamentModel extends Equatable {
     this.rules,
     this.results,
     this.distance,
+    this.discordChannels,
     this.gameFormat = GameFormat.single,
     this.gameServer = GameServer.kr,
     this.customRoomName,
@@ -167,6 +171,7 @@ class TournamentModel extends Equatable {
     Map<String, dynamic>? rules,
     Map<String, dynamic>? results,
     double? distance,
+    Map<String, dynamic>? discordChannels,
     GameFormat gameFormat = GameFormat.single,
     GameServer gameServer = GameServer.kr,
     String? customRoomName,
@@ -227,6 +232,7 @@ class TournamentModel extends Equatable {
       rules: rules,
       results: results,
       distance: distance,
+      discordChannels: discordChannels,
       gameFormat: gameFormat,
       gameServer: gameServer,
       customRoomName: customRoomName,
@@ -388,7 +394,7 @@ class TournamentModel extends Equatable {
       }
     }
 
-    // 이전 버전 호환성 유지를 위한 코드
+    // 이전 버전 호환성 위한 코드
     // 더 명확한 로직으로 tournamentType 설정
     TournamentType tournamentType;
     
@@ -522,6 +528,7 @@ class TournamentModel extends Equatable {
       rules: data['rules'],
       results: data['results'],
       distance: (data['distance'] as num?)?.toDouble(),
+      discordChannels: data['discordChannels'],
       gameFormat: gameFormat,
       gameServer: gameServer,
       customRoomName: data['customRoomName'],
@@ -580,6 +587,7 @@ class TournamentModel extends Equatable {
     if (updatedAt != null) result['updatedAt'] = Timestamp.fromDate(updatedAt!);
     if (results != null) result['results'] = results;
     if (distance != null) result['distance'] = distance;
+    if (discordChannels != null) result['discordChannels'] = discordChannels;
     if (customRoomName != null) result['customRoomName'] = customRoomName;
     if (customRoomPassword != null) result['customRoomPassword'] = customRoomPassword;
     if (_hostPosition != null) result['hostPosition'] = _hostPosition;
@@ -613,6 +621,7 @@ class TournamentModel extends Equatable {
     Map<String, dynamic>? rules,
     Map<String, dynamic>? results,
     double? distance,
+    Map<String, dynamic>? discordChannels,
     GameFormat? gameFormat,
     GameServer? gameServer,
     String? customRoomName,
@@ -648,6 +657,7 @@ class TournamentModel extends Equatable {
       rules: rules ?? this.rules,
       results: results ?? this.results,
       distance: distance ?? this.distance,
+      discordChannels: discordChannels ?? this.discordChannels,
       gameFormat: gameFormat ?? this.gameFormat,
       gameServer: gameServer ?? this.gameServer,
       customRoomName: customRoomName ?? this.customRoomName,
@@ -727,7 +737,7 @@ class TournamentModel extends Equatable {
     startsAt, location, tournamentType, creditCost, ovrLimit, tierLimit, premiumBadge, 
     status, createdAt, updatedAt, slots, filledSlots, slotsByRole, filledSlotsByRole,
     participants, participantsByRole, rules, results, distance, 
-    gameFormat, gameServer, customRoomName, customRoomPassword,
+    discordChannels, gameFormat, gameServer, customRoomName, customRoomPassword,
     referees, isRefereed, _hostPosition
   ];
 } 

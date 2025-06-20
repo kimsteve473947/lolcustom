@@ -832,6 +832,9 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
           );
         }
 
+        // 토너먼트 정보 새로고침을 먼저 실행하고 완료될 때까지 기다림
+        await _loadTournamentDetails();
+
         // 알림 표시
         if (mounted) {
           showDialog(
@@ -848,9 +851,6 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
             ),
           );
         }
-
-        // 토너먼트 정보 새로고침
-        _loadTournamentDetails();
       } else {
         // 오류 발생
         if (mounted) {
@@ -1075,8 +1075,8 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
       bottomNavigationBar: _tournament != null
           ? _isUserHost()
               ? _buildHostActionButtons()  // 주최자 액션 버튼
-              : _tournament!.status == TournamentStatus.open
-          ? _buildParticipationButtons()  // 참가 버튼 표시 위젯을 호출
+              : _hasUserApplied() || _tournament!.status == TournamentStatus.open
+                  ? _buildParticipationButtons()  // 참가 버튼 표시 위젯을 호출
                   : null
           : null,
     );
@@ -2763,10 +2763,20 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   
   Widget _buildParticipationButtons() {
     final appState = Provider.of<AppStateProvider>(context);
-    final hasApplied = appState.currentUser != null && _applications.any((app) => 
+    
+    // 더 견고한 참가 여부 체크 - applications와 participants 모두 확인
+    final hasAppliedInApplications = appState.currentUser != null && _applications.any((app) => 
         app.userUid == appState.currentUser!.uid && 
         app.status != ApplicationStatus.cancelled && 
         app.status != ApplicationStatus.rejected);
+    
+    final hasAppliedInParticipants = appState.currentUser != null && 
+        _tournament != null && 
+        _tournament!.participants.contains(appState.currentUser!.uid);
+    
+    final hasApplied = hasAppliedInApplications || hasAppliedInParticipants;
+    
+    debugPrint('🔍 참가 여부 체크: applications=$hasAppliedInApplications, participants=$hasAppliedInParticipants, final=$hasApplied');
     
     if (hasApplied) {
       final application = _applications.firstWhere(
@@ -4139,5 +4149,13 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   Widget _buildStatusBadge() {
     if (_tournament == null) return const SizedBox.shrink();
     return TournamentUIUtils.buildTournamentStatusChip(_tournament!.status);
+  }
+
+  bool _hasUserApplied() {
+    final appState = Provider.of<AppStateProvider>(context, listen: false);
+    return appState.currentUser != null && _applications.any((app) => 
+        app.userUid == appState.currentUser!.uid && 
+        app.status != ApplicationStatus.cancelled && 
+        app.status != ApplicationStatus.rejected);
   }
 } 

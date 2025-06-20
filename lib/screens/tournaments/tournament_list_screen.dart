@@ -128,6 +128,7 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
           ...dateFilters,
           'isPaid': false,
           'showOnlyFuture': true,
+          'status': TournamentStatus.open.index,  // open 상태만 표시
         },
       );
       
@@ -199,6 +200,7 @@ class _TournamentListScreenState extends State<TournamentListScreen> with Single
           ...dateFilters,
           'isPaid': true,
           'showOnlyFuture': true,
+          'status': TournamentStatus.open.index,  // open 상태만 표시
         },
       );
       

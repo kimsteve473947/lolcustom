@@ -598,6 +598,31 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           onPressed: _leaveChatRoom,
           tooltip: '채팅방 나가기',
         ),
+        // Discord 디버그 버튼 (임시)
+        if (Provider.of<AppStateProvider>(context, listen: false).currentUser?.email == 'kimjh473954@gmail.com') // 개발자만 보이도록
+          IconButton(
+            icon: const Icon(Icons.bug_report),
+            onPressed: () async {
+              // 테스트 Discord 메시지 생성
+              await FirebaseFirestore.instance.collection('messages').add({
+                'chatRoomId': widget.chatRoomId,
+                'senderId': 'system',
+                'senderName': '시스템',
+                'senderProfileImageUrl': null,
+                'text': '🎯 테스트 Discord 채널이 생성되었습니다!\n\n💬 텍스트 채팅\nhttps://discord.gg/test123\n\n🎤 음성 채팅\nA팀: https://discord.gg/testA\nB팀: https://discord.gg/testB',
+                'readStatus': {},
+                'timestamp': FieldValue.serverTimestamp(),
+                'metadata': {
+                  'isSystem': true,
+                  'type': 'discord_channels',
+                },
+              });
+              
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('테스트 Discord 메시지 전송됨')),
+              );
+            },
+          ),
       ],
     );
   }
