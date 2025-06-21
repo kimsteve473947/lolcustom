@@ -1,15 +1,15 @@
 import 'package:flutter/material.dart';
-import 'package:lol_custom_game_manager/models/clan_model.dart';
-import 'package:lol_custom_game_manager/services/clan_service.dart';
-import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
-import 'package:lol_custom_game_manager/constants/app_theme.dart';
-import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
-import 'package:lol_custom_game_manager/providers/auth_provider.dart';
+import 'package:go_router/go_router.dart';
+import '../../../constants/app_theme.dart';
+import '../../../models/clan_model.dart';
+import '../../../models/clan_application_model.dart';
+import '../../../services/clan_service.dart';
+import '../../../providers/auth_provider.dart';
+import '../../../widgets/loading_indicator.dart';
+import '../../../widgets/clan_emblem_widget.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_member_tab.dart';
-import 'package:lol_custom_game_manager/widgets/clan_emblem_widget.dart';
-import 'dart:ui';
 
 class ClanDetailScreen extends StatefulWidget {
   final String clanId;
@@ -25,6 +25,11 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
   late TabController _tabController;
   ClanModel? _clan;
   bool _isLoading = true;
+  bool _isMember = false;
+  bool _isOwner = false;
+  bool _hasApplied = false;
+  bool _isLoadingApplication = false;
+  ClanApplicationModel? _currentApplication;
 
   @override
   void initState() {
@@ -33,14 +38,63 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
     _loadClanDetails();
   }
 
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadClanDetails() async {
+    setState(() {
+      _isLoading = true;
+    });
+
     try {
       final clan = await _clanService.getClan(widget.clanId);
-      if (mounted) {
-        setState(() {
-          _clan = clan;
-          _isLoading = false;
-        });
+      final authProvider = Provider.of<AuthProvider>(context, listen: false);
+      final currentUser = authProvider.user;
+      
+      if (clan != null && currentUser != null) {
+        final isMember = clan.members.contains(currentUser.uid);
+        
+        // 멤버가 아닌 경우 공개 프로필 화면으로 리다이렉트
+        if (!isMember) {
+          if (mounted) {
+            context.go('/clans/public/${widget.clanId}');
+          }
+          return;
+        }
+        
+        final isOwner = clan.ownerId == currentUser.uid;
+        
+        // 가입 신청 여부 확인
+        final applications = await _clanService.getUserApplications().first;
+        final currentApplication = applications
+            .where((app) => app.clanId == widget.clanId && app.status == ClanApplicationStatus.pending)
+            .firstOrNull;
+        
+        if (mounted) {
+          setState(() {
+            _clan = clan;
+            _isMember = isMember;
+            _isOwner = isOwner;
+            _hasApplied = currentApplication != null;
+            _currentApplication = currentApplication;
+            _isLoading = false;
+          });
+        }
+      } else {
+        // 로그인하지 않았거나 클랜이 없는 경우 공개 프로필로 리다이렉트
+        if (mounted) {
+          if (clan != null) {
+            context.go('/clans/public/${widget.clanId}');
+          } else {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('클랜 정보를 찾을 수 없습니다')),
+            );
+            context.go('/clans');
+          }
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -56,131 +110,213 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      body: _isLoading
-          ? const Center(child: LoadingIndicator())
-          : _clan == null
-              ? const Center(child: Text('클랜 정보를 찾을 수 없습니다.'))
-              : _buildClanDetailBody(),
-    );
-  }
+    if (_isLoading) {
+      return const Scaffold(
+        body: Center(child: LoadingIndicator()),
+      );
+    }
 
-  Widget _buildClanDetailBody() {
-    return CustomScrollView(
-      slivers: [
-        SliverAppBar(
-          expandedHeight: 250.0,
-          floating: false,
-          pinned: true,
-          elevation: 0,
-          leading: IconButton(
-            icon: const Icon(Icons.arrow_back),
-            onPressed: () {
-              if (context.canPop()) {
-                context.pop();
-              } else {
-                context.go('/clans');
-              }
-            },
-          ),
-          actions: [
-            Consumer<AuthProvider>(
-              builder: (context, authProvider, child) {
-                final isOwner = authProvider.user?.uid == _clan?.ownerId;
-                if (isOwner) {
-                  return IconButton(
-                    icon: const Icon(Icons.settings),
-                    onPressed: () async {
-                      await context.push('/clans/${widget.clanId}/manage');
-                      _loadClanDetails();
-                    },
-                  );
-                }
-                return const SizedBox.shrink();
-              },
-            ),
-            IconButton(icon: const Icon(Icons.more_vert), onPressed: () { /* 더보기 메뉴 */ }),
-          ],
-          flexibleSpace: FlexibleSpaceBar(
-            background: _buildHeader(),
-          ),
-          bottom: TabBar(
-            controller: _tabController,
-            tabs: const [
-              Tab(text: '오버뷰'),
-              Tab(text: '일정'),
-              Tab(text: '멤버'),
-            ],
-          ),
+    if (_clan == null) {
+      return Scaffold(
+        appBar: AppBar(
+          title: const Text('클랜 정보'),
         ),
-        SliverFillRemaining(
-          child: TabBarView(
-            controller: _tabController,
-            children: [
-              _buildOverviewTab(),
-              const Center(child: Text('일정 정보가 여기에 표시됩니다.')),
-              ClanMemberTab(
-                clanId: _clan!.id,
-                isOwner: context.read<AuthProvider>().user?.uid == _clan!.ownerId,
+        body: const Center(
+          child: Text('클랜 정보를 찾을 수 없습니다.'),
+        ),
+      );
+    }
+
+    return DefaultTabController(
+      length: 3,
+      child: Scaffold(
+        backgroundColor: AppColors.background,
+        body: Column(
+          children: [
+            // 헤더 부분
+            Container(
+              decoration: BoxDecoration(
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    AppColors.primary,
+                    AppColors.primary.withOpacity(0.8),
+                  ],
+                ),
               ),
-            ],
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildHeader() {
-    return ClipRRect(
-      child: Stack(
-        fit: StackFit.expand,
-        children: [
-          // Background
-          Container(
-            decoration: const BoxDecoration(
-              color: Color(0xFFE0E0E0), // 임시로 직접 색상 코드 사용
+              child: SafeArea(
+                child: Column(
+                  children: [
+                    // AppBar 부분
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8),
+                      child: Row(
+                        children: [
+                          IconButton(
+                            icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white),
+                            onPressed: () {
+                              if (context.canPop()) {
+                                context.pop();
+                              } else {
+                                context.go('/clans');
+                              }
+                            },
+                          ),
+                          const Spacer(),
+                          if (_isOwner)
+                            IconButton(
+                              icon: const Icon(Icons.settings, color: Colors.white),
+                              onPressed: () async {
+                                await context.push('/clans/${widget.clanId}/manage');
+                                _loadClanDetails();
+                              },
+                            ),
+                          IconButton(
+                            icon: const Icon(Icons.more_vert, color: Colors.white),
+                            onPressed: () { /* 더보기 메뉴 */ },
+                          ),
+                        ],
+                      ),
+                    ),
+                    
+                    // 클랜 정보 부분
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
+                      child: Column(
+                        children: [
+                          // 클랜 엠블럼
+                          Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: Colors.white.withOpacity(0.2),
+                              border: Border.all(
+                                color: Colors.white.withOpacity(0.3),
+                                width: 3,
+                              ),
+                            ),
+                            child: Padding(
+                              padding: const EdgeInsets.all(12),
+                              child: ClanEmblemWidget(
+                                emblemData: _clan!.emblem,
+                                size: 56,
+                              ),
+                            ),
+                          ),
+                          
+                          const SizedBox(height: 16),
+                          
+                          // 클랜 이름
+                          Text(
+                            _clan!.name,
+                            style: const TextStyle(
+                              fontSize: 28,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                              height: 1.2,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          
+                          const SizedBox(height: 12),
+                          
+                          // 레벨 & 멤버 정보
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              _buildBadge(
+                                icon: Icons.star_rounded,
+                                text: 'Lv.${_clan!.level}',
+                              ),
+                              const SizedBox(width: 12),
+                              _buildBadge(
+                                icon: Icons.group_rounded,
+                                text: '${_clan!.memberCount}/${_clan!.maxMembers}',
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             ),
-          ),
-          // Frosted glass effect
-          BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 10.0, sigmaY: 10.0),
-            child: Container(
-              color: Colors.black.withOpacity(0.1),
+            
+            // 탭바
+            Container(
+              color: Colors.white,
+              child: TabBar(
+                controller: _tabController,
+                indicatorColor: AppColors.primary,
+                labelColor: AppColors.primary,
+                unselectedLabelColor: AppColors.textSecondary,
+                labelStyle: const TextStyle(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 14,
+                ),
+                unselectedLabelStyle: const TextStyle(
+                  fontWeight: FontWeight.w500,
+                  fontSize: 14,
+                ),
+                tabs: const [
+                  Tab(text: '오버뷰'),
+                  Tab(text: '일정'),
+                  Tab(text: '멤버'),
+                ],
+              ),
             ),
-          ),
-          // Content
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.only(bottom: 50.0), // Space for the TabBar
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
+            
+            // 탭 내용
+            Expanded(
+              child: TabBarView(
+                controller: _tabController,
                 children: [
-                  ClanEmblemWidget(
-                    emblemData: _clan!.emblem,
-                    size: 100,
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    _clan!.name,
-                    style: const TextStyle(
-                      fontSize: 24,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      shadows: [Shadow(blurRadius: 2, color: Colors.black54, offset: Offset(1, 1))],
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    'Lv. ${_clan!.level}',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
-                      color: Colors.white.withOpacity(0.8),
-                      shadows: const [Shadow(blurRadius: 1, color: Colors.black26, offset: Offset(1, 1))],
-                    ),
+                  _buildOverviewTab(),
+                  _buildScheduleTab(),
+                  ClanMemberTab(
+                    clanId: widget.clanId,
+                    isOwner: _isOwner,
                   ),
                 ],
               ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildBadge({required IconData icon, required String text}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: Colors.white.withOpacity(0.2),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: Colors.white.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(
+            icon,
+            color: Colors.white,
+            size: 16,
+          ),
+          const SizedBox(width: 6),
+          Text(
+            text,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: Colors.white,
             ),
           ),
         ],
@@ -190,32 +326,567 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
 
   Widget _buildOverviewTab() {
     return SingleChildScrollView(
-      padding: const EdgeInsets.all(16.0),
+      padding: const EdgeInsets.all(16),
       child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSectionTitle('클랜 정보'),
-          _infoRow(Icons.shield_outlined, '클랜명', _clan!.name),
-          _infoRow(Icons.description_outlined, '클랜 설명', _clan!.description ?? '없음'),
-          _buildDiscordRow(),
-          const SizedBox(height: 24),
-          _buildSectionTitle('활동 정보'),
-          _infoRow(Icons.calendar_today_outlined, '활동 요일', _clan!.activityDays.isNotEmpty ? _clan!.activityDays.join(', ') : '미정'),
-          _infoRow(Icons.access_time_outlined, '활동 시간', _clan!.activityTimes.isNotEmpty ? _clan!.activityTimes.map(_playTimeToString).join(', ') : '미정'),
-          const SizedBox(height: 24),
-          _buildSectionTitle('클랜 성향'),
-          _infoRow(Icons.people_outline, '선호 연령대', _clan!.ageGroups.isNotEmpty ? _clan!.ageGroups.map(_ageGroupToString).join(', ') : '모든 연령'),
-          _infoRow(Icons.wc_outlined, '선호 성별', _genderPreferenceToString(_clan!.genderPreference)),
-          _infoRow(Icons.flag_outlined, '클랜 포커스', _clanFocusToString(_clan!.focus)),
-          _buildFocusRatingBar(_clan!.focusRating),
-          const SizedBox(height: 24),
-          _buildSectionTitle('멤버 및 레벨'),
-          _infoRow(Icons.group_outlined, '멤버', '${_clan!.memberCount} / ${_clan!.maxMembers}'),
-          _infoRow(Icons.star_outline, '레벨', 'Lv. ${_clan!.level}'),
-          _buildXpBar(_clan!.xp, _clan!.xpToNextLevel),
+          // 클랜 정보 카드
+          _buildInfoCard(
+            title: '클랜 정보',
+            icon: Icons.info_outline_rounded,
+            children: [
+              _buildInfoRow(
+                icon: Icons.description_outlined,
+                title: '클랜 설명',
+                content: _clan!.description ?? '설명이 없습니다',
+              ),
+              const SizedBox(height: 16),
+              _buildDiscordInfoRow(),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // 활동 정보 카드
+          _buildInfoCard(
+            title: '활동 정보',
+            icon: Icons.schedule_rounded,
+            children: [
+              _buildInfoRow(
+                icon: Icons.calendar_today_outlined,
+                title: '활동 요일',
+                content: _clan!.activityDays.isNotEmpty 
+                    ? _clan!.activityDays.join(', ') 
+                    : '미정',
+              ),
+              const SizedBox(height: 16),
+              _buildInfoRow(
+                icon: Icons.access_time_outlined,
+                title: '활동 시간',
+                content: _clan!.activityTimes.isNotEmpty 
+                    ? _clan!.activityTimes.map(_playTimeToString).join(', ') 
+                    : '미정',
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // 클랜 성향 카드
+          _buildInfoCard(
+            title: '클랜 성향',
+            icon: Icons.psychology_rounded,
+            children: [
+              _buildInfoRow(
+                icon: Icons.people_outline,
+                title: '선호 연령대',
+                content: _clan!.ageGroups.isNotEmpty 
+                    ? _clan!.ageGroups.map(_ageGroupToString).join(', ') 
+                    : '모든 연령',
+              ),
+              const SizedBox(height: 16),
+              _buildInfoRow(
+                icon: Icons.wc_outlined,
+                title: '선호 성별',
+                content: _genderPreferenceToString(_clan!.genderPreference),
+              ),
+              const SizedBox(height: 16),
+              _buildInfoRow(
+                icon: Icons.flag_outlined,
+                title: '클랜 포커스',
+                content: _clanFocusToString(_clan!.focus),
+              ),
+              const SizedBox(height: 20),
+              _buildFocusRatingBar(_clan!.focusRating),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // 레벨 정보 카드
+          _buildInfoCard(
+            title: '레벨 & 경험치',
+            icon: Icons.trending_up_rounded,
+            children: [
+              _buildInfoRow(
+                icon: Icons.star_outline,
+                title: '현재 레벨',
+                content: 'Lv. ${_clan!.level}',
+              ),
+              const SizedBox(height: 20),
+              _buildXpBar(_clan!.xp, _clan!.xpToNextLevel),
+            ],
+          ),
+
+          const SizedBox(height: 100), // 하단 여백
         ],
       ),
     );
+  }
+
+  Widget _buildScheduleTab() {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(16),
+      child: Column(
+        children: [
+          // 활동 요일 카드
+          _buildInfoCard(
+            title: '활동 요일',
+            icon: Icons.calendar_today_rounded,
+            children: [
+              if (_clan!.activityDays.isNotEmpty)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _clan!.activityDays.map((day) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.primary.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppColors.primary.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        day,
+                        style: TextStyle(
+                          color: AppColors.primary,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                )
+              else
+                _buildEmptyState(
+                  icon: Icons.calendar_today_outlined,
+                  message: '활동 요일이 정해지지 않았습니다',
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // 활동 시간 카드
+          _buildInfoCard(
+            title: '활동 시간대',
+            icon: Icons.access_time_rounded,
+            children: [
+              if (_clan!.activityTimes.isNotEmpty)
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: _clan!.activityTimes.map((time) {
+                    return Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: AppColors.success.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(
+                          color: AppColors.success.withOpacity(0.3),
+                          width: 1,
+                        ),
+                      ),
+                      child: Text(
+                        _playTimeToString(time),
+                        style: TextStyle(
+                          color: AppColors.success,
+                          fontWeight: FontWeight.w600,
+                          fontSize: 14,
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                )
+              else
+                _buildEmptyState(
+                  icon: Icons.access_time_outlined,
+                  message: '활동 시간대가 정해지지 않았습니다',
+                ),
+            ],
+          ),
+
+          const SizedBox(height: 16),
+
+          // 예정된 이벤트 카드
+          _buildInfoCard(
+            title: '예정된 이벤트',
+            icon: Icons.event_rounded,
+            children: [
+              _buildEmptyState(
+                icon: Icons.event_available_outlined,
+                message: '아직 예정된 이벤트가 없습니다',
+                description: '클랜장이 이벤트를 등록하면 여기에 표시됩니다',
+              ),
+            ],
+          ),
+
+          const SizedBox(height: 100), // 하단 여백
+        ],
+      ),
+    );
+  }
+
+  Widget _buildInfoCard({
+    required String title,
+    required IconData icon,
+    required List<Widget> children,
+  }) {
+    return Container(
+      width: double.infinity,
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: AppColors.primary.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Icon(
+                    icon,
+                    color: AppColors.primary,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Text(
+                  title,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 20),
+            ...children,
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildInfoRow({
+    required IconData icon,
+    required String title,
+    required String content,
+  }) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppColors.backgroundGrey,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: Icon(
+            icon,
+            color: AppColors.textSecondary,
+            size: 16,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                title,
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              Text(
+                content,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildDiscordInfoRow() {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 32,
+          height: 32,
+          decoration: BoxDecoration(
+            color: AppColors.backgroundGrey,
+            borderRadius: BorderRadius.circular(8),
+          ),
+          child: const Icon(
+            Icons.discord,
+            color: AppColors.textSecondary,
+            size: 16,
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '디스코드',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: AppColors.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 4),
+              if (_clan!.discordUrl != null && _clan!.discordUrl!.isNotEmpty)
+                GestureDetector(
+                  onTap: () => _launchUrl(_clan!.discordUrl!),
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF5865F2).withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: const Color(0xFF5865F2).withOpacity(0.3),
+                        width: 1,
+                      ),
+                    ),
+                    child: const Text(
+                      '디스코드 참여하기',
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFF5865F2),
+                      ),
+                    ),
+                  ),
+                )
+              else
+                const Text(
+                  '등록된 디스코드가 없습니다',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppColors.textPrimary,
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildEmptyState({
+    required IconData icon,
+    required String message,
+    String? description,
+  }) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(32),
+      child: Column(
+        children: [
+          Container(
+            width: 64,
+            height: 64,
+            decoration: BoxDecoration(
+              color: AppColors.backgroundGrey,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              icon,
+              size: 32,
+              color: AppColors.textTertiary,
+            ),
+          ),
+          const SizedBox(height: 16),
+          Text(
+            message,
+            style: const TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w600,
+              color: AppColors.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          if (description != null) ...[
+            const SizedBox(height: 8),
+            Text(
+              description,
+              style: const TextStyle(
+                fontSize: 14,
+                color: AppColors.textTertiary,
+              ),
+              textAlign: TextAlign.center,
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  Widget _buildFocusRatingBar(int rating) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          '게임 집중도: ${rating >= 7 ? '실력 위주' : rating >= 4 ? '밸런스' : '친목 위주'}',
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+            color: AppColors.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        Container(
+          height: 8,
+          decoration: BoxDecoration(
+            color: AppColors.backgroundGrey,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: Stack(
+            children: [
+              Container(
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    colors: [AppColors.success, AppColors.warning, AppColors.error],
+                  ),
+                  borderRadius: BorderRadius.circular(4),
+                ),
+              ),
+              Positioned(
+                left: (rating / 10.0) * (MediaQuery.of(context).size.width - 72),
+                child: Container(
+                  width: 16,
+                  height: 16,
+                  transform: Matrix4.translationValues(-8, -4, 0),
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    shape: BoxShape.circle,
+                    border: Border.all(color: AppColors.primary, width: 2),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '친목',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textTertiary,
+              ),
+            ),
+            Text(
+              '실력',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: AppColors.textTertiary,
+              ),
+            ),
+          ],
+        ),
+      ],
+    );
+  }
+
+  Widget _buildXpBar(int currentXp, int maxXp) {
+    final progress = maxXp > 0 ? currentXp / maxXp : 0.0;
+    
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              '경험치',
+              style: const TextStyle(
+                fontSize: 16,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textPrimary,
+              ),
+            ),
+            Text(
+              '$currentXp / $maxXp XP',
+              style: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+                color: AppColors.textSecondary,
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          height: 8,
+          decoration: BoxDecoration(
+            color: AppColors.backgroundGrey,
+            borderRadius: BorderRadius.circular(4),
+          ),
+          child: FractionallySizedBox(
+            alignment: Alignment.centerLeft,
+            widthFactor: progress.clamp(0.0, 1.0),
+            child: Container(
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(4),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _launchUrl(String url) async {
+    final uri = Uri.parse(url);
+    if (await canLaunchUrl(uri)) {
+      await launchUrl(uri);
+    }
   }
 
   String _playTimeToString(PlayTimeType type) {
@@ -254,152 +925,5 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
       case ClanFocus.balanced: return '균형';
       default: return '';
     }
-  }
-
-  Widget _buildFocusRatingBar(int rating) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        children: [
-          const Icon(Icons.balance, color: Colors.grey),
-          const SizedBox(width: 16),
-          const SizedBox(
-            width: 100,
-            child: Text('성향', style: TextStyle(fontSize: 16, color: Colors.grey)),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                LinearProgressIndicator(
-                  value: rating / 10.0,
-                  backgroundColor: Colors.grey.shade300,
-                  color: Color.lerp(Colors.blue, Colors.red, rating / 10.0),
-                ),
-                const SizedBox(height: 4),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: const [
-                    Text('친목', style: TextStyle(fontSize: 12)),
-                    Text('실력', style: TextStyle(fontSize: 12)),
-                  ],
-                )
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildXpBar(int currentXp, int xpToNextLevel) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        children: [
-          const Icon(Icons.trending_up, color: Colors.grey),
-          const SizedBox(width: 16),
-          const SizedBox(
-            width: 100,
-            child: Text('경험치', style: TextStyle(fontSize: 16, color: Colors.grey)),
-          ),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                LinearProgressIndicator(
-                  value: currentXp / xpToNextLevel,
-                  backgroundColor: Colors.grey.shade300,
-                  color: AppColors.primary,
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  '$currentXp / $xpToNextLevel XP',
-                  style: const TextStyle(fontSize: 12, color: Colors.grey),
-                  textAlign: TextAlign.end,
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 8.0),
-      child: Text(
-        title,
-        style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
-      ),
-    );
-  }
-
-  Widget _infoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.grey.shade600),
-          const SizedBox(width: 16),
-          SizedBox(
-            width: 100,
-            child: Text(label, style: TextStyle(fontSize: 16, color: Colors.grey.shade700)),
-          ),
-          Expanded(
-            child: Text(
-              value,
-              style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w500),
-              textAlign: TextAlign.end,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-  Widget _buildDiscordRow() {
-    final discordUrl = _clan?.discordUrl;
-    final bool hasUrl = discordUrl != null && discordUrl.isNotEmpty;
-
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 12.0),
-      child: Row(
-        children: [
-          Icon(Icons.discord, color: Colors.grey.shade600),
-          const SizedBox(width: 16),
-          SizedBox(
-            width: 100,
-            child: Text('디스코드', style: TextStyle(fontSize: 16, color: Colors.grey.shade700)),
-          ),
-          Expanded(
-            child: InkWell(
-              onTap: hasUrl ? () async {
-                if (discordUrl != null) {
-                  final uri = Uri.parse(discordUrl);
-                  if (await canLaunchUrl(uri)) {
-                    await launchUrl(uri, mode: LaunchMode.externalApplication);
-                  } else {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('링크를 열 수 없습니다: $discordUrl')),
-                    );
-                  }
-                }
-              } : null,
-              child: Text(
-                hasUrl ? discordUrl : '없음',
-                style: TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w500,
-                  color: hasUrl ? Colors.blue : Colors.black,
-                  decoration: hasUrl ? TextDecoration.underline : TextDecoration.none,
-                ),
-                textAlign: TextAlign.end,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
   }
 }

@@ -710,38 +710,37 @@ class ClanService {
     });
   }
 
-  // 클랜 가입 신청 취소
-  Future<void> cancelClanApplication(String applicationId) async {
-    final user = _auth.currentUser;
-    if (user == null) {
-      throw Exception('로그인이 필요합니다.');
-    }
+  // 클랜 가입 신청 취소 (clanId와 userId로)
+  Future<void> cancelClanApplicationByUser(String clanId, String userId) async {
+    try {
+      // 해당 사용자의 해당 클랜 신청서 찾기
+      final snapshot = await _firestore
+          .collection('clan_applications')
+          .where('clanId', isEqualTo: clanId)
+          .where('userUid', isEqualTo: userId)
+          .where('status', isEqualTo: ClanApplicationStatus.pending.index)
+          .get();
 
-    final applicationRef = _firestore.collection('clan_applications').doc(applicationId);
-
-    return _firestore.runTransaction((transaction) async {
-      final applicationDoc = await transaction.get(applicationRef);
-      if (!applicationDoc.exists) {
-        throw Exception('존재하지 않는 신청서입니다.');
+      if (snapshot.docs.isEmpty) {
+        throw Exception('취소할 신청서가 없습니다.');
       }
 
-      final applicationData = applicationDoc.data() as Map<String, dynamic>;
-      if (applicationData['userUid'] != user.uid) {
-        throw Exception('신청을 취소할 권한이 없습니다.');
-      }
+      final applicationDoc = snapshot.docs.first;
+      
+      return _firestore.runTransaction((transaction) async {
+        // 신청서 삭제
+        transaction.delete(applicationDoc.reference);
 
-      // 신청서 삭제
-      transaction.delete(applicationRef);
-
-      // 클랜의 pendingMembers에서 사용자 제거
-      final clanId = applicationData['clanId'];
-      if (clanId != null) {
+        // 클랜의 pendingMembers에서 사용자 제거
         final clanRef = _firestore.collection('clans').doc(clanId);
         transaction.update(clanRef, {
-          'pendingMembers': FieldValue.arrayRemove([user.uid])
+          'pendingMembers': FieldValue.arrayRemove([userId])
         });
-      }
-    });
+      });
+    } catch (e) {
+      debugPrint('Error canceling clan application: $e');
+      rethrow;
+    }
   }
 
   // 클랜 평균 티어 계산
@@ -816,5 +815,57 @@ class ClanService {
       'read': false,
       'createdAt': Timestamp.now(),
     });
+  }
+
+  // 사용자가 특정 클랜에 가입 신청했는지 확인
+
+  // 클랜 가입 신청 취소 (applicationId로)
+  Future<void> cancelClanApplicationById(String applicationId) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('로그인이 필요합니다.');
+    }
+
+    final applicationRef = _firestore.collection('clan_applications').doc(applicationId);
+
+    return _firestore.runTransaction((transaction) async {
+      final applicationDoc = await transaction.get(applicationRef);
+      if (!applicationDoc.exists) {
+        throw Exception('존재하지 않는 신청서입니다.');
+      }
+
+      final applicationData = applicationDoc.data() as Map<String, dynamic>;
+      if (applicationData['userUid'] != user.uid) {
+        throw Exception('신청을 취소할 권한이 없습니다.');
+      }
+
+      // 신청서 삭제
+      transaction.delete(applicationRef);
+
+      // 클랜의 pendingMembers에서 사용자 제거
+      final clanId = applicationData['clanId'];
+      if (clanId != null) {
+        final clanRef = _firestore.collection('clans').doc(clanId);
+        transaction.update(clanRef, {
+          'pendingMembers': FieldValue.arrayRemove([user.uid])
+        });
+      }
+    });
+  }
+
+  Future<bool> hasUserAppliedToClan(String clanId, String userId) async {
+    try {
+      final snapshot = await _firestore
+          .collection('clan_applications')
+          .where('clanId', isEqualTo: clanId)
+          .where('userUid', isEqualTo: userId)
+          .where('status', isEqualTo: ClanApplicationStatus.pending.index)
+          .get();
+
+      return snapshot.docs.isNotEmpty;
+    } catch (e) {
+      debugPrint('Error checking if user applied to clan: $e');
+      return false;
+    }
   }
 }

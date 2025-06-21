@@ -49,12 +49,11 @@ class ChatService {
     TournamentModel tournament,
     UserModel currentUser,
   ) async {
-    // 채팅방 제목 생성: "[토너먼트 제목] – MM.dd HH:mm (참여자수/10)"
+    // 채팅방 제목 생성: "[토너먼트 제목] – MM.dd HH:mm" (참여자수 제거)
     final startDateTime = tournament.startsAt.toDate();
     final formattedDate = DateFormat('MM.dd HH:mm').format(startDateTime);
     final participantCount = tournament.participants.length;
-    final chatRoomTitle = 
-        "${tournament.title} – $formattedDate ($participantCount/${tournament.totalSlots})";
+    final chatRoomTitle = "${tournament.title} – $formattedDate";
 
     // 참가자 초기화 (주최자 및 현재 참가자 포함)
     final participantIds = List<String>.from(tournament.participants);
@@ -289,8 +288,7 @@ class ChatService {
   ) async {
     final startDateTime = tournament.startsAt.toDate();
     final formattedDate = DateFormat('MM.dd HH:mm').format(startDateTime);
-    final chatRoomTitle = 
-        "${tournament.title} – $formattedDate ($participantCount/${tournament.totalSlots})";
+    final chatRoomTitle = "${tournament.title} – $formattedDate";
     
     await _firestore.collection('chatRooms').doc(chatRoomId).update({
       'title': chatRoomTitle,
@@ -498,123 +496,11 @@ class ChatService {
            // 모든 메시지 기본 정보 출력
            debugPrint('🔍 [MESSAGE DEBUG] ID: ${message.id}, senderId: ${message.senderId}, hasMetadata: ${message.metadata != null}');
            
-           if (message.senderId == 'system' && message.metadata != null && message.metadata!['type'] == 'discord_channels') {
+           // Discord 초대 메시지 찾기 (Firebase Functions에서 사용하는 타입명과 일치)
+           if (message.senderId == 'system' && message.metadata != null && message.metadata!['type'] == 'discord_invite') {
              debugPrint('🎯 [DISCORD MESSAGE FOUND] Message ID: ${message.id}');
              debugPrint('🎯 [DISCORD MESSAGE FOUND] Content: ${message.text}');
              debugPrint('🎯 [DISCORD MESSAGE FOUND] Metadata: ${message.metadata}');
-           }
-           
-           // 특정 메시지 ID 검색 (Firebase Functions에서 저장한 ID)
-           if (message.id == 'H8UVCw2VseCBNwMlQqp4') {
-             debugPrint('🎯 [FIREBASE MESSAGE FOUND] Found message with ID H8UVCw2VseCBNwMlQqp4');
-             debugPrint('🎯 [FIREBASE MESSAGE FOUND] SenderId: ${message.senderId}');
-             debugPrint('🎯 [FIREBASE MESSAGE FOUND] Text: ${message.text}');
-             debugPrint('🎯 [FIREBASE MESSAGE FOUND] Metadata: ${message.metadata}');
-           }
-           
-           // 최신 Firebase Functions 메시지 ID 검색
-           if (message.id == 'WWgg1Q4PS1MqfE3MUBdL') {
-             debugPrint('🎯 [LATEST DISCORD MESSAGE] Found latest message with ID WWgg1Q4PS1MqfE3MUBdL');
-             debugPrint('🎯 [LATEST DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯 [LATEST DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯 [LATEST DISCORD MESSAGE] Metadata: ${message.metadata}');
-           }
-           
-           // 가장 최신 Firebase Functions 메시지 ID 검색
-           if (message.id == 'v4Ucp1QHMc88KbAfsoWU') {
-             debugPrint('🎯 [NEWEST DISCORD MESSAGE] Found newest message with ID v4Ucp1QHMc88KbAfsoWU');
-             debugPrint('🎯 [NEWEST DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯 [NEWEST DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯 [NEWEST DISCORD MESSAGE] Metadata: ${message.metadata}');
-           }
-           
-           // 초최신 Firebase Functions 메시지 ID 검색 
-           if (message.id == 'eSlllYMCk05WBMNlYQbS') {
-             debugPrint('🎯 [SUPER LATEST DISCORD MESSAGE] Found super latest message with ID eSlllYMCk05WBMNlYQbS');
-             debugPrint('🎯 [SUPER LATEST DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯 [SUPER LATEST DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯 [SUPER LATEST DISCORD MESSAGE] Metadata: ${message.metadata}');
-           }
-           
-           // 울트라 최신 Firebase Functions 메시지 ID 검색 
-           if (message.id == 'uRKT0o8vmE0m7wc6jSS4') {
-             debugPrint('🎯 [ULTRA LATEST DISCORD MESSAGE] Found ultra latest message with ID uRKT0o8vmE0m7wc6jSS4');
-             debugPrint('🎯 [ULTRA LATEST DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯 [ULTRA LATEST DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯 [ULTRA LATEST DISCORD MESSAGE] Metadata: ${message.metadata}');
-           }
-           
-           // 최최신 Firebase Functions 메시지 ID 검색 
-           if (message.id == 'h3WkDErR8vTmEm85Voi5') {
-             debugPrint('🎯 [NEWEST DISCORD MESSAGE] Found newest message with ID h3WkDErR8vTmEm85Voi5');
-             debugPrint('🎯 [NEWEST DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯 [NEWEST DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯 [NEWEST DISCORD MESSAGE] Metadata: ${message.metadata}');
-           }
-           
-           // 방금 Firebase Functions에서 저장한 메시지 ID 검색 
-           if (message.id == 'E27uAld0BfeV9RBckxCx') {
-             debugPrint('🎯 [CURRENT DISCORD MESSAGE] Found current message with ID E27uAld0BfeV9RBckxCx');
-             debugPrint('🎯 [CURRENT DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯 [CURRENT DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯 [CURRENT DISCORD MESSAGE] Metadata: ${message.metadata}');
-           }
-           
-           // 방금 Firebase Functions에서 저장한 메시지 ID 검색 
-           if (message.id == 'n75Ph0wSN6NWERTnWJcK') {
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Found latest message with ID n75Ph0wSN6NWERTnWJcK');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Metadata: ${message.metadata}');
-           }
-           
-           // 방금 Firebase Functions에서 저장한 메시지 ID 검색 
-           if (message.id == 'LWOE4QFlA3HA081y2LrI') {
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Found latest message with ID LWOE4QFlA3HA081y2LrI');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Metadata: ${message.metadata}');
-           }
-           
-           // 방금 Firebase Functions에서 저장한 메시지 ID 검색 
-           if (message.id == 'zT7Cm70PaEiJplKtn1MK') {
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Found latest message with ID zT7Cm70PaEiJplKtn1MK');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Metadata: ${message.metadata}');
-           }
-           
-           // 방금 Firebase Functions에서 저장한 메시지 ID 검색 
-           if (message.id == 'kZzpYvpnqfTmjm49RuNM') {
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Found latest message with ID kZzpYvpnqfTmjm49RuNM');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Metadata: ${message.metadata}');
-           }
-           
-           // Discord 버튼 메시지 타입 확인
-           if (message.metadata != null && message.metadata!['type'] == 'discord_button') {
-             debugPrint('🔘 [DISCORD BUTTON MESSAGE] Found Discord button message');
-             debugPrint('🔘 [DISCORD BUTTON MESSAGE] ID: ${message.id}');
-             debugPrint('🔘 [DISCORD BUTTON MESSAGE] Text: ${message.text}');
-             debugPrint('🔘 [DISCORD BUTTON MESSAGE] Metadata: ${message.metadata}');
-             debugPrint('🔘 [DISCORD BUTTON MESSAGE] HasButton: ${message.metadata!['hasButton']}');
-           }
-           
-           // 최신 Firebase Functions 메시지 ID 검색 
-           if (message.id == 'z8GWar3ZkAM5B5c0CPZg') {
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Found latest message with ID z8GWar3ZkAM5B5c0CPZg');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯🎯🎯 [FOUND LATEST DISCORD MESSAGE] Metadata: ${message.metadata}');
-           }
-           
-           // 방금 Firebase Functions에서 저장한 메시지 ID 검색 
-           if (message.id == 'YAktcm7pUZbuO5xwJYtF') {
-             debugPrint('🎯🎯🎯 [FOUND DISCORD MESSAGE] Found latest Discord message with ID YAktcm7pUZbuO5xwJYtF');
-             debugPrint('🎯🎯🎯 [FOUND DISCORD MESSAGE] SenderId: ${message.senderId}');
-             debugPrint('🎯🎯🎯 [FOUND DISCORD MESSAGE] Text: ${message.text}');
-             debugPrint('🎯🎯🎯 [FOUND DISCORD MESSAGE] Metadata: ${message.metadata}');
            }
          }
          

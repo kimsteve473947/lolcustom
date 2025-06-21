@@ -2,7 +2,7 @@ import {onDocumentUpdated} from 'firebase-functions/v2/firestore';
 import {onCall} from 'firebase-functions/v2/https';
 import {onSchedule} from 'firebase-functions/v2/scheduler';
 import * as admin from 'firebase-admin';
-import { getDiscordBot, TournamentChannelData } from './discord-bot';
+import { getDiscordBot } from './discord-bot';
 
 /**
  * 토너먼트 참가자가 변경될 때 트리거되는 함수
@@ -201,70 +201,6 @@ B팀: ${channelData.voiceChannel2Invite}
 }
 
 /**
- * Discord 채널 생성 후 앱 채팅방에 알림 메시지 전송
- */
-async function sendDiscordButtonNotification(tournamentData: any): Promise<void> {
-  console.log(`📱 [DISCORD NOTIFICATION] Starting button notification for tournament: ${tournamentData.id}`);
-  console.log(`📱 [DISCORD NOTIFICATION] Tournament name: ${tournamentData.name}`);
-  
-  try {
-    const db = admin.firestore();
-    
-    // 채팅방 ID 찾기
-    const finalChatId = await getTournamentChatRoomId(tournamentData.id);
-    if (!finalChatId) {
-      console.error(`❌ [DISCORD NOTIFICATION] No chat room found for tournament: ${tournamentData.id}`);
-      throw new Error(`No chat room found for tournament: ${tournamentData.id}`);
-    }
-    
-    console.log(`✅ [DISCORD NOTIFICATION] Using chat room: ${finalChatId}`);
-    
-    // 클릭 가능한 Discord 초대링크 받기 메시지 생성
-    const messageContent = `🎯 ${tournamentData.name} 토너먼트 10명 달성!\n\n💬 Discord 채팅방이 생성되었습니다.\n아래 버튼을 클릭하여 초대링크를 받아보세요!\n\n📱 각자 클릭해서 Discord 채널에 입장하세요!`;
-    
-    console.log(`📝 [DISCORD NOTIFICATION] Generated button message content (length: ${messageContent.length})`);
-    
-    // Flutter 앱과 100% 동일한 메시지 구조 사용
-    const systemMessage = {
-      chatRoomId: finalChatId,
-      senderId: 'system',
-      senderName: '시스템',
-      senderProfileImageUrl: null,
-      text: messageContent,
-      readStatus: {},
-      timestamp: admin.firestore.FieldValue.serverTimestamp(),
-      imageUrl: null,
-      metadata: {
-        isSystem: true,
-        type: 'discord_button',
-        action: 'get_discord_invite',
-        tournamentId: tournamentData.id,
-        hasButton: true,
-      },
-    };
-
-    console.log(`💾 [DISCORD NOTIFICATION] Adding button message to chat room: ${finalChatId}`);
-    
-    // Flutter 앱과 동일한 messages 컬렉션에 저장
-    const messageRef = await db.collection('messages').add(systemMessage);
-    console.log(`✅ [DISCORD NOTIFICATION] Button message added with ID: ${messageRef.id}`);
-    
-    // 채팅방의 lastMessage 업데이트
-    console.log(`🔄 [DISCORD NOTIFICATION] Updating chat room last message...`);
-    await db.collection('chatRooms').doc(finalChatId).update({
-      lastMessageText: messageContent.substring(0, 100) + '...',
-      lastMessageTime: systemMessage.timestamp,
-    });
-    
-    console.log(`🎉 [DISCORD NOTIFICATION] Successfully sent Discord button notification to chat room: ${finalChatId}`);
-    
-  } catch (error) {
-    console.error(`❌ [DISCORD NOTIFICATION] Error sending button notification:`, error);
-    throw error;
-  }
-}
-
-/**
  * 토너먼트와 연결된 채팅방 ID 가져오기 (강화된 검색)
  */
 async function getTournamentChatRoomId(tournamentId: string): Promise<string | null> {
@@ -382,53 +318,6 @@ async function getTournamentChatRoomId(tournamentId: string): Promise<string | n
     console.error(`❌ [CHAT ROOM SEARCH] Error searching for tournament chat room: ${tournamentId}`, error);
     return null;
   }
-}
-
-/**
- * 토너먼트 채팅방 생성
- */
-async function createTournamentChatRoom(tournamentData: any): Promise<string | null> {
-  try {
-    console.log(`🏗️ [CHAT ROOM CREATE] Creating chat room for tournament: ${tournamentData.id}`);
-    const db = admin.firestore();
-
-    const chatRoomData = {
-      type: 'tournamentRecruitment',
-      tournamentId: tournamentData.id,
-      tournamentName: tournamentData.name || `토너먼트 ${tournamentData.id}`,
-      participants: tournamentData.participants || [],
-      createdAt: admin.firestore.FieldValue.serverTimestamp(),
-      lastMessage: '',
-      lastMessageTime: admin.firestore.FieldValue.serverTimestamp(),
-      lastMessageSenderId: '',
-    };
-
-    console.log(`💾 [CHAT ROOM CREATE] Chat room data:`, chatRoomData);
-    const newChatRoom = await db.collection('chatRooms').add(chatRoomData);
-    console.log(`✅ [CHAT ROOM CREATE] Created new chat room: ${tournamentData.id} → ${newChatRoom.id}`);
-    
-    return newChatRoom.id;
-
-  } catch (error) {
-    console.error(`❌ [CHAT ROOM CREATE] Error creating tournament chat room: ${tournamentData.id}`, error);
-    return null;
-  }
-}
-
-/**
- * 디스코드 채널 안내 메시지 생성 (Flutter 앱 호환)
- */
-function createDiscordChannelMessage(tournamentName: string, channelData: TournamentChannelData): string {
-  return `🎯 ${tournamentName} 토너먼트 Discord 채널이 생성되었습니다!
-
-💬 텍스트 채팅
-${channelData.textChannelInvite}
-
-🎤 음성 채팅
-A팀: ${channelData.voiceChannel1Invite}
-B팀: ${channelData.voiceChannel2Invite}
-
-📱 링크를 터치하여 Discord 채널에 입장하세요!`;
 }
 
 /**

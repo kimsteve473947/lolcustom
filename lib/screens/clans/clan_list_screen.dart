@@ -1314,7 +1314,7 @@ class _ClanListScreenState extends State<ClanListScreen> {
             onPressed: () async {
               Navigator.pop(context);
               try {
-                await _clanService.cancelClanApplication(application.id);
+                await _clanService.cancelClanApplicationById(application.id);
                 if (mounted) {
                 ScaffoldMessenger.of(context).showSnackBar(
                     SnackBar(

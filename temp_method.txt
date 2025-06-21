@@ -1,0 +1,17 @@
+
+  Future<void> _checkApplicationStatus() async {
+    final user = context.read<AuthProvider>().user;
+    if (user != null) {
+      try {
+        final hasApplied = await _clanService.hasUserAppliedToClan(widget.clanId, user.uid);
+        if (mounted) {
+          setState(() {
+            _hasApplied = hasApplied;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error checking application status: $e');
+      }
+    }
+  }
+

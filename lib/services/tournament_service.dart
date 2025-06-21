@@ -1072,13 +1072,12 @@ class TournamentService {
       
       final tournament = TournamentModel.fromFirestore(tournamentDoc);
       
-      // 전달받은 participantCount 사용 - 토너먼트 모델의 참가자 수가 아님
+      // 참여 인원 표시 제거 - 제목에서 "(x/y)" 패턴 제거
       final startDateTime = tournament.startsAt.toDate();
       final formattedDate = DateFormat('MM.dd HH:mm').format(startDateTime);
-      final chatRoomTitle = 
-          "${tournament.title} – $formattedDate ($participantCount/${tournament.totalSlots})";
+      final chatRoomTitle = "${tournament.title} – $formattedDate";
       
-      debugPrint('Updating chat room title with participant count: $participantCount/${tournament.totalSlots}');
+      debugPrint('Updating chat room title without participant count');
       debugPrint('New chat room title: $chatRoomTitle');
       
       await _firestore.collection('chatRooms').doc(chatRoomId).update({

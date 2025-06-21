@@ -592,6 +592,12 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   AppBar _buildAppBar(BuildContext context, ChatRoomModel chatRoom) {
     String title = chatRoom.title;
+    
+    // 토너먼트 채팅방인 경우 제목에서 참가자 수 제거
+    if (chatRoom.type == ChatRoomType.tournamentRecruitment) {
+      title = title.replaceAll(RegExp(r'\s*\(\d+/\d+명?\)\s*$'), '');
+    }
+    
     if (chatRoom.type == ChatRoomType.direct) {
       final currentUser = Provider.of<AppStateProvider>(context, listen: false).currentUser;
       final otherUserId = chatRoom.participantIds.firstWhere((id) => id != currentUser?.uid, orElse: () => '');
@@ -754,29 +760,32 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   ),
                   const SizedBox(height: 12),
                   
-                  // 텍스트 채팅 링크
-                  if (message.metadata!['discordInvites'] != null) ...[
+                  // 텍스트 채팅 링크 - Firebase Functions에서 저장하는 필드명 사용
+                  if (message.metadata!['textChannelInvite'] != null) ...[
                     _buildDiscordLinkButton(
                       '💬 텍스트 채팅방 입장하기',
-                      message.metadata!['discordInvites']['text'],
+                      message.metadata!['textChannelInvite'],
                       isPrimary: true,
                     ),
                     const SizedBox(height: 8),
-                    
-                    // 음성 채팅 링크들
+                  ],
+                  
+                  // 음성 채팅 링크들 - Firebase Functions에서 저장하는 필드명 사용
+                  if (message.metadata!['voiceChannel1Invite'] != null && 
+                      message.metadata!['voiceChannel2Invite'] != null) ...[
                     Row(
                       children: [
                         Expanded(
                           child: _buildDiscordLinkButton(
                             '🎤 A팀 음성',
-                            message.metadata!['discordInvites']['voice1'],
+                            message.metadata!['voiceChannel1Invite'],
                           ),
                         ),
                         const SizedBox(width: 8),
                         Expanded(
                           child: _buildDiscordLinkButton(
                             '🎤 B팀 음성',
-                            message.metadata!['discordInvites']['voice2'],
+                            message.metadata!['voiceChannel2Invite'],
                           ),
                         ),
                       ],
@@ -1024,30 +1033,33 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 crossAxisAlignment: CrossAxisAlignment.end,
                 children: [
                   // 시간 (자신의 메시지는 오른쪽에 표시)
-                  if (isCurrentUser)
+                  if (isCurrentUser) ...[
+                    // 안 읽은 사람 수 표시 (내가 보낸 메시지만)
+                    _buildUnreadCount(message),
                     Padding(
                       padding: const EdgeInsets.only(right: 4.0, bottom: 4.0),
                       child: Text(
                         timestamp,
                         style: TextStyle(
-              fontSize: 10,
-              color: AppColors.textSecondary,
-            ),
-          ),
-      ),
-
+                          fontSize: 10,
+                          color: AppColors.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                  
                   // 메시지 말풍선
                   Container(
-      constraints: BoxConstraints(
-        maxWidth: MediaQuery.of(context).size.width * 0.7,
-      ),
+                    constraints: BoxConstraints(
+                      maxWidth: MediaQuery.of(context).size.width * 0.7,
+                    ),
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16.0,
                       vertical: 10.0,
                     ),
-      decoration: BoxDecoration(
+                    decoration: BoxDecoration(
                       color: isCurrentUser
-                          ? AppColors.primary
+                          ? AppColors.primary // 메인 주황색 배경
                           : Colors.white,
                       borderRadius: BorderRadius.only(
                         topLeft: const Radius.circular(16),
@@ -1059,18 +1071,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                             ? const Radius.circular(4)
                             : const Radius.circular(16),
                       ),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.05),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.05),
                           blurRadius: 3,
                           offset: const Offset(0, 1),
-          ),
-        ],
-      ),
+                        ),
+                      ],
+                    ),
                     child: Text(
                       message.text,
                       style: TextStyle(
-                        color: isCurrentUser ? Colors.white : Colors.black87,
+                        color: isCurrentUser ? Colors.white : Colors.black87, // 내 메시지는 흰색 글씨
                       ),
                     ),
                   ),
@@ -1473,6 +1485,32 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               color: isPrimary ? Colors.white : const Color(0xFF5865F2),
             ),
           ],
+        ),
+      ),
+    );
+  }
+
+  // 안 읽은 사람 수 표시
+  Widget _buildUnreadCount(MessageModel message) {
+    final currentUser = Provider.of<AppStateProvider>(context, listen: false).currentUser;
+    if (message.senderId != currentUser?.uid) {
+      return const SizedBox.shrink();
+    }
+    
+    // 읽지 않은 사람 수 계산 (readStatus에서 false인 사람들)
+    final unreadCount = message.readStatus.values.where((isRead) => !isRead).length;
+    if (unreadCount <= 0) {
+      return const SizedBox.shrink();
+    }
+    
+    return Container(
+      margin: const EdgeInsets.only(right: 4.0, bottom: 4.0),
+      child: Text(
+        '$unreadCount',
+        style: TextStyle(
+          fontSize: 10,
+          color: AppColors.primary.withOpacity(0.8), // 연한 주황색
+          fontWeight: FontWeight.bold,
         ),
       ),
     );

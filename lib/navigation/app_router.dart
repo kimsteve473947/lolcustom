@@ -16,6 +16,7 @@ import 'package:lol_custom_game_manager/screens/clans/clan_management_screen.dar
 import 'package:lol_custom_game_manager/screens/clans/clan_recruitment_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_recruitment_list_screen.dart';
 import 'package:lol_custom_game_manager/screens/clans/clan_search_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_join_screen.dart';
 import 'package:lol_custom_game_manager/providers/clan_recruitment_provider.dart';
 import 'package:lol_custom_game_manager/screens/main_screen.dart';
 import 'package:provider/provider.dart';
@@ -159,6 +160,13 @@ class AppRouter {
         builder: (context, state) {
           final clanId = state.pathParameters['id']!;
           return ClanManagementScreen(clanId: clanId);
+        },
+      ),
+      GoRoute(
+        path: '/clans/:id/join',
+        builder: (context, state) {
+          final clanId = state.pathParameters['id']!;
+          return ClanJoinScreen(clanId: clanId);
         },
       ),
       GoRoute(

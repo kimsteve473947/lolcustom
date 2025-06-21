@@ -23,12 +23,14 @@ class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
   late Future<ClanModel?> _clanFuture;
   String _averageTier = 'Unranked';
   bool _isLoading = false;
+  bool _hasApplied = false;
 
   @override
   void initState() {
     super.initState();
     _clanFuture = _clanService.getClan(widget.clanId);
     _fetchAverageTier();
+    _checkApplicationStatus();
   }
 
   Future<void> _fetchAverageTier() async {
@@ -48,6 +50,22 @@ class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
     }
   }
 
+  Future<void> _checkApplicationStatus() async {
+    final user = context.read<AuthProvider>().user;
+    if (user != null) {
+      try {
+        final hasApplied = await _clanService.hasUserAppliedToClan(widget.clanId, user.uid);
+        if (mounted) {
+          setState(() {
+            _hasApplied = hasApplied;
+          });
+        }
+      } catch (e) {
+        debugPrint('Error checking application status: $e');
+      }
+    }
+  }
+
   void _applyToClan(ClanModel clan) async {
     final user = context.read<AuthProvider>().user;
     if (user == null) {
@@ -61,11 +79,44 @@ class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
 
     try {
       await _clanService.applyClanWithDetails(clanId: clan.id, message: "클랜 가입을 신청합니다!");
-      _showSnackBar('클랜 가입 신청이 완료되었습니다', isError: false);
-      await Future.delayed(const Duration(seconds: 1));
-      context.pop();
+      
+      if (mounted) {
+        setState(() {
+          _hasApplied = true;
+        });
+        _showSnackBar('클랜 가입 신청이 완료되었습니다', isError: false);
+      }
     } catch (e) {
       _showSnackBar('가입 신청 중 오류가 발생했습니다', isError: true);
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  void _cancelClanApplication(ClanModel clan) async {
+    final user = context.read<AuthProvider>().user;
+    if (user == null) {
+      _showSnackBar('로그인이 필요합니다', isError: true);
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+    });
+
+    try {
+      await _clanService.cancelClanApplicationByUser(widget.clanId, user.uid);
+      
+      if (mounted) {
+        setState(() {
+          _hasApplied = false;
+        });
+        _showSnackBar('클랜 가입 신청이 취소되었습니다', isError: false);
+      }
+    } catch (e) {
+      _showSnackBar('가입 신청 취소 중 오류가 발생했습니다', isError: true);
     } finally {
       setState(() {
         _isLoading = false;
@@ -105,7 +156,13 @@ class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
             Icons.arrow_back_ios_rounded,
             color: AppColors.textPrimary,
           ),
-          onPressed: () => context.pop(),
+          onPressed: () {
+            if (context.canPop()) {
+              context.pop();
+            } else {
+              context.go('/clans');
+            }
+          },
         ),
         title: Text(
           '클랜 정보',
@@ -566,41 +623,178 @@ class _ClanPublicProfileScreenState extends State<ClanPublicProfileScreen> {
         ),
         child: SafeArea(
           top: false,
-          child: SizedBox(
-            width: double.infinity,
-            height: 56,
-            child: ElevatedButton(
-              onPressed: _isLoading ? null : () => _applyToClan(clan),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: AppColors.primary,
-                foregroundColor: Colors.white,
-                elevation: 0,
-                shadowColor: Colors.transparent,
-                shape: RoundedRectangleBorder(
-                  borderRadius: BorderRadius.circular(16),
+          child: _hasApplied 
+              ? _buildApplicationPendingWidget(clan)
+              : _buildApplicationButton(clan),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildApplicationButton(ClanModel clan) {
+    return SizedBox(
+      width: double.infinity,
+      height: 56,
+      child: ElevatedButton(
+        onPressed: _isLoading ? null : () => _applyToClan(clan),
+        style: ElevatedButton.styleFrom(
+          backgroundColor: AppColors.primary,
+          foregroundColor: Colors.white,
+          elevation: 0,
+          shadowColor: Colors.transparent,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+          ),
+          disabledBackgroundColor: AppColors.textTertiary,
+        ),
+        child: _isLoading
+            ? SizedBox(
+                width: 24,
+                height: 24,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
                 ),
-                disabledBackgroundColor: AppColors.textTertiary,
+              )
+            : Text(
+                '가입 신청하기',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                ),
               ),
-              child: _isLoading
-                  ? SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
-                      ),
-                    )
-                  : Text(
-                      '가입 신청하기',
+      ),
+    );
+  }
+
+  Widget _buildApplicationPendingWidget(ClanModel clan) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        // 가입 신청 중 상태 카드
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(20),
+          decoration: BoxDecoration(
+            color: AppColors.warning.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: AppColors.warning.withOpacity(0.3),
+              width: 1,
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(
+                Icons.hourglass_empty,
+                color: AppColors.warning,
+                size: 24,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '가입 신청 중',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w700,
+                        color: AppColors.warning,
                       ),
                     ),
-            ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '클랜장의 승인을 기다리고 있습니다',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: AppColors.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ),
         ),
-      ),
+        
+        const SizedBox(height: 16),
+        
+        // 취소 버튼
+        SizedBox(
+          width: double.infinity,
+          height: 56,
+          child: OutlinedButton(
+            onPressed: _isLoading ? null : () => _showCancelApplicationDialog(clan),
+            style: OutlinedButton.styleFrom(
+              foregroundColor: AppColors.error,
+              side: BorderSide(color: AppColors.error, width: 1.5),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
+            ),
+            child: _isLoading
+                ? SizedBox(
+                    width: 24,
+                    height: 24,
+                    child: CircularProgressIndicator(
+                      strokeWidth: 2,
+                      valueColor: AlwaysStoppedAnimation<Color>(AppColors.error),
+                    ),
+                  )
+                : Text(
+                    '가입 신청 취소',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showCancelApplicationDialog(ClanModel clan) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text(
+            '가입 신청 취소',
+            style: TextStyle(
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          content: const Text(
+            '클랜 가입 신청을 취소하시겠습니까?\n이 작업은 되돌릴 수 없습니다.',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                '아니요',
+                style: TextStyle(
+                  color: AppColors.textSecondary,
+                ),
+              ),
+            ),
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+                _cancelClanApplication(clan);
+              },
+              child: Text(
+                '네, 취소합니다',
+                style: TextStyle(
+                  color: AppColors.error,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
 

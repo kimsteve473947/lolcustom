@@ -152,7 +152,7 @@ class FirebaseService {
         // Create chat room model - initialize with 1 participant (the host)
         final chatRoom = ChatRoomModel(
           id: ref.id,  // Use tournament ID as chat room ID
-          title: '${tournament.title} (${formattedDate}) (1/${tournament.totalSlots}명)',
+          title: '${tournament.title} (${formattedDate})',
           participantIds: participantIds,
           participantNames: participantNames,
           participantProfileImages: participantProfileImages,

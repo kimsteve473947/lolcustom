@@ -82,7 +82,7 @@ class _ClanJoinScreenState extends State<ClanJoinScreen> {
     });
     
     try {
-      final success = await _clanService.applyToClan(
+      final success = await _clanService.applyClanWithDetails(
         clanId: widget.clanId,
         message: _messageController.text,
         position: _positionController.text,
@@ -93,19 +93,29 @@ class _ClanJoinScreenState extends State<ClanJoinScreen> {
       if (mounted) {
         if (success) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('클랜 가입 신청이 완료되었습니다')),
+            const SnackBar(
+              content: Text('클랜 가입 신청이 완료되었습니다'),
+              backgroundColor: AppColors.success,
+            ),
           );
-          context.pop();
+          // 클랜 상세 화면으로 이동 (가입 신청 중 상태 표시)
+          context.go('/clans/${widget.clanId}');
         } else {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('클랜 가입 신청 중 오류가 발생했습니다')),
+            const SnackBar(
+              content: Text('클랜 가입 신청 중 오류가 발생했습니다'),
+              backgroundColor: AppColors.error,
+            ),
           );
         }
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('${e.toString()}')),
+          SnackBar(
+            content: Text('${e.toString()}'),
+            backgroundColor: AppColors.error,
+          ),
         );
       }
     } finally {
