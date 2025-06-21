@@ -1,17 +1,20 @@
-import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:intl/intl.dart';
+import 'package:cloud_functions/cloud_functions.dart';
+import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:go_router/go_router.dart';
+import 'package:intl/intl.dart';
 import 'package:lol_custom_game_manager/constants/app_theme.dart';
-import 'package:lol_custom_game_manager/models/models.dart';
+import 'package:lol_custom_game_manager/models/chat_model.dart';
+import 'package:lol_custom_game_manager/models/tournament_model.dart';
+import 'package:lol_custom_game_manager/models/user_model.dart';
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
-import 'package:lol_custom_game_manager/providers/chat_provider.dart';
 import 'package:lol_custom_game_manager/services/chat_service.dart';
-import 'package:lol_custom_game_manager/services/tournament_service.dart';
-import 'package:lol_custom_game_manager/widgets/error_view.dart';
-import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:lol_custom_game_manager/services/firebase_service.dart';
+import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
+import 'package:lol_custom_game_manager/widgets/error_view.dart';
 import 'package:provider/provider.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final String chatRoomId;
@@ -32,6 +35,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   
   late Future<ChatRoomModel> _chatRoomFuture;
   bool _isSending = false;
+  TournamentModel? _tournament;
+  bool _isLoadingDiscord = false;
 
   @override
   void initState() {
@@ -48,7 +53,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (!doc.exists) {
       throw Exception('채팅방을 찾을 수 없습니다.');
     }
-    return ChatRoomModel.fromFirestore(doc);
+    
+    final chatRoom = ChatRoomModel.fromFirestore(doc);
+    
+    // 토너먼트 채팅방인 경우 토너먼트 정보 로드
+    if (chatRoom.type == ChatRoomType.tournamentRecruitment && chatRoom.tournamentId != null) {
+      try {
+        _tournament = await FirebaseService().getTournament(chatRoom.tournamentId!);
+      } catch (e) {
+        debugPrint('토너먼트 정보 로드 실패: $e');
+      }
+    }
+    
+    return chatRoom;
   }
 
   Future<void> _markAsRead() async {
@@ -332,7 +349,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                                 shape: BoxShape.circle,
                                                 border: Border.all(color: Colors.white, width: 1.5),
                                               ),
-                                              child: const Icon(
+                                              child: Icon(
                                                 Icons.star,
                                                 size: 10,
                                                 color: Colors.white,
@@ -537,6 +554,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           appBar: _buildAppBar(context, chatRoom),
           body: Column(
             children: [
+              // Discord 버튼 (조건에 맞을 때만 표시)
+              _buildDiscordButton(chatRoom),
               Expanded(
                 child: StreamBuilder<List<MessageModel>>(
                   stream: _chatService.getMessagesStream(widget.chatRoomId),
@@ -580,49 +599,63 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
 
     return AppBar(
-      title: Text(title),
+      backgroundColor: Colors.white,
+      elevation: 0,
+      leading: IconButton(
+        icon: const Icon(Icons.arrow_back_ios, color: Colors.black),
+        onPressed: () => _navigateBack(),
+      ),
+      title: GestureDetector(
+        onTap: () => _showMembersModal(chatRoom),
+        child: Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  if (chatRoom.type == ChatRoomType.tournamentRecruitment)
+                    Text(
+                      '${chatRoom.participantIds.length}명',
+                      style: TextStyle(
+                        color: Colors.grey.shade600,
+                        fontSize: 12,
+                      ),
+                    ),
+                ],
+              ),
+            ),
+            const SizedBox(width: 8),
+            // 개발자 전용 새로고침 버튼
+            if (Provider.of<AppStateProvider>(context, listen: false).currentUser?.email == 'kimjh473954@gmail.com')
+              IconButton(
+                icon: const Icon(Icons.refresh, color: Colors.blue),
+                onPressed: () {
+                  setState(() {
+                    // StreamBuilder를 강제로 새로고침
+                  });
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('🔄 메시지 새로고침 중...')),
+                  );
+                },
+              ),
+            const Icon(Icons.people, color: Colors.grey),
+          ],
+        ),
+      ),
       actions: [
         IconButton(
-          icon: const Icon(Icons.people_outline),
-          onPressed: () => _showMembersModal(chatRoom),
-          tooltip: '참가자 목록',
+          icon: const Icon(Icons.more_vert, color: Colors.black),
+          onPressed: () => _leaveChatRoom(),
         ),
-        if (chatRoom.tournamentId != null)
-          IconButton(
-            icon: const Icon(Icons.sports_esports_outlined),
-            onPressed: () => _viewTournament(chatRoom.tournamentId!),
-            tooltip: '토너먼트 보기',
-          ),
-        IconButton(
-          icon: const Icon(Icons.exit_to_app),
-          onPressed: _leaveChatRoom,
-          tooltip: '채팅방 나가기',
-        ),
-        // Discord 디버그 버튼 (임시)
-        if (Provider.of<AppStateProvider>(context, listen: false).currentUser?.email == 'kimjh473954@gmail.com') // 개발자만 보이도록
-          IconButton(
-            icon: const Icon(Icons.bug_report),
-            onPressed: () async {
-              // 테스트 Discord 메시지 생성
-              await FirebaseFirestore.instance.collection('messages').add({
-                'chatRoomId': widget.chatRoomId,
-                'senderId': 'system',
-                'senderName': '시스템',
-                'senderProfileImageUrl': null,
-                'text': '🎯 테스트 Discord 채널이 생성되었습니다!\n\n💬 텍스트 채팅\nhttps://discord.gg/test123\n\n🎤 음성 채팅\nA팀: https://discord.gg/testA\nB팀: https://discord.gg/testB',
-                'readStatus': {},
-                'timestamp': FieldValue.serverTimestamp(),
-                'metadata': {
-                  'isSystem': true,
-                  'type': 'discord_channels',
-                },
-              });
-              
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('테스트 Discord 메시지 전송됨')),
-              );
-            },
-          ),
       ],
     );
   }
@@ -685,6 +718,134 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       debugPrint('System message: ${message.text}');
       debugPrint('System message metadata: ${message.metadata}');
       
+      // Discord 초대링크 메시지 특별 처리
+      if (message.metadata != null && message.metadata!['type'] == 'discord_invite') {
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 16.0),
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: const Color(0xFF5865F2).withOpacity(0.1),
+                border: Border.all(color: const Color(0xFF5865F2).withOpacity(0.3)),
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.discord,
+                        size: 24,
+                        color: const Color(0xFF5865F2),
+                      ),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Discord 채널이 생성되었습니다!',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF5865F2),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  
+                  // 텍스트 채팅 링크
+                  if (message.metadata!['discordInvites'] != null) ...[
+                    _buildDiscordLinkButton(
+                      '💬 텍스트 채팅방 입장하기',
+                      message.metadata!['discordInvites']['text'],
+                      isPrimary: true,
+                    ),
+                    const SizedBox(height: 8),
+                    
+                    // 음성 채팅 링크들
+                    Row(
+                      children: [
+                        Expanded(
+                          child: _buildDiscordLinkButton(
+                            '🎤 A팀 음성',
+                            message.metadata!['discordInvites']['voice1'],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: _buildDiscordLinkButton(
+                            '🎤 B팀 음성',
+                            message.metadata!['discordInvites']['voice2'],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+      
+      // Discord 버튼 메시지 특별 처리 (이전 버전 호환)
+      if (message.metadata != null && message.metadata!['type'] == 'discord_button') {
+        return Container(
+          margin: const EdgeInsets.symmetric(vertical: 16.0),
+          child: Center(
+            child: Container(
+              padding: const EdgeInsets.all(16.0),
+              decoration: BoxDecoration(
+                color: Colors.blue.shade50,
+                border: Border.all(color: Colors.blue.shade200),
+                borderRadius: BorderRadius.circular(12.0),
+              ),
+              child: Column(
+                children: [
+                  Icon(
+                    Icons.discord,
+                    size: 32,
+                    color: Colors.blue.shade600,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    message.text,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: Colors.blue.shade800,
+                      fontWeight: FontWeight.w500,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 12),
+                  ElevatedButton.icon(
+                    onPressed: () => _getDiscordInviteLink(message.metadata!['tournamentId']),
+                    icon: const Icon(Icons.link, color: Colors.white),
+                    label: const Text(
+                      'Discord 초대링크 받기',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: Colors.blue.shade600,
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        );
+      }
+      
+      // 일반 시스템 메시지 처리
       // 원본 메시지 텍스트
       String displayText = message.text;
       
@@ -951,5 +1112,369 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       default:
         return Colors.grey;
     }
+  }
+
+  // Discord 초대링크 받기 (토너먼트 문서에서 직접 읽어오기)
+  Future<void> _getDiscordInviteLink(String tournamentId) async {
+    if (_isLoadingDiscord) return;
+    
+    setState(() => _isLoadingDiscord = true);
+    
+    try {
+      // 토너먼트 문서에서 Discord 채널 정보 직접 읽어오기
+      final tournamentDoc = await FirebaseFirestore.instance
+          .collection('tournaments')
+          .doc(tournamentId)
+          .get();
+      
+      if (!tournamentDoc.exists) {
+        throw Exception('토너먼트를 찾을 수 없습니다');
+      }
+      
+      final tournamentData = tournamentDoc.data() as Map<String, dynamic>;
+      final discordChannels = tournamentData['discordChannels'] as Map<String, dynamic>?;
+      
+      if (discordChannels == null || discordChannels.isEmpty) {
+        throw Exception('Discord 채널이 아직 생성되지 않았습니다');
+      }
+      
+      // 초대링크가 모두 있는지 확인
+      final textChannelInvite = discordChannels['textChannelInvite'] as String?;
+      final voiceChannel1Invite = discordChannels['voiceChannel1Invite'] as String?;
+      final voiceChannel2Invite = discordChannels['voiceChannel2Invite'] as String?;
+      
+      if (textChannelInvite == null || voiceChannel1Invite == null || voiceChannel2Invite == null) {
+        throw Exception('Discord 초대링크가 완전하지 않습니다');
+      }
+      
+      // Discord 초대링크 팝업 표시
+      if (mounted) {
+        _showDiscordInviteDialog({
+          'textChannelInvite': textChannelInvite,
+          'voiceChannel1Invite': voiceChannel1Invite,
+          'voiceChannel2Invite': voiceChannel2Invite,
+        });
+      }
+      
+    } catch (e) {
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('오류'),
+            content: Text('Discord 초대링크를 가져오는데 실패했습니다:\n$e'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: const Text('확인'),
+              ),
+            ],
+          ),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoadingDiscord = false);
+      }
+    }
+  }
+
+  // Discord 초대링크 팝업 표시 (텍스트 채팅만)
+  void _showDiscordInviteDialog(Map<String, dynamic> channelData) {
+    final textChannelInvite = channelData['textChannelInvite'] as String?;
+    
+    if (textChannelInvite == null || textChannelInvite.isEmpty) {
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('오류'),
+          content: const Text('Discord 초대링크를 찾을 수 없습니다.'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: const Text('확인'),
+            ),
+          ],
+        ),
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: const Color(0xFF5865F2),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Icon(
+                Icons.chat,
+                color: Colors.white,
+                size: 20,
+              ),
+            ),
+            const SizedBox(width: 8),
+            const Text(
+              'Discord 초대링크',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ],
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text(
+              '🎯 토너먼트 Discord 채널이 생성되었습니다!\n\n💬 아래 링크를 터치해서 Discord 채팅방에 입장하세요:',
+              style: TextStyle(fontSize: 14),
+            ),
+            const SizedBox(height: 16),
+            
+            // 텍스트 채팅 링크 (클릭 가능)
+            InkWell(
+              onTap: () async {
+                Navigator.of(context).pop();
+                final uri = Uri.parse(textChannelInvite);
+                if (await canLaunchUrl(uri)) {
+                  await launchUrl(uri, mode: LaunchMode.externalApplication);
+                } else {
+                  // 링크를 열 수 없는 경우 클립보드에 복사
+                  Clipboard.setData(ClipboardData(text: textChannelInvite));
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('링크를 열 수 없어 클립보드에 복사했습니다')),
+                  );
+                }
+              },
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF5865F2).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: const Color(0xFF5865F2).withOpacity(0.3)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(
+                          Icons.chat,
+                          color: const Color(0xFF5865F2),
+                          size: 18,
+                        ),
+                        const SizedBox(width: 8),
+                        const Text(
+                          '💬 텍스트 채팅방 입장하기',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFF5865F2),
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      textChannelInvite,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF5865F2),
+                        decoration: TextDecoration.underline,
+                      ),
+                      overflow: TextOverflow.ellipsis,
+                      maxLines: 2,
+                    ),
+                    const SizedBox(height: 4),
+                    const Row(
+                      children: [
+                        Icon(
+                          Icons.touch_app,
+                          size: 14,
+                          color: Colors.grey,
+                        ),
+                        SizedBox(width: 4),
+                        Text(
+                          '터치해서 Discord 열기',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: const Text('닫기'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // Discord 초대링크 받기 버튼 표시 조건 확인
+  bool _shouldShowDiscordButton(ChatRoomModel chatRoom) {
+    if (chatRoom.type != ChatRoomType.tournamentRecruitment || _tournament == null) {
+      return false;
+    }
+    
+    // 10명 달성 + Discord 채널 생성됨
+    final participantCount = _tournament!.participants?.length ?? 0;
+    final hasDiscordChannels = _tournament!.discordChannels != null && 
+                              _tournament!.discordChannels!['textChannelId'] != null;
+    
+    return participantCount >= 10 && hasDiscordChannels;
+  }
+
+  // Discord 초대링크 받기 버튼 UI
+  Widget _buildDiscordButton(ChatRoomModel chatRoom) {
+    if (!_shouldShowDiscordButton(chatRoom)) {
+      return const SizedBox.shrink();
+    }
+
+    return Container(
+      margin: const EdgeInsets.all(16.0),
+      child: Container(
+        padding: const EdgeInsets.all(16.0),
+        decoration: BoxDecoration(
+          color: const Color(0xFF5865F2).withOpacity(0.1),
+          border: Border.all(color: const Color(0xFF5865F2).withOpacity(0.3)),
+          borderRadius: BorderRadius.circular(12.0),
+        ),
+        child: Column(
+          children: [
+            Row(
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(8),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF5865F2),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.discord,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '🎯 토너먼트 10명 달성!',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF5865F2),
+                        ),
+                      ),
+                      Text(
+                        'Discord 채널이 생성되었습니다',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: _isLoadingDiscord ? null : () => _getDiscordInviteLink(_tournament!.id),
+                icon: _isLoadingDiscord 
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.link),
+                label: Text(_isLoadingDiscord ? '초대링크 가져오는 중...' : 'Discord 초대링크 받기'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF5865F2),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // Discord 링크 버튼 위젯
+  Widget _buildDiscordLinkButton(String label, String? inviteLink, {bool isPrimary = false}) {
+    if (inviteLink == null || inviteLink.isEmpty) {
+      return const SizedBox.shrink();
+    }
+    
+    return InkWell(
+      onTap: () async {
+        final uri = Uri.parse(inviteLink);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+        } else {
+          // 링크를 열 수 없는 경우 클립보드에 복사
+          Clipboard.setData(ClipboardData(text: inviteLink));
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Discord 링크가 복사되었습니다')),
+          );
+        }
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: isPrimary 
+              ? const Color(0xFF5865F2) 
+              : const Color(0xFF5865F2).withOpacity(0.1),
+          borderRadius: BorderRadius.circular(8),
+          border: Border.all(
+            color: const Color(0xFF5865F2).withOpacity(isPrimary ? 1 : 0.3),
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: isPrimary ? Colors.white : const Color(0xFF5865F2),
+                fontWeight: FontWeight.bold,
+                fontSize: isPrimary ? 14 : 12,
+              ),
+            ),
+            const SizedBox(width: 4),
+            Icon(
+              Icons.open_in_new,
+              size: isPrimary ? 16 : 14,
+              color: isPrimary ? Colors.white : const Color(0xFF5865F2),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 }

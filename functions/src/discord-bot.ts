@@ -87,87 +87,51 @@ export class TournamentDiscordBot {
     try {
       console.log(`🎯 Creating channels for tournament: ${tournamentName} (${tournamentId})`);
 
-      if (!this.botToken || !this.guildId || !this.categoryId) {
-        throw new Error('Discord bot token, guild ID, or category ID not configured');
+      if (!this.botToken || !this.guildId) {
+        throw new Error('Discord bot token or guild ID not configured');
       }
 
-      // 토너먼트별 채널명 생성 (카테고리는 기존 사용)
+      // 토너먼트별 채널명 생성
       const baseChannelName = this.generateChannelName(tournamentData || {});
       
       console.log(`📝 Generated base channel name: ${baseChannelName}`);
-      console.log(`📁 Using existing category ID: ${this.categoryId}`);
+      console.log(`📁 Creating channels without category (temporarily)`);
 
-      // 기존 채널들의 position 값 조회하여 다음 위치 계산
-      const existingChannels = await this.makeDiscordRequest('GET', `/guilds/${this.guildId}/channels`);
-      const categoryChannels = existingChannels.filter((channel: any) => channel.parent_id === this.categoryId);
-      
-      // 가장 높은 position 값 찾기 (3개씩 그룹화)
-      const maxPosition = categoryChannels.length > 0 
-        ? Math.max(...categoryChannels.map((ch: any) => ch.position || 0))
-        : 0;
-      
-      // 새 토너먼트 채널들의 시작 position (기존 채널들 다음에 3개씩 그룹으로)
-      const startPosition = maxPosition + 1;
-
-      // 1. 텍스트 채널 생성 (기존 스크림져드 내전방 카테고리 내)
+      // 1. 텍스트 채널 생성 (카테고리 없이)
       console.log('💬 Creating text channel...');
       const textChannelData = {
         name: baseChannelName,
         type: 0, // GUILD_TEXT
-        parent_id: this.categoryId, // 기존 스크림져드 내전방 카테고리
-        position: startPosition, // 토너먼트 그룹의 첫 번째
+        // parent_id: this.categoryId, // 카테고리 사용 비활성화
         topic: `${tournamentName} 토너먼트 채팅방 (주최자: ${tournamentData?.hostName || '알 수 없음'})`,
-        permission_overwrites: [
-          {
-            id: this.guildId, // @everyone role
-            type: 0, // role
-            deny: '1024' // VIEW_CHANNEL permission
-          }
-        ]
       };
 
       const textChannel = await this.makeDiscordRequest('POST', `/guilds/${this.guildId}/channels`, textChannelData);
-      console.log(`✅ Created text channel: ${textChannel.name} (${textChannel.id}) at position ${startPosition}`);
+      console.log(`✅ Created text channel: ${textChannel.name} (${textChannel.id})`);
 
-      // 2. 음성 채널 A팀 생성 (텍스트 채널 바로 다음)
+      // 2. 음성 채널 A팀 생성
       console.log('🔊 Creating voice channel A...');
       const voiceChannel1Data = {
         name: `${baseChannelName}-A팀`,
         type: 2, // GUILD_VOICE
-        parent_id: this.categoryId, // 기존 스크림져드 내전방 카테고리
-        position: startPosition + 1, // 텍스트 채널 바로 다음
+        // parent_id: this.categoryId, // 카테고리 사용 비활성화
         user_limit: 5, // 5명 제한
-        permission_overwrites: [
-          {
-            id: this.guildId, // @everyone role
-            type: 0, // role
-            deny: '1024' // VIEW_CHANNEL permission
-          }
-        ]
       };
 
       const voiceChannel1 = await this.makeDiscordRequest('POST', `/guilds/${this.guildId}/channels`, voiceChannel1Data);
-      console.log(`✅ Created voice channel A: ${voiceChannel1.name} (${voiceChannel1.id}) at position ${startPosition + 1}`);
+      console.log(`✅ Created voice channel A: ${voiceChannel1.name} (${voiceChannel1.id})`);
 
-      // 3. 음성 채널 B팀 생성 (A팀 바로 다음)
+      // 3. 음성 채널 B팀 생성
       console.log('🔊 Creating voice channel B...');
       const voiceChannel2Data = {
         name: `${baseChannelName}-B팀`,
         type: 2, // GUILD_VOICE
-        parent_id: this.categoryId, // 기존 스크림져드 내전방 카테고리
-        position: startPosition + 2, // A팀 채널 바로 다음
+        // parent_id: this.categoryId, // 카테고리 사용 비활성화
         user_limit: 5, // 5명 제한
-        permission_overwrites: [
-          {
-            id: this.guildId, // @everyone role
-            type: 0, // role
-            deny: '1024' // VIEW_CHANNEL permission
-          }
-        ]
       };
 
       const voiceChannel2 = await this.makeDiscordRequest('POST', `/guilds/${this.guildId}/channels`, voiceChannel2Data);
-      console.log(`✅ Created voice channel B: ${voiceChannel2.name} (${voiceChannel2.id}) at position ${startPosition + 2}`);
+      console.log(`✅ Created voice channel B: ${voiceChannel2.name} (${voiceChannel2.id})`);
 
       // 4. 각 채널의 초대 링크 생성 (4시간 후 만료)
       console.log('🔗 Creating invite links...');
@@ -202,13 +166,13 @@ export class TournamentDiscordBot {
         voiceChannel2Invite: `https://discord.gg/${voiceChannel2Invite.code}`,
       };
 
-      // 6. Firebase에 채널 정보 저장 (기존 카테고리 ID 사용)
-      await this.saveTournamentChannelsToFirebase(channelData, this.categoryId);
+      // 6. Firebase에 채널 정보 저장
+      await this.saveTournamentChannelsToFirebase(channelData, 'no-category');
 
       // 7. 웰컴 메시지 전송
       await this.sendWelcomeMessage(textChannel.id, tournamentName, participants.length, tournamentData);
 
-      console.log(`🎉 Successfully created tournament channels grouped together: ${baseChannelName} (positions: ${startPosition}-${startPosition + 2})`);
+      console.log(`🎉 Successfully created tournament channels: ${baseChannelName}`);
       return channelData;
 
     } catch (error) {
@@ -419,4 +383,4 @@ export function getDiscordBot(): TournamentDiscordBot {
     botInstance = new TournamentDiscordBot();
   }
   return botInstance;
-} 
+}

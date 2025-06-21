@@ -42,46 +42,23 @@ export const onTournamentParticipantChange = onDocumentUpdated(
       console.log('🔍 Before participants:', beforeData?.participants || []);
       console.log('🔍 After participants:', afterData?.participants || []);
 
-      // 10명이 된 경우에만 디스코드 채널 생성 시도
+      // 10명 달성 확인 (before < 10 && after >= 10)
       if (beforeParticipantCount < 10 && afterParticipantCount >= 10) {
-        console.log(`🎯 Tournament ${tournamentId} reached ${afterParticipantCount} participants! Checking Discord channels...`);
-
-        // 해당 토너먼트 ID의 Discord 채널이 실제로 존재하는지 확인
+        console.log(`🎯 Tournament ${tournamentId} reached 10 participants! Processing Discord channels...`);
+        
         const discordBot = getDiscordBot();
-        const hasValidTournamentChannels = await discordBot.checkTournamentChannelsExist(tournamentId);
-        console.log(`📁 Valid Discord channels exist for tournament ${tournamentId}: ${hasValidTournamentChannels}`);
-
-        // 해당 토너먼트의 유효한 Discord 채널이 없다면 새로 생성
-        if (!hasValidTournamentChannels) {
-          console.log(`🚀 Creating new Discord channels for tournament: ${tournamentId}...`);
-
-          const tournamentData = {
-            id: tournamentId,
-            name: afterData.title || afterData.name || `토너먼트 ${tournamentId}`,
-            participants: afterData.participants || [],
-            startsAt: afterData.startsAt,
-            hostName: afterData.hostName,
-            hostNickname: afterData.hostNickname,
-            gameFormat: afterData.gameFormat,
-            ...afterData,
-          };
-
-          console.log(`🤖 Initializing Discord bot for tournament ${tournamentId}...`);
-          console.log(`📅 Tournament info:`, {
-            name: tournamentData.name,
-            startsAt: tournamentData.startsAt,
-            hostName: tournamentData.hostName,
-            gameFormat: tournamentData.gameFormat
-          });
+        let channelData = null;
+        
+        // 1. 기존 Discord 채널 확인
+        if (!afterData.discordChannels || !afterData.discordChannels.textChannelId) {
+          // Discord 채널이 없는 경우 → 새로 생성
+          console.log('🏗️ No existing Discord channels, creating new ones...');
           
-          // 디스코드 채널 생성 (토너먼트 데이터 전달)
-          console.log('🏗️ Attempting to create Discord channels...');
-          
-          const channelData = await discordBot.createTournamentChannels(
+          channelData = await discordBot.createTournamentChannels(
             tournamentId,
-            tournamentData.name,
-            tournamentData.participants,
-            tournamentData // 토너먼트 전체 데이터 전달
+            afterData.title || afterData.name || `토너먼트 ${tournamentId}`,
+            afterData.participants || [],
+            afterData // 토너먼트 전체 데이터 전달
           );
 
           if (channelData) {
@@ -92,13 +69,8 @@ export const onTournamentParticipantChange = onDocumentUpdated(
               voiceChannel2Id: channelData.voiceChannel2Id
             });
 
-            // 앱에 시스템 메시지 전송
-            console.log('📱 Sending notification to app...');
-            await sendDiscordChannelNotificationToApp(tournamentData, channelData);
-            
-            // 토너먼트 문서에 디스코드 채널 정보 업데이트
-            console.log('📄 Updating tournament document...');
-            await event.data?.after.ref.update({
+            // 토너먼트 문서 업데이트 (discordChannels 필드 추가)
+            await admin.firestore().collection('tournaments').doc(tournamentId).update({
               discordChannels: {
                 textChannelId: channelData.textChannelId,
                 voiceChannel1Id: channelData.voiceChannel1Id,
@@ -110,37 +82,41 @@ export const onTournamentParticipantChange = onDocumentUpdated(
               },
             });
 
-            console.log(`🎉 Successfully created Discord channels for tournament: ${tournamentId}`);
+            // tournamentChannels 컬렉션에도 저장
+            await admin.firestore().collection('tournamentChannels').doc(tournamentId).set({
+              isActive: true,
+              deleteAt: admin.firestore.Timestamp.fromMillis(Date.now() + 4 * 60 * 60 * 1000), // 4시간 후
+              textChannelId: channelData.textChannelId,
+              voiceChannel1Id: channelData.voiceChannel1Id,
+              voiceChannel2Id: channelData.voiceChannel2Id,
+              textChannelInvite: channelData.textChannelInvite,
+              voiceChannel1Invite: channelData.voiceChannel1Invite,
+              voiceChannel2Invite: channelData.voiceChannel2Invite,
+              createdAt: admin.firestore.FieldValue.serverTimestamp(),
+            });
           } else {
             console.error(`❌ Failed to create Discord channels for tournament: ${tournamentId}`);
           }
         } else {
-          console.log(`✅ Valid Discord channels already exist for tournament ${tournamentId}`);
+          // Discord 채널이 이미 있는 경우 → 기존 채널 데이터 사용
+          console.log(`✅ Discord channels already exist for tournament ${tournamentId}`);
+          channelData = afterData.discordChannels;
+        }
+        
+        // 2. 채널 데이터가 있으면 무조건 초대링크 메시지 전송
+        if (channelData && channelData.textChannelInvite) {
+          console.log('📱 Sending Discord invite link to chat...');
+          console.log('⏰ Waiting 3 seconds before sending invite link...');
+          await new Promise(resolve => setTimeout(resolve, 3000));
           
-          // 기존 Discord 채널이 있어도 새로운 참가자를 위해 알림 재전송
-          console.log(`📱 Sending existing Discord channel notification for tournament ${tournamentId}...`);
+          await sendDiscordInviteMessage(
+            { id: tournamentId, name: afterData.title, participants: afterData.participants },
+            channelData
+          );
           
-          const tournamentData = {
-            id: tournamentId,
-            name: afterData.title || afterData.name || `토너먼트 ${tournamentId}`,
-            participants: afterData.participants || [],
-            ...afterData,
-          };
-
-          // 기존 Discord 채널 정보를 사용해서 알림 전송
-          const existingChannelData = {
-            textChannelInvite: afterData.discordChannels?.textChannelInvite,
-            voiceChannel1Invite: afterData.discordChannels?.voiceChannel1Invite,
-            voiceChannel2Invite: afterData.discordChannels?.voiceChannel2Invite,
-          };
-
-          // 기존 채널 정보가 있는 경우에만 알림 전송
-          if (existingChannelData.textChannelInvite) {
-            await sendDiscordChannelNotificationToApp(tournamentData, existingChannelData as any);
-            console.log(`📤 Resent Discord channel notification for tournament ${tournamentId}`);
-          } else {
-            console.log(`⚠️ No existing channel invite links found for tournament ${tournamentId}`);
-          }
+          console.log(`🎉 Successfully sent Discord invite link for tournament: ${tournamentId}`);
+        } else {
+          console.error(`❌ No valid Discord channel data found for tournament: ${tournamentId}`);
         }
       } else {
         console.log(`📊 Participant count change detected but conditions not met:`);
@@ -156,135 +132,135 @@ export const onTournamentParticipantChange = onDocumentUpdated(
 );
 
 /**
- * 앱에 디스코드 채널 생성 알림 메시지 전송
+ * Discord 초대링크를 채팅방에 전송
+ * Updated: 2025-06-21 Force deploy v2
  */
-async function sendDiscordChannelNotificationToApp(
-  tournamentData: any,
-  channelData: TournamentChannelData
-): Promise<void> {
+async function sendDiscordInviteMessage(tournamentData: any, channelData: any): Promise<void> {
+  console.log(`📱 [DISCORD INVITE] Sending Discord invite link for tournament: ${tournamentData.id}`);
+  
   try {
-    console.log(`📱 [DISCORD NOTIFICATION] Starting notification for tournament: ${tournamentData.id}`);
-    console.log(`📱 [DISCORD NOTIFICATION] Tournament name: ${tournamentData.name}`);
-    console.log(`📱 [DISCORD NOTIFICATION] Channel data:`, {
-      textChannelInvite: channelData.textChannelInvite,
-      voiceChannel1Invite: channelData.voiceChannel1Invite,
-      voiceChannel2Invite: channelData.voiceChannel2Invite
-    });
-
     const db = admin.firestore();
     
-    // 토너먼트 채팅방 ID 가져오기 (강화된 검색)
-    console.log(`🔍 [DISCORD NOTIFICATION] Searching for chat room for tournament: ${tournamentData.id}`);
-    const tournamentChatId = await getTournamentChatRoomId(tournamentData.id);
-    
-    if (!tournamentChatId) {
-      console.error(`❌ [DISCORD NOTIFICATION] No chat room found for tournament: ${tournamentData.id}`);
-      console.log(`🔍 [DISCORD NOTIFICATION] Attempting to create chat room...`);
-      
-      // 채팅방이 없다면 생성 시도
-      const newChatRoomId = await createTournamentChatRoom(tournamentData);
-      if (!newChatRoomId) {
-        console.error(`❌ [DISCORD NOTIFICATION] Failed to create chat room for tournament: ${tournamentData.id}`);
-        return;
-      }
-      console.log(`✅ [DISCORD NOTIFICATION] Created new chat room: ${newChatRoomId}`);
-    }
-
-    // 최종 채팅방 ID 확인
-    const finalChatId = tournamentChatId || await getTournamentChatRoomId(tournamentData.id);
-    if (!finalChatId) {
-      console.error(`❌ [DISCORD NOTIFICATION] Still no chat room available for tournament: ${tournamentData.id}`);
+    // 채팅방 ID 찾기
+    const chatRoomId = await getTournamentChatRoomId(tournamentData.id);
+    if (!chatRoomId) {
+      console.error(`❌ [DISCORD INVITE] No chat room found for tournament: ${tournamentData.id}`);
       return;
     }
+    
+    console.log(`✅ [DISCORD INVITE] Using chat room: ${chatRoomId}`);
+    
+    // Discord 초대링크 메시지 생성
+    const messageContent = `🎯 ${tournamentData.name} 토너먼트 Discord 채널이 생성되었습니다!
 
+💬 텍스트 채팅방 입장하기:
+${channelData.textChannelInvite}
+
+🎤 음성 채팅방:
+A팀: ${channelData.voiceChannel1Invite}
+B팀: ${channelData.voiceChannel2Invite}
+
+📱 링크를 터치하여 Discord 채널에 입장하세요!`;
+    
+    console.log(`📝 [DISCORD INVITE] Generated message content (length: ${messageContent.length})`);
+    
+    // 메시지 생성
+    const messageData = {
+      chatRoomId: chatRoomId,
+      senderId: 'system',
+      senderName: '시스템',
+      text: messageContent,
+      readStatus: {},
+      timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      metadata: {
+        type: 'discord_invite',
+        discordChannels: channelData,
+        textChannelInvite: channelData.textChannelInvite,
+        voiceChannel1Invite: channelData.voiceChannel1Invite,
+        voiceChannel2Invite: channelData.voiceChannel2Invite,
+      },
+    };
+
+    console.log(`💾 [DISCORD INVITE] Adding message to chat room: ${chatRoomId}`);
+    
+    const messageRef = await db.collection('messages').add(messageData);
+    console.log(`✅ [DISCORD INVITE] Message added with ID: ${messageRef.id}`);
+    
+    // 채팅방의 lastMessage 업데이트
+    await db.collection('chatRooms').doc(chatRoomId).update({
+      lastMessageText: 'Discord 채널이 생성되었습니다!',
+      lastMessageTime: messageData.timestamp,
+    });
+    
+    console.log(`🎉 [DISCORD INVITE] Successfully sent Discord invite to chat room: ${chatRoomId}`);
+    
+  } catch (error) {
+    console.error(`❌ [DISCORD INVITE] Error sending invite message:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Discord 채널 생성 후 앱 채팅방에 알림 메시지 전송
+ */
+async function sendDiscordButtonNotification(tournamentData: any): Promise<void> {
+  console.log(`📱 [DISCORD NOTIFICATION] Starting button notification for tournament: ${tournamentData.id}`);
+  console.log(`📱 [DISCORD NOTIFICATION] Tournament name: ${tournamentData.name}`);
+  
+  try {
+    const db = admin.firestore();
+    
+    // 채팅방 ID 찾기
+    const finalChatId = await getTournamentChatRoomId(tournamentData.id);
+    if (!finalChatId) {
+      console.error(`❌ [DISCORD NOTIFICATION] No chat room found for tournament: ${tournamentData.id}`);
+      throw new Error(`No chat room found for tournament: ${tournamentData.id}`);
+    }
+    
     console.log(`✅ [DISCORD NOTIFICATION] Using chat room: ${finalChatId}`);
-
-    // 시스템 메시지 생성
-    const messageContent = createDiscordChannelMessage(tournamentData.name, channelData);
-    console.log(`📝 [DISCORD NOTIFICATION] Generated message content (length: ${messageContent.length})`);
-
-    // Flutter 앱과 동일한 메시지 구조 사용
+    
+    // 클릭 가능한 Discord 초대링크 받기 메시지 생성
+    const messageContent = `🎯 ${tournamentData.name} 토너먼트 10명 달성!\n\n💬 Discord 채팅방이 생성되었습니다.\n아래 버튼을 클릭하여 초대링크를 받아보세요!\n\n📱 각자 클릭해서 Discord 채널에 입장하세요!`;
+    
+    console.log(`📝 [DISCORD NOTIFICATION] Generated button message content (length: ${messageContent.length})`);
+    
+    // Flutter 앱과 100% 동일한 메시지 구조 사용
     const systemMessage = {
       chatRoomId: finalChatId,
       senderId: 'system',
       senderName: '시스템',
       senderProfileImageUrl: null,
-      text: messageContent, // content -> text로 변경
+      text: messageContent,
       readStatus: {},
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
+      imageUrl: null,
       metadata: {
-        isSystem: true, // Flutter 앱 시스템 메시지 식별용
-        type: 'discord_channels',
+        isSystem: true,
+        type: 'discord_button',
+        action: 'get_discord_invite',
         tournamentId: tournamentData.id,
-        tournamentName: tournamentData.name,
-        channelData: {
-          textChannelInvite: channelData.textChannelInvite,
-          voiceChannel1Invite: channelData.voiceChannel1Invite,
-          voiceChannel2Invite: channelData.voiceChannel2Invite,
-        },
+        hasButton: true,
       },
     };
 
-    console.log(`💾 [DISCORD NOTIFICATION] Adding message to messages collection: ${finalChatId}`);
-    console.log(`💾 [DISCORD NOTIFICATION] Message content (first 100 chars): ${messageContent.substring(0, 100)}...`);
-    console.log(`💾 [DISCORD NOTIFICATION] System message structure:`, {
-      chatRoomId: finalChatId,
-      senderId: systemMessage.senderId,
-      senderName: systemMessage.senderName,
-      textLength: systemMessage.text.length,
-      hasMetadata: !!systemMessage.metadata,
-      metadataType: systemMessage.metadata?.type,
-      isSystem: systemMessage.metadata?.isSystem,
-    });
+    console.log(`💾 [DISCORD NOTIFICATION] Adding button message to chat room: ${finalChatId}`);
     
-    try {
-      // Firebase Admin SDK 확인
-      console.log(`🔐 [DISCORD NOTIFICATION] Admin app initialized: ${admin.apps.length > 0}`);
-      console.log(`🔐 [DISCORD NOTIFICATION] Using admin.firestore()`);
-      
-      // Flutter 앱과 동일한 messages 컬렉션에 저장
-      const messageRef = await db.collection('messages').add(systemMessage);
-      console.log(`✅ [DISCORD NOTIFICATION] Message added with ID: ${messageRef.id}`);
-      
-      // 저장된 메시지 즉시 검증
-      console.log(`🔍 [DISCORD NOTIFICATION] Verifying saved message...`);
-      const savedMessage = await messageRef.get();
-      if (savedMessage.exists) {
-        const savedData = savedMessage.data();
-        console.log(`✅ [DISCORD NOTIFICATION] Message verified - ID: ${savedMessage.id}`);
-        console.log(`🔍 [DISCORD NOTIFICATION] Verified data:`, {
-          chatRoomId: savedData?.chatRoomId,
-          senderId: savedData?.senderId,
-          textLength: savedData?.text?.length || 0,
-          hasMetadata: !!savedData?.metadata,
-          metadataType: savedData?.metadata?.type,
-          isSystem: savedData?.metadata?.isSystem,
-        });
-      } else {
-        console.error(`❌ [DISCORD NOTIFICATION] CRITICAL: Message was not saved! ID: ${messageRef.id}`);
-        throw new Error(`Failed to save Discord notification message`);
-      }
-    } catch (error) {
-      console.error(`❌ [DISCORD NOTIFICATION] CRITICAL ERROR saving message:`, error);
-      console.error(`❌ [DISCORD NOTIFICATION] Error type: ${error instanceof Error ? error.name : typeof error}`);
-      console.error(`❌ [DISCORD NOTIFICATION] Error message: ${error instanceof Error ? error.message : String(error)}`);
-      console.error(`❌ [DISCORD NOTIFICATION] Error stack:`, error instanceof Error ? error.stack : 'No stack');
-      throw error; // 에러를 다시 던져서 함수 실패로 표시
-    }
-
-    // 채팅방 lastMessage 업데이트
+    // Flutter 앱과 동일한 messages 컬렉션에 저장
+    const messageRef = await db.collection('messages').add(systemMessage);
+    console.log(`✅ [DISCORD NOTIFICATION] Button message added with ID: ${messageRef.id}`);
+    
+    // 채팅방의 lastMessage 업데이트
     console.log(`🔄 [DISCORD NOTIFICATION] Updating chat room last message...`);
     await db.collection('chatRooms').doc(finalChatId).update({
-      lastMessageText: systemMessage.text.substring(0, 100) + '...', // lastMessage -> lastMessageText로 변경
+      lastMessageText: messageContent.substring(0, 100) + '...',
       lastMessageTime: systemMessage.timestamp,
-      lastMessageSenderId: systemMessage.senderId,
     });
-
-    console.log(`🎉 [DISCORD NOTIFICATION] Successfully sent Discord channel notification to chat room: ${finalChatId}`);
-
+    
+    console.log(`🎉 [DISCORD NOTIFICATION] Successfully sent Discord button notification to chat room: ${finalChatId}`);
+    
   } catch (error) {
-    console.error('❌ [DISCORD NOTIFICATION] Error sending Discord channel notification to app:', error);
-    console.error('📚 [DISCORD NOTIFICATION] Error stack:', error instanceof Error ? error.stack : 'No stack trace');
+    console.error(`❌ [DISCORD NOTIFICATION] Error sending button notification:`, error);
+    throw error;
   }
 }
 
@@ -495,8 +471,23 @@ export const createDiscordChannelsManually = onCall(async (request) => {
       status: tournamentData?.status || 'No status'
     });
     
-    // 디스코드 채널 생성
-    console.log('🤖 Initializing Discord bot...');
+    // 이미 Discord 채널이 생성되었는지 확인
+    if (tournamentData?.discordChannels) {
+      console.log('✅ Discord channels already exist, returning existing invite links');
+      
+      const channelData = tournamentData.discordChannels;
+      return {
+        success: true,
+        channelData: {
+          textChannelInvite: channelData.textChannelInvite,
+          voiceChannel1Invite: channelData.voiceChannel1Invite,
+          voiceChannel2Invite: channelData.voiceChannel2Invite,
+        },
+      };
+    }
+    
+    // 채널이 없는 경우에만 새로 생성
+    console.log('🤖 No existing channels found, creating new ones...');
     const discordBot = getDiscordBot();
     
     console.log('🏗️ Creating Discord channels...');
@@ -532,9 +523,9 @@ export const createDiscordChannelsManually = onCall(async (request) => {
       },
     });
 
-    // 앱에 알림 전송
-    console.log('📱 Sending notification to app...');
-    await sendDiscordChannelNotificationToApp(
+    // 초대링크 메시지 전송
+    console.log('📱 Sending invite link to chat...');
+    await sendDiscordInviteMessage(
       { id: tournamentId, name: tournamentData?.title, participants: tournamentData?.participants },
       channelData
     );
@@ -651,4 +642,4 @@ export const cleanupExpiredDiscordChannels = onSchedule(
       console.error('❌ Error in cleanupExpiredDiscordChannels:', error);
     }
   }
-); 
+);
