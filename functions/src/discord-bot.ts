@@ -1,4 +1,5 @@
 import * as admin from 'firebase-admin';
+import * as functions from 'firebase-functions';
 import axios from 'axios';
 
 export interface TournamentChannelData {
@@ -19,12 +20,13 @@ export class TournamentDiscordBot {
   private categoryId: string;
 
   constructor() {
-    // Firebase Functions v2에서는 환경변수 사용
-    this.botToken = process.env.DISCORD_BOT_TOKEN || '';
-    this.guildId = process.env.DISCORD_GUILD_ID || '';
-    this.categoryId = process.env.DISCORD_CATEGORY_ID || '';
+    // Firebase Functions config 사용 (환경변수 fallback)
+    const config = functions.config();
+    this.botToken = config.discord?.bot_token || process.env.DISCORD_BOT_TOKEN || '';
+    this.guildId = config.discord?.guild_id || process.env.DISCORD_GUILD_ID || '';
+    this.categoryId = config.discord?.category_id || process.env.DISCORD_CATEGORY_ID || '';
 
-    console.log('🤖 Discord Bot initialized with environment variables');
+    console.log('🤖 Discord Bot initialized with Firebase Functions config');
     console.log('✅ Bot Token:', this.botToken ? 'Set' : 'Missing');
     console.log('✅ Guild ID:', this.guildId || 'Missing');
     console.log('✅ Category ID:', this.categoryId || 'Missing');

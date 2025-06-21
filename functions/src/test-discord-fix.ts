@@ -1,20 +1,22 @@
 import {onCall} from 'firebase-functions/v2/https';
+import * as functions from 'firebase-functions';
 import * as admin from 'firebase-admin';
 import { getDiscordBot } from './discord-bot';
 
 /**
- * 환경변수로 Discord 채널 강제 생성 테스트
+ * Firebase Functions config로 Discord 채널 강제 생성 테스트
  */
 export const testDiscordFix = onCall(async (request) => {
-  console.log('🔧 Testing Discord with environment variables...');
+  console.log('🔧 Testing Discord with Firebase Functions config...');
   
   try {
-    // 환경변수 확인
-    const botToken = process.env.DISCORD_BOT_TOKEN;
-    const guildId = process.env.DISCORD_GUILD_ID;
-    const categoryId = process.env.DISCORD_CATEGORY_ID;
+    // Firebase Functions config 확인
+    const config = functions.config();
+    const botToken = config.discord?.bot_token || process.env.DISCORD_BOT_TOKEN;
+    const guildId = config.discord?.guild_id || process.env.DISCORD_GUILD_ID;
+    const categoryId = config.discord?.category_id || process.env.DISCORD_CATEGORY_ID;
     
-    console.log('📋 Environment variables check:', {
+    console.log('📋 Config check:', {
       hasToken: !!botToken,
       hasGuildId: !!guildId,
       hasCategoryId: !!categoryId,
@@ -24,7 +26,7 @@ export const testDiscordFix = onCall(async (request) => {
     if (!botToken || !guildId || !categoryId) {
       return {
         success: false,
-        error: 'Missing environment variables',
+        error: 'Missing Firebase Functions config',
         details: {
           hasToken: !!botToken,
           hasGuildId: !!guildId,
