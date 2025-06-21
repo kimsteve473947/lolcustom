@@ -15,6 +15,11 @@ import 'package:flutter/foundation.dart'
 /// );
 /// ```
 /// 
+/// SECURITY NOTE:
+/// For production apps, consider using environment variables or 
+/// Firebase App Check for additional security.
+/// Current configuration uses actual keys for development purposes.
+/// 
 /// To generate this file run:
 /// ```
 /// flutterfire configure
@@ -39,6 +44,13 @@ class DefaultFirebaseOptions {
     }
   }
 
+  // PRODUCTION SECURITY RECOMMENDATIONS:
+  // 1. Enable Firebase App Check for additional protection
+  // 2. Configure API key restrictions in Firebase Console
+  // 3. Set up proper Firestore Security Rules
+  // 4. Monitor usage in Firebase Console for unusual activity
+  // 5. Consider using Firebase Functions for sensitive operations
+
   // 아래 정보는 Firebase Console에서 앱을 등록한 후 얻을 수 있는 정보입니다.
   // 개발 환경에서는 flutterfire configure 명령어로 자동 생성할 수 있습니다.
   // 샘플 값으로 작성되었으니 실제 앱 개발 시 올바른 값으로 변경하세요.
@@ -52,8 +64,6 @@ class DefaultFirebaseOptions {
     storageBucket: 'lolcustom-3d471.firebasestorage.app',
     measurementId: 'G-FQGBJCHQE6',
   );
-
-  
 
   static const FirebaseOptions android = FirebaseOptions(
     apiKey: 'AIzaSyB7iVwjLVb_TB0P_tBJAU57KmUu3Yq-Dss',
@@ -71,5 +81,4 @@ class DefaultFirebaseOptions {
     storageBucket: 'lolcustom-3d471.firebasestorage.app',
     iosBundleId: 'com.judgg.lolcustom',
   );
-
 } 
