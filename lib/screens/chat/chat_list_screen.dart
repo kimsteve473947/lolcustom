@@ -4,6 +4,7 @@ import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/models/models.dart';
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 import 'package:lol_custom_game_manager/services/chat_service.dart';
+import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:lol_custom_game_manager/widgets/error_view.dart';
 import 'package:provider/provider.dart';
@@ -20,6 +21,8 @@ class ChatListScreen extends StatefulWidget {
 class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProviderStateMixin {
   late TabController _tabController;
   int _selectedTabIndex = 0;
+  final TournamentService _tournamentService = TournamentService();
+  final Map<String, TournamentModel?> _tournamentCache = {};
   
   @override
   void initState() {
@@ -40,6 +43,23 @@ class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProvid
       setState(() {
         _selectedTabIndex = _tabController.index;
       });
+    }
+  }
+
+  // 토너먼트 정보를 가져오는 함수
+  Future<TournamentModel?> _getTournamentInfo(String tournamentId) async {
+    if (_tournamentCache.containsKey(tournamentId)) {
+      return _tournamentCache[tournamentId];
+    }
+    
+    try {
+      final tournament = await _tournamentService.getTournament(tournamentId);
+      _tournamentCache[tournamentId] = tournament;
+      return tournament;
+    } catch (e) {
+      print('Error fetching tournament $tournamentId: $e');
+      _tournamentCache[tournamentId] = null;
+      return null;
     }
   }
 
@@ -250,7 +270,11 @@ class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProvid
     String displayName = chatRoom.title;
     String? displayImage;
 
-    if (chatRoom.type == ChatRoomType.direct && appState.currentUser != null) {
+    // 토너먼트 채팅방인 경우 제목에서 참가자 수 제거
+    if (chatRoom.type == ChatRoomType.tournamentRecruitment) {
+      // 제목에서 "(9/10)" 같은 패턴 제거
+      displayName = chatRoom.title.replaceAll(RegExp(r'\s*\(\d+/\d+\)\s*$'), '');
+    } else if (chatRoom.type == ChatRoomType.direct && appState.currentUser != null) {
       final otherUserId = chatRoom.participantIds.firstWhere((id) => id != appState.currentUser!.uid, orElse: () => '');
       if (otherUserId.isNotEmpty) {
         displayName = chatRoom.participantNames[otherUserId] ?? '알 수 없음';
@@ -405,36 +429,40 @@ class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProvid
                         overflow: TextOverflow.ellipsis,
                       ),
                       const SizedBox(height: 6),
-                      Row(
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 8,
-                              vertical: 3,
-                            ),
-                            decoration: BoxDecoration(
-                              color: _getChatRoomTypeColor(chatRoom.type).withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(12),
-                            ),
-                            child: Text(
-                              _getChatRoomTypeText(chatRoom.type),
-                              style: TextStyle(
-                                fontSize: 10,
-                                color: _getChatRoomTypeColor(chatRoom.type),
-                                fontWeight: FontWeight.bold,
+                      // 토너먼트 채팅방인 경우 주최자 정보 표시
+                      if (chatRoom.type == ChatRoomType.tournamentRecruitment)
+                        _buildTournamentChatRoomInfo(chatRoom, participantsText)
+                      else
+                        Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 3,
+                              ),
+                              decoration: BoxDecoration(
+                                color: _getChatRoomTypeColor(chatRoom.type).withOpacity(0.1),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: Text(
+                                _getChatRoomTypeText(chatRoom.type),
+                                style: TextStyle(
+                                  fontSize: 10,
+                                  color: _getChatRoomTypeColor(chatRoom.type),
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
                             ),
-                          ),
-                          const SizedBox(width: 6),
-                          Text(
-                            participantsText,
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: Colors.grey.shade500,
+                            const SizedBox(width: 6),
+                            Text(
+                              participantsText,
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: Colors.grey.shade500,
+                              ),
                             ),
-                          ),
-                        ],
-                      ),
+                          ],
+                        ),
                     ],
                   ),
                 ),
@@ -443,6 +471,61 @@ class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProvid
           ),
         ),
       ),
+    );
+  }
+
+  // 토너먼트 채팅방 정보를 표시하는 위젯
+  Widget _buildTournamentChatRoomInfo(ChatRoomModel chatRoom, String participantsText) {
+    return FutureBuilder<TournamentModel?>(
+      future: _getTournamentInfo(chatRoom.tournamentId ?? ''),
+      builder: (context, snapshot) {
+        String hostName = '알 수 없음';
+        
+        if (snapshot.hasData && snapshot.data != null) {
+          final tournament = snapshot.data!;
+          hostName = tournament.hostNickname ?? tournament.hostName;
+        }
+
+        return Row(
+          children: [
+            Container(
+              padding: const EdgeInsets.symmetric(
+                horizontal: 8,
+                vertical: 3,
+              ),
+              decoration: BoxDecoration(
+                color: _getChatRoomTypeColor(chatRoom.type).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                _getChatRoomTypeText(chatRoom.type),
+                style: TextStyle(
+                  fontSize: 10,
+                  color: _getChatRoomTypeColor(chatRoom.type),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Text(
+              participantsText,
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade500,
+              ),
+            ),
+            const Spacer(),
+            Text(
+              '주최자: $hostName',
+              style: TextStyle(
+                fontSize: 11,
+                color: Colors.grey.shade600,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ],
+        );
+      },
     );
   }
   
