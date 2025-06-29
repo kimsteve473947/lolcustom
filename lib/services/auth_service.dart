@@ -508,4 +508,196 @@ class AuthService {
         return e.message ?? '알 수 없는 오류가 발생했습니다.';
     }
   }
+
+  // Discord OAuth2 로그인 (Firebase Auth 내장 기능 사용)
+  Future<UserCredential> signInWithDiscord() async {
+    try {
+      debugPrint('Discord OAuth2 로그인 시작');
+      
+      // Firebase Auth가 초기화되었는지 확인
+      await _checkFirebaseAuth();
+      
+      // Discord OAuth Provider 생성
+      final discordProvider = OAuthProvider('discord.com');
+      discordProvider.addScope('identify');
+      discordProvider.addScope('email');
+      
+      // Discord OAuth2 인증
+      final credential = await _auth.signInWithProvider(discordProvider);
+      
+      debugPrint('Discord OAuth2 인증 성공: ${credential.user?.email}');
+      
+      // Discord 사용자 정보 추출
+      final user = credential.user;
+      if (user == null) {
+        throw Exception('Discord 인증에 성공했지만 사용자 정보를 가져올 수 없습니다.');
+      }
+      
+      // OAuth 추가 정보에서 Discord 특정 정보 추출
+      String? discordId;
+      String? discordUsername;
+      String? discordAvatar;
+      
+      // additionalUserInfo에서 Discord 정보 추출
+      final additionalInfo = credential.additionalUserInfo?.profile;
+      if (additionalInfo != null) {
+        discordId = additionalInfo['id']?.toString();
+        discordUsername = additionalInfo['username']?.toString();
+        discordAvatar = additionalInfo['avatar']?.toString();
+        
+        // Discord CDN을 통한 프로필 이미지 URL 생성
+        if (discordAvatar != null && discordId != null) {
+          discordAvatar = 'https://cdn.discordapp.com/avatars/$discordId/$discordAvatar.png';
+        }
+        
+        debugPrint('Discord 사용자 정보 - ID: $discordId, Username: $discordUsername');
+      }
+      
+      // Firestore에서 기존 사용자 문서 확인
+      DocumentSnapshot userDoc = await _firestore.collection('users').doc(user.uid).get();
+      
+      final now = Timestamp.now();
+      
+      if (!userDoc.exists) {
+        // 새 사용자 생성
+        debugPrint('새 Discord 사용자 생성: ${user.email}');
+        
+        final nickname = discordUsername ?? user.displayName ?? 'User${user.uid.substring(0, 4)}';
+        
+        // Discord 정보를 additionalInfo에 저장
+        final discordInfo = <String, dynamic>{
+          if (discordId != null) 'discordId': discordId,
+          if (discordUsername != null) 'discordUsername': discordUsername,
+          if (discordAvatar != null) 'discordAvatar': discordAvatar,
+          'discordConnectedAt': now.millisecondsSinceEpoch,
+        };
+
+        final newUser = UserModel(
+          uid: user.uid,
+          email: user.email ?? '',
+          nickname: nickname,
+          profileImageUrl: discordAvatar ?? user.photoURL ?? '',
+          joinedAt: now,
+          role: UserRole.user,
+          credits: 0,
+          isPremium: false,
+          additionalInfo: discordInfo,
+        );
+        
+        await _firestore.collection('users').doc(user.uid).set(newUser.toFirestore());
+        debugPrint('새 Discord 사용자 문서 생성 완료');
+        
+      } else {
+        // 기존 사용자 업데이트 (Discord 정보 추가/업데이트)
+        debugPrint('기존 사용자에 Discord 정보 업데이트: ${user.email}');
+        
+        final userData = userDoc.data() as Map<String, dynamic>;
+        final currentAdditionalInfo = userData['additionalInfo'] as Map<String, dynamic>? ?? {};
+        
+        // Discord 정보를 additionalInfo에 병합
+        final discordInfo = <String, dynamic>{
+          if (discordId != null) 'discordId': discordId,
+          if (discordUsername != null) 'discordUsername': discordUsername,
+          if (discordAvatar != null) 'discordAvatar': discordAvatar,
+          'discordConnectedAt': now.millisecondsSinceEpoch,
+        };
+        
+        // 기존 additionalInfo와 병합
+        final mergedAdditionalInfo = {...currentAdditionalInfo, ...discordInfo};
+        
+        final updates = <String, dynamic>{
+          'lastActiveAt': now,
+          'additionalInfo': mergedAdditionalInfo,
+        };
+        
+        // 프로필 이미지가 없는 경우 Discord 아바타를 기본 프로필 이미지로 설정
+        if (discordAvatar != null) {
+          final currentProfileImage = userData['profileImageUrl'] as String?;
+          if (currentProfileImage == null || currentProfileImage.isEmpty) {
+            updates['profileImageUrl'] = discordAvatar;
+          }
+        }
+        
+        await _firestore.collection('users').doc(user.uid).update(updates);
+        debugPrint('Discord 정보 업데이트 완료');
+      }
+      
+      return credential;
+      
+    } on FirebaseAuthException catch (e) {
+      debugPrint('Discord OAuth2 Firebase Auth Exception: ${e.code} - ${e.message}');
+      
+      // Discord OAuth2 관련 오류 처리
+      if (e.code == 'user-cancelled') {
+        throw FirebaseAuthException(
+          code: 'user-cancelled',
+          message: 'Discord 로그인이 취소되었습니다.',
+        );
+      } else if (e.code == 'network-request-failed') {
+        throw FirebaseAuthException(
+          code: 'network-request-failed',
+          message: '네트워크 연결에 문제가 있습니다. 인터넷 연결을 확인해주세요.',
+        );
+      }
+      
+      throw getKoreanErrorMessage(e);
+    } catch (e) {
+      debugPrint('Discord OAuth2 로그인 중 오류: $e');
+      rethrow;
+    }
+  }
+  
+  // Discord 연결 해제
+  Future<void> disconnectDiscord() async {
+    try {
+      final user = currentUser;
+      if (user == null) throw Exception('사용자가 로그인되어 있지 않습니다.');
+      
+      debugPrint('Discord 연결 해제 시작: ${user.uid}');
+      
+      // 현재 사용자 정보 가져오기
+      final doc = await _firestore.collection('users').doc(user.uid).get();
+      if (!doc.exists) return;
+      
+      final userData = doc.data() as Map<String, dynamic>;
+      final currentAdditionalInfo = userData['additionalInfo'] as Map<String, dynamic>? ?? {};
+      
+      // Discord 관련 정보 제거
+      final updatedAdditionalInfo = Map<String, dynamic>.from(currentAdditionalInfo);
+      updatedAdditionalInfo.removeWhere((key, value) => 
+        key.startsWith('discord') || key == 'discordConnectedAt');
+      
+      // Firestore에서 Discord 정보 제거
+      await _firestore.collection('users').doc(user.uid).update({
+        'additionalInfo': updatedAdditionalInfo,
+      });
+      
+      debugPrint('Discord 연결 해제 완료');
+    } catch (e) {
+      debugPrint('Discord 연결 해제 중 오류: $e');
+      rethrow;
+    }
+  }
+  
+  // 사용자의 Discord 연결 상태 확인
+  Future<bool> isDiscordConnected() async {
+    try {
+      final user = currentUser;
+      if (user == null) return false;
+      
+      final doc = await _firestore.collection('users').doc(user.uid).get();
+      if (!doc.exists) return false;
+      
+      final userData = doc.data() as Map<String, dynamic>;
+      final additionalInfo = userData['additionalInfo'] as Map<String, dynamic>?;
+      
+      if (additionalInfo == null) return false;
+      
+      final discordId = additionalInfo['discordId'] as String?;
+      return discordId != null && discordId.isNotEmpty;
+    } catch (e) {
+      debugPrint('Discord 연결 상태 확인 중 오류: $e');
+      return false;
+    }
+  }
 } 

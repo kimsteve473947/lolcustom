@@ -119,7 +119,7 @@ class FirebaseService {
     }
   }
 
-  Future<String> createTournament(TournamentModel tournament) async {
+  Future<String> createTournament(TournamentModel tournament, {List<String>? clanMemberIds}) async {
     try {
       debugPrint('=== 토너먼트 생성 시작 ===');
       DocumentReference ref =
@@ -137,7 +137,7 @@ class FirebaseService {
           return ref.id;
         }
         
-        // Initialize chat room participants (host only initially)
+        // Initialize chat room participants 
         final participantIds = [tournament.hostId];
         final participantNames = {tournament.hostId: hostUser.nickname};
         final participantProfileImages = {
@@ -145,18 +145,38 @@ class FirebaseService {
         };
         final unreadCount = {tournament.hostId: 0};
         
+        // 클랜전인 경우 선택된 클랜원들을 초기 참가자로 추가
+        if (tournament.gameCategory == GameCategory.clan && clanMemberIds != null) {
+          debugPrint('클랜전 채팅방 생성 - 클랜원 ${clanMemberIds.length}명 추가');
+          
+          for (final memberId in clanMemberIds) {
+            if (!participantIds.contains(memberId)) {
+              final memberUser = await getUserById(memberId);
+              if (memberUser != null) {
+                participantIds.add(memberId);
+                participantNames[memberId] = memberUser.nickname;
+                participantProfileImages[memberId] = memberUser.profileImageUrl;
+                unreadCount[memberId] = 0;
+                debugPrint('클랜원 추가: ${memberUser.nickname} (${memberId})');
+              }
+            }
+          }
+          
+          debugPrint('클랜전 채팅방 초기 참가자 수: ${participantIds.length}명');
+        }
+        
         // Format tournament start time
         final startsAtDateTime = tournament.startsAt.toDate();
         final formattedDate = '${startsAtDateTime.month}/${startsAtDateTime.day} ${startsAtDateTime.hour}:${startsAtDateTime.minute.toString().padLeft(2, '0')}';
         
-        // Create chat room model - initialize with 1 participant (the host)
+        // Create chat room model - initialize with actual participant count
         final chatRoom = ChatRoomModel(
           id: ref.id,  // Use tournament ID as chat room ID
           title: '${tournament.title} (${formattedDate})',
           participantIds: participantIds,
           participantNames: participantNames,
           participantProfileImages: participantProfileImages,
-          participantCount: 1, // Initialize with host count
+          participantCount: participantIds.length, // 실제 참가자 수로 설정
           unreadCount: unreadCount,
           type: ChatRoomType.tournamentRecruitment,
           tournamentId: ref.id,
@@ -166,16 +186,20 @@ class FirebaseService {
         
         // Create chat room document with tournament ID
         await _firestore.collection('chatRooms').doc(ref.id).set(chatRoom.toFirestore());
-        debugPrint('채팅방 생성 완료 (ID: ${ref.id}) - 참가자 수: 1명 (호스트)');
+        debugPrint('채팅방 생성 완료 (ID: ${ref.id}) - 참가자 수: ${participantIds.length}명');
         
         // Send system message
+        final messageText = tournament.gameCategory == GameCategory.clan
+            ? '클랜전 채팅방이 생성되었습니다. 클랜원들과 자유롭게 대화하세요!'
+            : '내전 채팅방이 생성되었습니다. 참가자가 모이면 알림이 전송됩니다.';
+            
         final message = MessageModel(
           id: '',
           chatRoomId: ref.id,
           senderId: 'system',
           senderName: '시스템',
           senderProfileImageUrl: null,
-          text: '내전 채팅방이 생성되었습니다. 참가자가 모이면 알림이 전송됩니다.',
+          text: messageText,
           readStatus: {},
           timestamp: Timestamp.now(),
         );
@@ -258,164 +282,7 @@ class FirebaseService {
     }
   }
 
-  // Mercenary methods
-  Future<List<MercenaryModel>> getAvailableMercenaries({
-    int? limit,
-    DocumentSnapshot? startAfter,
-    List<String>? positions,
-    List<PlayerTier>? tiers,
-    List<String>? activityTimes,
-    int? minOvr,
-  }) async {
-    try {
-      // 인덱스 오류를 방지하기 위해 기본 쿼리만 사용하고 필터링은 클라이언트에서 수행
-      Query query = _firestore
-          .collection('mercenaries')
-          .orderBy('lastActiveAt', descending: true);
-
-      if (limit != null) {
-        query = query.limit(limit);
-      }
-
-      if (startAfter != null) {
-        query = query.startAfterDocument(startAfter);
-      }
-
-      final snapshot = await query.get();
-      List<MercenaryModel> mercenaries = snapshot.docs
-          .map((doc) => MercenaryModel.fromFirestore(doc))
-          .toList();
-
-      // isAvailable 필터링
-      mercenaries = mercenaries.where((m) => m.isAvailable).toList();
-          
-      // 포지션 필터링
-      if (positions != null && positions.isNotEmpty) {
-        mercenaries = mercenaries.where((mercenary) {
-          return positions.any((position) => 
-              mercenary.preferredPositions.contains(position));
-        }).toList();
-      }
-      
-      // 티어 필터링
-      if (tiers != null && tiers.isNotEmpty) {
-        mercenaries = mercenaries.where((mercenary) => 
-          mercenary.tier != null && tiers.contains(mercenary.tier)
-        ).toList();
-      }
-      
-      // 활동 시간 필터링
-      if (activityTimes != null && activityTimes.isNotEmpty) {
-        mercenaries = mercenaries.where((mercenary) {
-          if (mercenary.availabilityTimeSlots.isEmpty) {
-            return false;
-          }
-          
-          bool hasWeekdayMorning = activityTimes.contains('평일 오전') && 
-            ['월', '화', '수', '목', '금'].any((day) => 
-              mercenary.availabilityTimeSlots[day]?.contains('오전') ?? false);
-              
-          bool hasWeekdayAfternoon = activityTimes.contains('평일 오후') && 
-            ['월', '화', '수', '목', '금'].any((day) => 
-              (mercenary.availabilityTimeSlots[day]?.contains('오후') ?? false) || 
-              (mercenary.availabilityTimeSlots[day]?.contains('저녁') ?? false));
-              
-          bool hasWeekendMorning = activityTimes.contains('주말 오전') && 
-            ['토', '일'].any((day) => 
-              mercenary.availabilityTimeSlots[day]?.contains('오전') ?? false);
-              
-          bool hasWeekendAfternoon = activityTimes.contains('주말 오후') && 
-            ['토', '일'].any((day) => 
-              (mercenary.availabilityTimeSlots[day]?.contains('오후') ?? false) || 
-              (mercenary.availabilityTimeSlots[day]?.contains('저녁') ?? false));
-          
-          return hasWeekdayMorning || hasWeekdayAfternoon || hasWeekendMorning || hasWeekendAfternoon;
-        }).toList();
-      }
-
-      // OVR 필터링 (사용하지 않음)
-      if (minOvr != null) {
-        mercenaries =
-            mercenaries.where((m) => m.averageRoleStat >= minOvr).toList();
-      }
-
-      return mercenaries;
-    } catch (e) {
-      debugPrint('Error getting mercenaries: $e');
-      return [];
-    }
-  }
-
-  Future<String> createMercenaryProfile(MercenaryModel mercenary) async {
-    try {
-      debugPrint('=== 용병 프로필 생성 시작 ===');
-      debugPrint('용병 데이터: ${mercenary.toFirestore()}');
-      
-      // 필수 필드 검사
-      if (mercenary.userUid.isEmpty) {
-        throw Exception('userUid는 필수 값입니다');
-      }
-      
-      if (mercenary.preferredPositions.isEmpty) {
-        throw Exception('preferredPositions는 최소 1개 이상 필요합니다');
-      }
-      
-      DocumentReference ref =
-          await _firestore.collection('mercenaries').add(mercenary.toFirestore());
-      debugPrint('용병 프로필 생성 완료, ID: ${ref.id}');
-      return ref.id;
-    } catch (e) {
-      debugPrint('!!! 용병 프로필 생성 실패: $e !!!');
-      throw Exception('용병 프로필 생성 실패: $e');
-    }
-  }
-
-  Future<void> updateMercenaryProfile(MercenaryModel mercenary) async {
-    try {
-      debugPrint('=== 용병 프로필 업데이트 시작 ===');
-      debugPrint('용병 ID: ${mercenary.id}');
-      debugPrint('용병 데이터: ${mercenary.toFirestore()}');
-      
-      if (mercenary.id.isEmpty) {
-        throw Exception('용병 ID가 비어 있습니다');
-      }
-      
-      await _firestore
-          .collection('mercenaries')
-          .doc(mercenary.id)
-          .update(mercenary.toFirestore());
-      debugPrint('용병 프로필 업데이트 완료');
-    } catch (e) {
-      debugPrint('!!! 용병 프로필 업데이트 실패: $e !!!');
-      throw Exception('용병 프로필 업데이트 실패: $e');
-    }
-  }
-
-  Future<MercenaryModel?> getMercenary(String id) async {
-    try {
-      debugPrint('=== 용병 정보 조회 시작 ===');
-      debugPrint('요청 ID: $id');
-      
-      if (id.isEmpty) {
-        debugPrint('!!! 용병 ID가 비어 있습니다 !!!');
-        return null;
-      }
-      
-      DocumentSnapshot doc =
-          await _firestore.collection('mercenaries').doc(id).get();
-      
-      if (doc.exists) {
-        debugPrint('용병 정보 조회 성공');
-        return MercenaryModel.fromFirestore(doc);
-      } else {
-        debugPrint('!!! 해당 ID의 용병 정보가 없습니다 !!!');
-        return null;
-      }
-    } catch (e) {
-      debugPrint('!!! 용병 정보 조회 실패: $e !!!');
-      return null;
-    }
-  }
+  // 용병 관련 메서드들을 제거했습니다 (듀오 찾기 기능만 유지)
 
   // Duo Post methods
   Future<void> createDuoPost(DuoPostModel post) async {

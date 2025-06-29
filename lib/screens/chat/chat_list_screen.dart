@@ -324,35 +324,53 @@ class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProvid
                 // Profile image with status indicator
                 Stack(
                   children: [
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        borderRadius: BorderRadius.circular(20),
-                        color: AppColors.primary.withOpacity(0.1),
-                        image: displayImage != null && displayImage.isNotEmpty && displayImage.startsWith('http')
-                            ? DecorationImage(
-                                image: NetworkImage(displayImage),
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(20),
+                      child: Container(
+                        width: 60,
+                        height: 60,
+                        decoration: BoxDecoration(
+                          color: AppColors.primary.withOpacity(0.1),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.05),
+                              blurRadius: 4,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        child: displayImage != null && displayImage.isNotEmpty && displayImage.startsWith('http')
+                            ? Image.network(
+                                displayImage,
                                 fit: BoxFit.cover,
+                                errorBuilder: (context, error, stackTrace) {
+                                  return Icon(
+                                    chatRoom.type == ChatRoomType.tournamentRecruitment 
+                                        ? Icons.groups_outlined 
+                                        : Icons.person_outline,
+                                    color: AppColors.primary,
+                                    size: 28,
+                                  );
+                                },
+                                loadingBuilder: (context, child, loadingProgress) {
+                                  if (loadingProgress == null) return child;
+                                  return Center(
+                                    child: CircularProgressIndicator(
+                                      value: loadingProgress.expectedTotalBytes != null
+                                          ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                          : null,
+                                    ),
+                                  );
+                                },
                               )
-                            : null,
-                        boxShadow: [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.05),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ],
+                            : Icon(
+                                chatRoom.type == ChatRoomType.tournamentRecruitment 
+                                    ? Icons.groups_outlined 
+                                    : Icons.person_outline,
+                                color: AppColors.primary,
+                                size: 28,
+                              ),
                       ),
-                      child: displayImage == null || displayImage.isEmpty || !displayImage.startsWith('http')
-                          ? Icon(
-                              chatRoom.type == ChatRoomType.tournamentRecruitment 
-                                  ? Icons.groups_outlined 
-                                  : Icons.person_outline,
-                              color: AppColors.primary,
-                              size: 28,
-                            )
-                          : null,
                     ),
                     if (hasUnread)
                       Positioned(
@@ -520,10 +538,24 @@ class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProvid
       future: _getTournamentInfo(chatRoom.tournamentId ?? ''),
       builder: (context, snapshot) {
         String hostName = '알 수 없음';
+        String tournamentTypeText = '토너먼트'; // 기본값
         
         if (snapshot.hasData && snapshot.data != null) {
           final tournament = snapshot.data!;
           hostName = tournament.hostNickname ?? tournament.hostName;
+          
+          // gameCategory에 따라 타입 텍스트 설정
+          switch (tournament.gameCategory) {
+            case GameCategory.individual:
+              tournamentTypeText = '개인전';
+              break;
+            case GameCategory.clan:
+              tournamentTypeText = '클랜전';
+              break;
+            case GameCategory.university:
+              tournamentTypeText = '대학 대항전';
+              break;
+          }
         }
 
         return Row(
@@ -538,7 +570,7 @@ class _ChatListScreenState extends State<ChatListScreen> with SingleTickerProvid
                 borderRadius: BorderRadius.circular(12),
               ),
               child: Text(
-                _getChatRoomTypeText(chatRoom.type),
+                tournamentTypeText,
                 style: TextStyle(
                   fontSize: 10,
                   color: _getChatRoomTypeColor(chatRoom.type),

@@ -9,14 +9,17 @@ import 'package:lol_custom_game_manager/services/tournament_service.dart';
 import 'package:lol_custom_game_manager/widgets/error_view.dart';
 import 'package:lol_custom_game_manager/widgets/loading_indicator.dart';
 import 'package:lol_custom_game_manager/widgets/lane_icon_widget.dart';
+import 'package:lol_custom_game_manager/widgets/clan_emblem_widget.dart';
 import 'package:provider/provider.dart';
 
 class MatchListTab extends StatefulWidget {
   final TournamentType tournamentType;
+  final GameCategory gameCategory;
 
   const MatchListTab({
     Key? key,
     required this.tournamentType,
+    required this.gameCategory,
   }) : super(key: key);
 
   @override
@@ -43,9 +46,9 @@ class MatchListTabState extends State<MatchListTab> {
     final provider = Provider.of<TournamentProvider>(context, listen: false);
     if (_scrollController.position.pixels >=
             _scrollController.position.maxScrollExtent - 200 &&
-        !provider.isLoading(widget.tournamentType) &&
-        provider.hasMore(widget.tournamentType)) {
-      provider.fetchMoreTournaments(widget.tournamentType);
+        !provider.isLoading(widget.gameCategory, widget.tournamentType) &&
+        provider.hasMore(widget.gameCategory, widget.tournamentType)) {
+      provider.fetchMoreTournaments(widget.gameCategory, widget.tournamentType);
     }
   }
 
@@ -53,15 +56,15 @@ class MatchListTabState extends State<MatchListTab> {
   Widget build(BuildContext context) {
     return Consumer<TournamentProvider>(
       builder: (context, provider, child) {
-        final tournaments = provider.tournaments(widget.tournamentType);
-        final isLoading = provider.isLoading(widget.tournamentType);
-        final hasMore = provider.hasMore(widget.tournamentType);
+        final tournaments = provider.tournaments(widget.gameCategory, widget.tournamentType);
+        final isLoading = provider.isLoading(widget.gameCategory, widget.tournamentType);
+        final hasMore = provider.hasMore(widget.gameCategory, widget.tournamentType);
         final errorMessage = provider.errorMessage;
 
         if (errorMessage != null) {
           return ErrorView(
             errorMessage: errorMessage,
-            onRetry: () => provider.fetchInitialTournaments(widget.tournamentType),
+            onRetry: () => provider.fetchInitialTournaments(widget.gameCategory, widget.tournamentType),
           );
         }
 
@@ -75,7 +78,7 @@ class MatchListTabState extends State<MatchListTab> {
         }
 
         return RefreshIndicator(
-          onRefresh: () => provider.fetchInitialTournaments(widget.tournamentType),
+          onRefresh: () => provider.fetchInitialTournaments(widget.gameCategory, widget.tournamentType),
           child: ListView.builder(
             controller: _scrollController,
             padding: const EdgeInsets.all(16),
@@ -133,28 +136,6 @@ class MatchListTabState extends State<MatchListTab> {
                     color: Colors.grey.shade700,
                   ),
                   textAlign: TextAlign.center,
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton.icon(
-                  onPressed: () {
-                    context.push('/tournaments/create');
-                  },
-                  icon: const Icon(Icons.add, size: 18),
-                  label: const Text(
-                    '내전 만들기',
-                    style: TextStyle(
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: AppColors.primary,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(24),
-                    ),
-                    elevation: 0,
-                  ),
                 ),
               ],
             ),
@@ -292,72 +273,289 @@ class MatchListTabState extends State<MatchListTab> {
                 ],
               ),
             ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
+            // 클랜전인지 개인전인지에 따라 다른 UI 표시
+            tournament.gameCategory == GameCategory.clan
+                ? _buildClanTournamentInfo(tournament)
+                : _buildIndividualTournamentInfo(tournament, orderedRoles, totalParticipants, totalSlots),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 클랜전용 UI
+  Widget _buildClanTournamentInfo(TournamentModel tournament) {
+    // TODO: 실제 참가한 클랜 수 계산 (현재는 임시)
+    final participatingClans = 0; // 임시값
+    final maxClans = 2; // 1vs1 클랜전
+    
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                '클랜 대결',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '1 vs 1',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 16),
+          
+          // 클랜 vs 클랜 아이콘 표시
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              // 주최 클랜
+              _buildHostClanEmblem(tournament),
+              
+              const SizedBox(width: 24),
+              
+              // VS 텍스트
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: AppColors.primary,
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Text(
+                  'VS',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w900,
+                    letterSpacing: 1,
+                  ),
+                ),
+              ),
+              
+              const SizedBox(width: 24),
+              
+              // 도전 클랜 (빈 상태)
+              _buildChallengeClanEmblem(tournament),
+            ],
+          ),
+          
+          const SizedBox(height: 16),
+          
+          // 대결 상태
+          Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Colors.orange.shade200,
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  Icons.access_time,
+                  color: Colors.orange.shade600,
+                  size: 16,
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '도전할 클랜을 기다리고 있습니다',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w500,
+                      color: Colors.orange.shade800,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 주최 클랜 엠블렘
+  Widget _buildHostClanEmblem(TournamentModel tournament) {
+    return FutureBuilder<Map<String, dynamic>?>(
+      future: _getHostClanInfo(tournament.hostId),
+      builder: (context, snapshot) {
+        final clanInfo = snapshot.data;
+        
+        return Container(
+          width: 48,
+          height: 48,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: AppColors.primary.withOpacity(0.1),
+            border: Border.all(
+              color: AppColors.primary,
+              width: 2,
+            ),
+          ),
+          child: ClipOval(
+            child: ClanEmblemWidget(
+              emblemData: clanInfo?['emblem'] ?? clanInfo?['emblemUrl'],
+              size: 44,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  // 도전 클랜 엠블렘 (현재는 빈 상태)
+  Widget _buildChallengeClanEmblem(TournamentModel tournament) {
+    // TODO: 실제 참가한 클랜 정보 가져오기
+    final hasChallenger = false; // 임시
+    
+    return Container(
+      width: 48,
+      height: 48,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: hasChallenger 
+            ? const Color(0xFFE74C3C).withOpacity(0.1)
+            : Colors.grey.shade200,
+        border: Border.all(
+          color: hasChallenger 
+              ? const Color(0xFFE74C3C)
+              : Colors.grey.shade400,
+          width: hasChallenger ? 2 : 1,
+        ),
+      ),
+      child: Icon(
+        hasChallenger ? Icons.shield : Icons.help_outline,
+        color: hasChallenger 
+            ? const Color(0xFFE74C3C)
+            : Colors.grey.shade500,
+        size: 24,
+      ),
+    );
+  }
+
+  // 주최 클랜 정보 가져오기
+  Future<Map<String, dynamic>?> _getHostClanInfo(String hostId) async {
+    try {
+      // 주최자의 사용자 정보 가져오기
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(hostId)
+          .get();
+      
+      if (!userDoc.exists) return null;
+      
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final clanId = userData['clanId'] as String?;
+      
+      if (clanId == null) return null;
+      
+      // 클랜 정보 가져오기
+      final clanDoc = await FirebaseFirestore.instance
+          .collection('clans')
+          .doc(clanId)
+          .get();
+      
+      if (!clanDoc.exists) return null;
+      
+      final clanData = clanDoc.data() as Map<String, dynamic>;
+      return {
+        'name': clanData['name'] ?? '클랜',
+        'emblem': clanData['emblem'],
+        'emblemUrl': clanData['emblemUrl'],
+        'memberCount': (clanData['members'] as List?)?.length ?? 0,
+      };
+    } catch (e) {
+      debugPrint('Error getting host clan info: $e');
+      return null;
+    }
+  }
+
+  // 개인전용 UI (기존 코드)
+  Widget _buildIndividualTournamentInfo(TournamentModel tournament, List<String> orderedRoles, int totalParticipants, int totalSlots) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Text(
+                '참가 현황',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '$totalParticipants/$totalSlots',
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: _getParticipantCountColor(totalParticipants, totalSlots),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+            children: orderedRoles.map((role) {
+              final totalForRole = tournament.slotsByRole[role] ?? 2;
+              final filledForRole = tournament.filledSlotsByRole[role] ?? 0;
+              
+              return Column(
                 children: [
-                  Row(
-                    children: [
-                      const Text(
-                        '참가 현황',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const Spacer(),
-                      Text(
-                        '$totalParticipants/$totalSlots',
-                        style: TextStyle(
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                          color: _getParticipantCountColor(totalParticipants, totalSlots),
-                        ),
-                      ),
-                    ],
+                  LaneIconWidget(
+                    lane: role,
+                    size: 36,
                   ),
-                  const SizedBox(height: 12),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: orderedRoles.map((role) {
-                      final totalForRole = tournament.slotsByRole[role] ?? 2;
-                      final filledForRole = tournament.filledSlotsByRole[role] ?? 0;
-                      
-                      return Column(
-                        children: [
-                          LaneIconWidget(
-                            lane: role,
-                            size: 36,
-                          ),
-                          const SizedBox(height: 4),
-                          Text(
-                            '$filledForRole/$totalForRole',
-                            style: TextStyle(
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                              color: _getParticipantCountColor(filledForRole, totalForRole),
-                            ),
-                          ),
-                        ],
-                      );
-                    }).toList(),
-                  ),
-                  const SizedBox(height: 12),
-                  ClipRRect(
-                    borderRadius: BorderRadius.circular(4),
-                    child: LinearProgressIndicator(
-                      value: totalSlots > 0 ? totalParticipants / totalSlots : 0,
-                      backgroundColor: Colors.grey.shade200,
-                      color: _getProgressBarColor(totalParticipants, totalSlots),
-                      minHeight: 8,
+                  const SizedBox(height: 4),
+                  Text(
+                    '$filledForRole/$totalForRole',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.bold,
+                      color: _getParticipantCountColor(filledForRole, totalForRole),
                     ),
                   ),
                 ],
-              ),
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 12),
+          ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: totalSlots > 0 ? totalParticipants / totalSlots : 0,
+              backgroundColor: Colors.grey.shade200,
+              color: _getProgressBarColor(totalParticipants, totalSlots),
+              minHeight: 8,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }

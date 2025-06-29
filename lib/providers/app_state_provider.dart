@@ -297,6 +297,7 @@ class AppStateProvider with ChangeNotifier {
     required DateTime startsAt,
     required Map<String, int> slotsByRole,
     required TournamentType tournamentType,
+    required GameCategory gameCategory,
     int? ovrLimit,
     PlayerTier? tierLimit,
     String? description,
@@ -306,6 +307,7 @@ class AppStateProvider with ChangeNotifier {
     String? customRoomName,
     String? customRoomPassword,
     String? hostPosition, // 주최자 포지션 추가
+    List<String>? clanMemberIds, // 클랜전용: 선택된 클랜원 ID 목록
   }) async {
     if (_currentUser == null) {
       _setError('사용자 로그인이 필요합니다');
@@ -404,6 +406,7 @@ class AppStateProvider with ChangeNotifier {
         startsAt: Timestamp.fromDate(startsAt),
         location: location,
         tournamentType: tournamentType,
+        gameCategory: gameCategory,
         creditCost: tournamentType == TournamentType.competitive ? 20 : null, // 항상 20 크레딧으로 고정
         status: TournamentStatus.open,
         createdAt: DateTime.now(),
@@ -437,7 +440,7 @@ class AppStateProvider with ChangeNotifier {
       );
       
       // Firestore에 저장
-      String id = await _firebaseService.createTournament(tournament);
+      String id = await _firebaseService.createTournament(tournament, clanMemberIds: clanMemberIds);
       
       // 주최자가 이미 포지션을 선택했다면, 자동으로 application 생성
       if (hostPosition != null && hostPosition.isNotEmpty) {
@@ -813,52 +816,7 @@ class AppStateProvider with ChangeNotifier {
     }
   }
   
-  // Create mercenary profile
-  Future<bool> createMercenaryProfile({
-    required Map<String, int> roleStats,
-    required Map<String, int> skillStats,
-    required List<String> preferredPositions,
-    String? description,
-  }) async {
-    if (_currentUser == null) return false;
-    
-    _setLoading(true);
-    _clearError();
-    
-    try {
-      // Calculate average role stat
-      double averageRoleStat = 0;
-      if (roleStats.isNotEmpty) {
-        final sum = roleStats.values.fold(0, (sum, stat) => sum + stat);
-        averageRoleStat = sum / roleStats.length;
-      }
-      
-      MercenaryModel mercenary = MercenaryModel(
-        id: '',  // Will be set by Firestore
-        userUid: _currentUser!.uid,
-        nickname: _currentUser!.nickname,
-        profileImageUrl: _currentUser!.profileImageUrl,
-        tier: _currentUser!.tier,
-        createdAt: Timestamp.now(),
-        lastActiveAt: Timestamp.now(),
-        roleStats: roleStats,
-        skillStats: skillStats,
-        preferredPositions: preferredPositions,
-        description: description,
-        averageRoleStat: averageRoleStat,
-        averageRating: _currentUser!.averageRating ?? 0.0,
-        isAvailable: true,  // Set mercenary as available by default
-      );
-      
-      await _firebaseService.createMercenaryProfile(mercenary);
-      return true;
-    } catch (e) {
-      _setError('Failed to create mercenary profile: $e');
-      return false;
-    } finally {
-      _setLoading(false);
-    }
-  }
+  // 용병 프로필 생성 메서드를 제거했습니다 (듀오 찾기 기능만 유지)
   
   // 토너먼트 일괄 삭제
   Future<int> deleteAllTournaments() async {

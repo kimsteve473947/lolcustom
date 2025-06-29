@@ -217,6 +217,55 @@ class AuthProvider extends ChangeNotifier {
     }
   }
   
+  // Discord OAuth2 로그인
+  Future<void> signInWithDiscord() async {
+    _setLoading(true);
+    try {
+      await authService.signInWithDiscord();
+      _clearError();
+      _setMessage('Discord로 로그인되었습니다!');
+    } on FirebaseAuthException catch (e) {
+      // Firebase Auth 오류 처리
+      if (e.code == 'billing-not-enabled') {
+        _setError('Firebase 결제 계정이 필요합니다. Firebase Console에서 Blaze 플랜으로 업그레이드하세요.');
+      } else {
+        _setError(authService.getKoreanErrorMessage(e));
+      }
+      rethrow;
+    } catch (e) {
+      _setError('Discord 로그인 중 오류가 발생했습니다: $e');
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // Discord 연결 해제
+  Future<void> disconnectDiscord() async {
+    _setLoading(true);
+    try {
+      await authService.disconnectDiscord();
+      await _fetchCurrentUser(); // 사용자 정보 새로고침
+      _clearError();
+      _setMessage('Discord 연결이 해제되었습니다.');
+    } catch (e) {
+      _setError('Discord 연결 해제 중 오류가 발생했습니다: $e');
+      rethrow;
+    } finally {
+      _setLoading(false);
+    }
+  }
+  
+  // Discord 연결 상태 확인
+  Future<bool> isDiscordConnected() async {
+    try {
+      return await authService.isDiscordConnected();
+    } catch (e) {
+      debugPrint('Discord 연결 상태 확인 중 오류: $e');
+      return false;
+    }
+  }
+  
   // 프로필 업데이트
   Future<void> updateProfile({String? nickname, String? profileImageUrl}) async {
     _setLoading(true);

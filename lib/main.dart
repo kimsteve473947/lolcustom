@@ -24,6 +24,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:lol_custom_game_manager/services/background_service.dart';
 import 'package:lol_custom_game_manager/providers/chat_provider.dart';
 import 'package:lol_custom_game_manager/providers/clan_creation_provider.dart';
+import 'package:lol_custom_game_manager/providers/university_verification_provider.dart';
 
 // Firebase background message handler
 @pragma('vm:entry-point')
@@ -200,6 +201,7 @@ class MyApp extends StatelessWidget {
         Provider<FirebaseMessagingService>(create: (_) => messagingService),
         ChangeNotifierProvider(create: (_) => ChatProvider()),
         ChangeNotifierProvider(create: (_) => ClanCreationProvider()),
+        ChangeNotifierProvider(create: (_) => UniversityVerificationProvider()),
         ChangeNotifierProvider<TournamentProvider>(
           create: (context) => TournamentProvider(
             Provider.of<TournamentService>(context, listen: false),

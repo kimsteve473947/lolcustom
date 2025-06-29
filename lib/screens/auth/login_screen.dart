@@ -60,6 +60,32 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  Future<void> _signInWithDiscord() async {
+    final authProvider = Provider.of<AuthProvider>(context, listen: false);
+    final appStateProvider = Provider.of<AppStateProvider>(context, listen: false);
+    
+    try {
+      await authProvider.signInWithDiscord();
+      
+      // 로그인 성공 후 AppStateProvider의 사용자 정보 동기화
+      await appStateProvider.syncCurrentUser();
+      debugPrint('LoginScreen - Discord 로그인 성공 후 AppStateProvider 동기화 완료');
+      
+      if (mounted) {
+        // 로그인 성공 후 리다이렉트 URL이 있으면 해당 URL로 이동
+        final redirectUrl = widget.redirectUrl;
+        if (redirectUrl != null && redirectUrl.isNotEmpty) {
+          context.go(redirectUrl);
+        } else {
+          context.go('/main');
+        }
+      }
+    } catch (e) {
+      // 오류는 AuthProvider에서 처리하므로 여기서는 별도 처리 필요 없음
+      debugPrint('Discord 로그인 오류: $e');
+    }
+  }
+
   Future<void> _launchFirebaseConsole() async {
     final Uri url = Uri.parse('https://console.firebase.google.com/');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
@@ -298,6 +324,55 @@ class _LoginScreenState extends State<LoginScreen> {
                               '로그인',
                               style: TextStyle(fontSize: 16),
                             ),
+                          ),
+                        ),
+                  const SizedBox(height: 24),
+                  
+                  // OR divider
+                  Row(
+                    children: [
+                      const Expanded(child: Divider(color: AppColors.border)),
+                      Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16),
+                        child: Text(
+                          '또는',
+                          style: TextStyle(
+                            color: AppColors.textSecondary,
+                            fontSize: 14,
+                          ),
+                        ),
+                      ),
+                      const Expanded(child: Divider(color: AppColors.border)),
+                    ],
+                  ),
+                  const SizedBox(height: 24),
+                  
+                  // Discord login button
+                  authProvider.isLoading
+                      ? const SizedBox.shrink()
+                      : OutlinedButton.icon(
+                          onPressed: _signInWithDiscord,
+                          icon: Container(
+                            width: 20,
+                            height: 20,
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(4),
+                              color: const Color(0xFF5865F2), // Discord brand color
+                            ),
+                            child: const Icon(
+                              Icons.chat,
+                              color: Colors.white,
+                              size: 14,
+                            ),
+                          ),
+                          label: const Text(
+                            'Discord로 로그인',
+                            style: TextStyle(fontSize: 16),
+                          ),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: const Color(0xFF5865F2),
+                            side: const BorderSide(color: Color(0xFF5865F2), width: 1),
+                            padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 24),
                           ),
                         ),
                   const SizedBox(height: 16),

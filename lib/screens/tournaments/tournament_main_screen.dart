@@ -6,13 +6,13 @@ import 'package:lol_custom_game_manager/constants/app_theme.dart';
 import 'package:lol_custom_game_manager/models/models.dart';
 import 'package:lol_custom_game_manager/providers/tournament_provider.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/match_list_tab.dart';
-import 'package:lol_custom_game_manager/screens/tournaments/mercenary_search_tab.dart';
+import 'package:lol_custom_game_manager/screens/college_league/college_league_screen.dart';
 import 'package:go_router/go_router.dart';
 import 'package:provider/provider.dart';
 import 'package:lol_custom_game_manager/services/evaluation_service.dart';
 import 'package:lol_custom_game_manager/providers/app_state_provider.dart';
 
-// Adding a temporary ClanBattlesTab widget until it's properly implemented
+// Adding temporary widgets until they're properly implemented
 class ClanBattlesTab extends StatelessWidget {
   const ClanBattlesTab({Key? key}) : super(key: key);
 
@@ -24,6 +24,58 @@ class ClanBattlesTab extends StatelessWidget {
   }
 }
 
+class CollegeLeagueView extends StatelessWidget {
+  const CollegeLeagueView({Key? key}) : super(key: key);
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      color: const Color(0xFFF8F9FA),
+      child: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 80,
+              height: 80,
+              decoration: BoxDecoration(
+                color: AppColors.primary.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.school,
+                  size: 40,
+                  color: AppColors.primary,
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              '대학 대항전',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '같은 대학끼리 팀을 이뤄 경쟁하세요',
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF999999),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+// DuoFinderView 클래스를 제거했습니다 (별도 라우트로 처리)
+
 class TournamentMainScreen extends StatefulWidget {
   const TournamentMainScreen({Key? key}) : super(key: key);
 
@@ -31,11 +83,12 @@ class TournamentMainScreen extends StatefulWidget {
   State<TournamentMainScreen> createState() => _TournamentMainScreenState();
 }
 
-class _TournamentMainScreenState extends State<TournamentMainScreen> {
+class _TournamentMainScreenState extends State<TournamentMainScreen> with SingleTickerProviderStateMixin {
   final PageController _pageController = PageController(viewportFraction: 1.0);
   int _currentPageIndex = 0;
   final EvaluationService _evaluationService = EvaluationService();
   List<Map<String, dynamic>> _pendingEvaluations = [];
+  TabController? _personalMatchTabController;
 
   // 메뉴 아이템 정의 - 토스 스타일
   final List<Map<String, dynamic>> _menuItems = [
@@ -52,9 +105,9 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
       'color': const Color(0xFF5C7CFA),
     },
     {
-      'title': '용병 찾기',
-      'subtitle': '실력있는 플레이어 매칭',
-      'icon': Icons.shield,
+      'title': '대학 대항전',
+      'subtitle': '같은 대학끼리 팀을 이뤄 경쟁',
+      'icon': Icons.school,
       'color': const Color(0xFFFF6B6B),
     },
     {
@@ -68,6 +121,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
   @override
   void initState() {
     super.initState();
+    _personalMatchTabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final provider = Provider.of<TournamentProvider>(context, listen: false);
       provider.selectDate(DateTime.now());
@@ -90,13 +144,25 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
   @override
   void dispose() {
     _pageController.dispose();
+    _personalMatchTabController?.dispose();
     super.dispose();
   }
   
   void _navigateToPage(int index) {
+    if (index == 2) {
+      // 클랜전 화면으로 push 방식으로 이동 (스택 유지)
+      context.push('/clan-battle');
+    } else if (index == 3) {
+      // 대학 대항전 화면으로 push 방식으로 이동 (스택 유지)
+      context.push('/college-league');
+    } else if (index == 4) {
+      // 듀오 찾기 화면으로 push 방식으로 이동 (스택 유지)
+      context.push('/duo-finder');
+    } else {
       setState(() {
-      _currentPageIndex = index;
-    });
+        _currentPageIndex = index;
+      });
+    }
   }
 
   @override
@@ -116,12 +182,6 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
         return _buildMainMenu();
       case 1:
         return _buildPersonalMatchPage();
-      case 2:
-        return _buildClanBattlePage();
-      case 3:
-        return _buildMercenaryFinderPage();
-      case 4:
-        return _buildDuoFinderPage();
       default:
         return _buildMainMenu();
     }
@@ -179,112 +239,166 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
       children: [
         _buildHeader('개인전'),
         Expanded(
-          child: DefaultTabController(
-            length: 2,
-            child: Column(
-              children: [
-                _buildDateSelector(),
-        Container(
-          color: Colors.white,
-          child: TabBar(
-            indicatorColor: AppColors.primary,
-                    indicatorWeight: 3,
-                    labelColor: const Color(0xFF1A1A1A),
-                    unselectedLabelColor: const Color(0xFF999999),
-                    labelStyle: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w600,
+          child: Column(
+            children: [
+              _buildProfileBanner(),
+              _buildDateSelector(),
+              Container(
+                color: Colors.white,
+                child: TabBar(
+                  controller: _personalMatchTabController,
+                  indicatorColor: AppColors.primary,
+                  indicatorWeight: 3,
+                  labelColor: const Color(0xFF1A1A1A),
+                  unselectedLabelColor: const Color(0xFF999999),
+                  labelStyle: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                  tabs: const [
+                    Tab(text: '일반전'),
+                    Tab(text: '리그전'),
+                  ],
+                ),
+              ),
+              Expanded(
+                child: TabBarView(
+                  controller: _personalMatchTabController,
+                  children: const [
+                    MatchListTab(
+                      tournamentType: TournamentType.casual,
+                      gameCategory: GameCategory.individual,
                     ),
-            tabs: const [
-              Tab(text: '일반전'),
-              Tab(text: '경쟁전'),
+                    MatchListTab(
+                      tournamentType: TournamentType.competitive,
+                      gameCategory: GameCategory.individual,
+                    ),
+                  ],
+                ),
+              ),
             ],
           ),
         ),
-                const Expanded(
-                  child: TabBarView(
-                    children: [
-                      MatchListTab(tournamentType: TournamentType.casual),
-                      MatchListTab(tournamentType: TournamentType.competitive),
-                    ],
-                  ),
-                ),
+      ],
+    );
+  }
+  
+  Widget _buildProfileBanner() {
+    return Consumer<AppStateProvider>(
+      builder: (context, appStateProvider, child) {
+        final currentUser = appStateProvider.currentUser;
+        
+        return Container(
+          margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                AppColors.primary.withOpacity(0.7),
+                AppColors.primary.withOpacity(0.9),
               ],
             ),
+            borderRadius: BorderRadius.circular(12),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.15),
+                blurRadius: 6,
+                offset: const Offset(0, 2),
+              ),
+            ],
           ),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildClanBattlePage() {
-    return Column(
-      children: [
-        _buildHeader('클랜전'),
-        Expanded(
-          child: Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                Container(
-                  width: 80,
-                  height: 80,
+          child: Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: Colors.white.withOpacity(0.2),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: currentUser?.profileImageUrl != null && currentUser!.profileImageUrl!.isNotEmpty
+                    ? ClipRRect(
+                        borderRadius: BorderRadius.circular(8),
+                        child: Image.network(
+                          currentUser.profileImageUrl!,
+                          width: 32,
+                          height: 32,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return const Center(
+                              child: Icon(
+                                Icons.person,
+                                color: Colors.white,
+                                size: 20,
+                              ),
+                            );
+                          },
+                        ),
+                      )
+                    : const Center(
+                        child: Icon(
+                          Icons.person,
+                          color: Colors.white,
+                          size: 20,
+                        ),
+                      ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      currentUser?.nickname ?? '게스트',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    const Text(
+                      '개인전에 참여하고 실력을 증명하세요',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              GestureDetector(
+                onTap: () {
+                  // 전적 보기 화면으로 이동 (추후 구현)
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('전적 보기 기능은 곧 추가될 예정입니다'),
+                      duration: Duration(seconds: 2),
+                    ),
+                  );
+                },
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(20),
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(6),
                   ),
-                  child: const Center(
-                    child: Icon(
-                      Icons.groups,
-                      size: 40,
-                      color: Color(0xFFCCCCCC),
+                  child: Text(
+                    '전적 보기',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w600,
+                      color: AppColors.primary,
                     ),
                   ),
                 ),
-                const SizedBox(height: 24),
-                const Text(
-                  '클랜전 준비 중',
-                  style: TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.w700,
-                    color: Color(0xFF1A1A1A),
-              ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  '곧 만나볼 수 있어요!',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Color(0xFF999999),
-                  ),
               ),
             ],
-            ),
           ),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildMercenaryFinderPage() {
-    return Column(
-      children: [
-        _buildHeader('용병 찾기'),
-        const Expanded(
-          child: MercenaryFinderView(),
-        ),
-      ],
-    );
-  }
-  
-  Widget _buildDuoFinderPage() {
-    return Column(
-      children: [
-        _buildHeader('듀오 찾기'),
-        const Expanded(
-          child: DuoFinderView(),
-        ),
-      ],
+        );
+      },
     );
   }
   
@@ -596,7 +710,7 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
                 icon: Icons.add_circle_outline,
                 title: '매치 생성',
                 subtitle: '새로운 스크림 매치 만들기',
-                onTap: () => context.push('/tournaments/create'),
+                onTap: () => _showCreateTournamentModal(),
               ),
               const Divider(height: 24),
               _buildQuickActionItem(
@@ -794,37 +908,202 @@ class _TournamentMainScreenState extends State<TournamentMainScreen> {
   Widget? _buildFloatingActionButton() {
     switch (_currentPageIndex) {
       case 1: // 개인전
-      case 2: // 클랜전
-        return FloatingActionButton(
-          onPressed: () async {
-            final result = await context.push('/tournaments/create');
-            if (result is TournamentModel) {
-              final provider = Provider.of<TournamentProvider>(context, listen: false);
-              await Future.delayed(const Duration(milliseconds: 500));
-              await provider.selectDate(result.startsAt.toDate());
-            }
-          },
-          backgroundColor: AppColors.primary,
-          child: const Icon(Icons.add, color: Colors.white),
-        );
-      case 3: // 용병 찾기
-        return FloatingActionButton.extended(
-          onPressed: () => context.push('/mercenaries/register'),
-          backgroundColor: AppColors.primary,
-          icon: const Icon(Icons.add, color: Colors.white),
-          label: const Text(
-            '용병 등록',
-            style: TextStyle(
-              color: Colors.white,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        );
-      case 4: // 듀오 찾기
-        return null; // DuoFinderView에 자체 FAB가 있음
+        if (_personalMatchTabController != null) {
+          return AnimatedBuilder(
+            animation: _personalMatchTabController!,
+            builder: (context, child) {
+              // 일반전 탭(index 0)일 때만 + 버튼 표시
+              if (_personalMatchTabController!.index == 0) {
+                return FloatingActionButton(
+                  onPressed: () => context.push('/tournaments/create?type=individual'),
+                  backgroundColor: AppColors.primary,
+                  child: const Icon(Icons.add, color: Colors.white),
+                );
+              }
+              return const SizedBox.shrink(); // 리그전 탭에서는 버튼 숨김
+            },
+          );
+        }
+        return null;
+
       default:
         return null;
     }
+  }
+  
+  void _showCreateTournamentModal() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (context) => Container(
+        decoration: const BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 24, 24, 32),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 상단 핸들바
+            Center(
+              child: Container(
+                width: 40,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: Colors.grey[300],
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // 제목
+            const Text(
+              '새 내전 만들기',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.w700,
+                color: Color(0xFF1A1A1A),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '어떤 유형의 내전을 만들고 싶나요?',
+              style: TextStyle(
+                fontSize: 14,
+                color: Color(0xFF999999),
+              ),
+            ),
+            const SizedBox(height: 24),
+            
+            // 개인전 옵션
+            _buildTournamentOption(
+              icon: Icons.person,
+              title: '개인전',
+              description: '개인 참가자들이 모여서 하는 내전',
+              color: AppColors.primary,
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/tournaments/create?type=individual');
+              },
+            ),
+            const SizedBox(height: 16),
+            
+            // 클랜전 옵션
+            _buildTournamentOption(
+              icon: Icons.groups,
+              title: '클랜전',
+              description: '클랜 vs 클랜으로 진행하는 대항전',
+              color: const Color(0xFF7B93FF),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/tournaments/create?type=clan');
+              },
+            ),
+            const SizedBox(height: 16),
+            
+            // 대학리그전 옵션
+            _buildTournamentOption(
+              icon: Icons.school,
+              title: '대학리그전',
+              description: '대학 인증을 받은 유저들이 참여하는 리그',
+              color: const Color(0xFF07C160),
+              onTap: () {
+                Navigator.pop(context);
+                context.push('/tournaments/create?type=university');
+              },
+            ),
+            
+            const SizedBox(height: 24),
+            
+            // 취소 버튼
+            SizedBox(
+              width: double.infinity,
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                style: TextButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  '취소',
+                  style: TextStyle(
+                    fontSize: 16,
+                    color: Color(0xFF999999),
+                  ),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildTournamentOption({
+    required IconData icon,
+    required String title,
+    required String description,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: const Color(0xFFE8E8E8)),
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Icon(
+                icon,
+                color: color,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFF1A1A1A),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Color(0xFF999999),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Icon(
+              Icons.arrow_forward_ios,
+              size: 16,
+              color: Color(0xFF999999),
+            ),
+          ],
+        ),
+      ),
+    );
   }
   
   Widget _buildEvaluationBanner() {

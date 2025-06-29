@@ -136,7 +136,7 @@ export const onTournamentParticipantChange = onDocumentUpdated(
  * Updated: 2025-06-21 Force deploy v2
  */
 async function sendDiscordInviteMessage(tournamentData: any, channelData: any): Promise<void> {
-  console.log(`📱 [DISCORD INVITE] Sending Discord invite link for tournament: ${tournamentData.id}`);
+  console.log(`📱 [DISCORD INVITE] Sending Discord channel info for tournament: ${tournamentData.id}`);
   
   try {
     const db = admin.firestore();
@@ -150,8 +150,12 @@ async function sendDiscordInviteMessage(tournamentData: any, channelData: any): 
     
     console.log(`✅ [DISCORD INVITE] Using chat room: ${chatRoomId}`);
     
-    // Discord 초대링크 메시지 생성
-    const messageContent = `🎯 ${tournamentData.name} 토너먼트 Discord 채널이 생성되었습니다!
+    // Discord 채널 메시지 생성 (권한 기반 vs 초대링크 기반)
+    let messageContent: string;
+    
+    if (channelData.textChannelInvite && channelData.textChannelInvite.trim() !== '') {
+      // 기존 초대링크 기반 메시지
+      messageContent = `🎯 ${tournamentData.name} 토너먼트 Discord 채널이 생성되었습니다!
 
 💬 텍스트 채팅방 입장하기:
 ${channelData.textChannelInvite}
@@ -161,6 +165,25 @@ A팀: ${channelData.voiceChannel1Invite}
 B팀: ${channelData.voiceChannel2Invite}
 
 📱 링크를 터치하여 Discord 채널에 입장하세요!`;
+    } else {
+      // 새로운 권한 기반 메시지
+      messageContent = `🔒 ${tournamentData.name} 토너먼트 Discord 채널이 생성되었습니다!
+
+✨ **자동 권한 설정 완료!**
+Discord 계정을 연결한 참가자들은 자동으로 채널 접근 권한을 받았습니다.
+
+🎮 **채널 이용 방법:**
+1. Discord 앱을 열어주세요
+2. 스크림져드 서버에서 새로 생성된 채널을 확인하세요
+3. 텍스트 채널과 A팀/B팀 음성 채널을 이용하세요
+
+🔐 **보안 기능:**
+• 참가자들만 접근 가능한 비공개 채널
+• 토너먼트 종료 시 자동 삭제
+• 안전한 경기 진행 보장
+
+📋 Discord 계정을 연결하지 않은 참가자는 앱 내 채팅을 이용해주세요.`;
+    }
     
     console.log(`📝 [DISCORD INVITE] Generated message content (length: ${messageContent.length})`);
     
@@ -173,11 +196,12 @@ B팀: ${channelData.voiceChannel2Invite}
       readStatus: {},
       timestamp: admin.firestore.FieldValue.serverTimestamp(),
       metadata: {
-        type: 'discord_invite',
+        type: channelData.textChannelInvite ? 'discord_invite' : 'discord_private_channel',
         discordChannels: channelData,
-        textChannelInvite: channelData.textChannelInvite,
-        voiceChannel1Invite: channelData.voiceChannel1Invite,
-        voiceChannel2Invite: channelData.voiceChannel2Invite,
+        isPrivateChannel: !channelData.textChannelInvite,
+        textChannelInvite: channelData.textChannelInvite || null,
+        voiceChannel1Invite: channelData.voiceChannel1Invite || null,
+        voiceChannel2Invite: channelData.voiceChannel2Invite || null,
       },
     };
 
@@ -187,15 +211,19 @@ B팀: ${channelData.voiceChannel2Invite}
     console.log(`✅ [DISCORD INVITE] Message added with ID: ${messageRef.id}`);
     
     // 채팅방의 lastMessage 업데이트
+    const lastMessageText = channelData.textChannelInvite 
+      ? 'Discord 채널이 생성되었습니다!' 
+      : 'Discord 비공개 채널이 생성되었습니다!';
+      
     await db.collection('chatRooms').doc(chatRoomId).update({
-      lastMessageText: 'Discord 채널이 생성되었습니다!',
+      lastMessageText: lastMessageText,
       lastMessageTime: messageData.timestamp,
     });
     
-    console.log(`🎉 [DISCORD INVITE] Successfully sent Discord invite to chat room: ${chatRoomId}`);
+    console.log(`🎉 [DISCORD INVITE] Successfully sent Discord channel info to chat room: ${chatRoomId}`);
     
   } catch (error) {
-    console.error(`❌ [DISCORD INVITE] Error sending invite message:`, error);
+    console.error(`❌ [DISCORD INVITE] Error sending channel info message:`, error);
     throw error;
   }
 }

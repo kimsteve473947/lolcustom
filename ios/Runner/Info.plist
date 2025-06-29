@@ -91,6 +91,15 @@
 				<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
 			</array>
 		</dict>
+		<!-- Discord OAuth2 URL Scheme -->
+		<dict>
+			<key>CFBundleURLName</key>
+			<string>discord-oauth</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>app-1-879820637627-ios-64a6ebbd52c78d32c9709e</string>
+			</array>
+		</dict>
 	</array>
 </dict>
 </plist>

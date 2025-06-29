@@ -369,6 +369,56 @@ class ClanService {
     // Delete clan document
     await _clansCollection.doc(clanId).delete();
   }
+
+  // Transfer clan ownership
+  Future<void> transferClanOwnership(String clanId, String newOwnerId) async {
+    final user = _auth.currentUser;
+    if (user == null) {
+      throw Exception('로그인이 필요합니다.');
+    }
+    final currentOwnerId = user.uid;
+
+    return _firestore.runTransaction((transaction) async {
+      final clanRef = _clansCollection.doc(clanId);
+      final clanDoc = await transaction.get(clanRef);
+
+      if (!clanDoc.exists) {
+        throw Exception('클랜이 존재하지 않습니다.');
+      }
+
+      final clanData = clanDoc.data() as Map<String, dynamic>;
+      if (clanData['ownerId'] != currentOwnerId) {
+        throw Exception('클랜 소유자만 권한을 위임할 수 있습니다.');
+      }
+
+      final members = List<String>.from(clanData['members'] ?? []);
+      if (!members.contains(newOwnerId)) {
+        throw Exception('새로운 소유자는 클랜 멤버여야 합니다.');
+      }
+      
+      if (currentOwnerId == newOwnerId) {
+        throw Exception('자기 자신에게 소유권을 위임할 수 없습니다.');
+      }
+
+      // Get new owner's nickname
+      final newOwnerDoc = await _firestore.collection('users').doc(newOwnerId).get();
+      final newOwnerName = newOwnerDoc.data()?['nickname'] ?? '이름 없음';
+
+      // Update clan document
+      transaction.update(clanRef, {
+        'ownerId': newOwnerId,
+        'ownerName': newOwnerName,
+      });
+
+      // Update old owner's user document
+      final oldOwnerRef = _firestore.collection('users').doc(currentOwnerId);
+      transaction.update(oldOwnerRef, {'isOwnerOfClan': false});
+
+      // Update new owner's user document
+      final newOwnerRef = _firestore.collection('users').doc(newOwnerId);
+      transaction.update(newOwnerRef, {'isOwnerOfClan': true});
+    });
+  }
   
   // Search clans
   Future<List<ClanModel>> searchClans(String query, {int limit = 10}) async {

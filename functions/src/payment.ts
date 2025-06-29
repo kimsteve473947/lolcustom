@@ -10,11 +10,10 @@ const TOSS_API_BASE_URL = 'https://api.tosspayments.com/v1';
 
 // 환경변수에서 토스 시크릿 키 가져오기
 function getTossSecretKey(): string {
-  const config = functions.config();
-  const secretKey = config.toss?.secret_key;
+  const secretKey = process.env.TOSS_SECRET_KEY;
   
   if (!secretKey) {
-    throw new Error('토스페이먼츠 시크릿 키가 설정되지 않았습니다. firebase functions:config:set toss.secret_key="YOUR_SECRET_KEY"를 실행하세요.');
+    throw new Error('토스페이먼츠 시크릿 키가 설정되지 않았습니다. TOSS_SECRET_KEY 환경변수를 설정하세요.');
   }
   
   return secretKey;

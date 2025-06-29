@@ -20,9 +20,8 @@ import 'package:lol_custom_game_manager/screens/clans/clan_join_screen.dart';
 import 'package:lol_custom_game_manager/providers/clan_recruitment_provider.dart';
 import 'package:lol_custom_game_manager/screens/main_screen.dart';
 import 'package:provider/provider.dart';
-import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_detail_screen.dart';
-import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_edit_screen.dart';
-import 'package:lol_custom_game_manager/screens/mercenaries/mercenary_list_screen.dart';
+import 'package:lol_custom_game_manager/screens/college_league/college_league_screen.dart';
+import 'package:lol_custom_game_manager/screens/college_league/university_verification_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/my_page_screen.dart';
 import 'package:lol_custom_game_manager/screens/my_page/edit_profile_screen.dart';
 import 'package:lol_custom_game_manager/screens/rankings/rankings_screen.dart';
@@ -32,6 +31,10 @@ import 'package:lol_custom_game_manager/screens/my_page/credit_charge_screen.dar
 import 'package:lol_custom_game_manager/screens/tournaments/tournament_detail_screen.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/tournament_main_screen.dart';
 import 'package:lol_custom_game_manager/screens/tournaments/create_tournament_screen.dart';
+import 'package:lol_custom_game_manager/screens/tournaments/create_clan_tournament_screen.dart';
+import 'package:lol_custom_game_manager/screens/tournaments/create_university_tournament_screen.dart';
+import 'package:lol_custom_game_manager/screens/duo/duo_finder_screen.dart';
+import 'package:lol_custom_game_manager/screens/clans/clan_battle_screen.dart';
 import 'package:lol_custom_game_manager/services/auth_service.dart';
 import 'package:lol_custom_game_manager/widgets/admin_tools.dart';
 import 'package:lol_custom_game_manager/screens/profile/user_profile_screen.dart';
@@ -86,8 +89,24 @@ class AppRouter {
         builder: (context, state) => const MainScreen(),
       ),
       GoRoute(
+        path: '/tournaments',
+        builder: (context, state) => const MainScreen(initialTabIndex: 0),
+      ),
+      GoRoute(
         path: '/tournaments/create',
-        builder: (context, state) => const CreateTournamentScreen(),
+        builder: (context, state) {
+          final type = state.uri.queryParameters['type'];
+          
+          switch (type) {
+            case 'clan':
+              return const CreateClanTournamentScreen();
+            case 'university':
+              return const CreateUniversityTournamentScreen();
+            case 'individual':
+            default:
+              return CreateTournamentScreen(type: type);
+          }
+        },
       ),
       GoRoute(
         path: '/tournaments/:id',
@@ -97,24 +116,23 @@ class AppRouter {
         },
       ),
       GoRoute(
-        path: '/mercenaries/register',
-        builder: (context, state) {
-          return const MercenaryEditScreen();
+        path: '/duo-finder',
+        parentNavigatorKey: _rootNavigatorKey,
+        pageBuilder: (context, state) {
+          return NoTransitionPage(child: const DuoFinderScreen());
         },
       ),
       GoRoute(
-        path: '/mercenaries/edit/:id',
-        builder: (context, state) {
-          final mercenaryId = state.pathParameters['id']!;
-          return MercenaryEditScreen(mercenaryId: mercenaryId);
-        },
+        path: '/clan-battle',
+        builder: (context, state) => const MainScreen(initialTabIndex: 0, child: ClanBattleScreen()),
       ),
       GoRoute(
-        path: '/mercenaries/:id',
-        builder: (context, state) {
-          final userId = state.pathParameters['id']!;
-          return MainScreen(child: MercenaryDetailScreen(mercenaryId: userId));
-        },
+        path: '/college-league',
+        builder: (context, state) => const MainScreen(initialTabIndex: 0, child: CollegeLeagueScreen()),
+      ),
+      GoRoute(
+        path: '/university-verification',
+        builder: (context, state) => const UniversityVerificationScreen(),
       ),
       GoRoute(
         path: '/clans',

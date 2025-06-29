@@ -28,3 +28,6 @@ export {
   handleTossWebhook,
   getPaymentStatus
 } from './payment';
+
+// Discord 봇 기능 - 삭제됨 (한번만 사용하는 서버 구성 기능이므로)
+// export { handleDiscordInteraction, registerDiscordCommands } from './discord-commands';

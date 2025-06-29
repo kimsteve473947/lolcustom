@@ -6,6 +6,17 @@
         "-y",
         "@modelcontextprotocol/server-sequential-thinking"
       ]
-    }
+    },
+   "discord": {
+     "command": "servers/mcp-discord/venv/bin/python",
+     "args": [
+       "-m",
+       "discord_mcp.server"
+     ],
+     "cwd": "servers/mcp-discord",
+     "env": {
+       "DISCORD_TOKEN": "${env:DISCORD_TOKEN}"
+     }
+   }
   }
 }

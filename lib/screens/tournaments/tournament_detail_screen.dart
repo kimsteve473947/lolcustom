@@ -20,8 +20,10 @@ import 'package:lol_custom_game_manager/widgets/host_trust_score_widget.dart';
 import 'package:lol_custom_game_manager/widgets/participant_trust_score_widget.dart';
 import 'package:lol_custom_game_manager/services/participant_trust_score_manager.dart';
 import 'package:lol_custom_game_manager/screens/evaluation/participant_evaluation_screen.dart';
+import 'package:lol_custom_game_manager/screens/tournaments/clan_team_application_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:lol_custom_game_manager/utils/image_utils.dart';
+import 'package:lol_custom_game_manager/widgets/clan_emblem_widget.dart';
 
 class TournamentDetailScreen extends StatefulWidget {
   final String tournamentId;
@@ -673,6 +675,38 @@ class _TossStyleHostTrustSheet extends StatelessWidget {
   }
 }
 
+// 클랜전 헤더 배경 패턴 페인터
+class _ClanWarPatternPainter extends CustomPainter {
+  @override
+  void paint(Canvas canvas, Size size) {
+    final paint = Paint()
+      ..color = Colors.white.withOpacity(0.05)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1;
+
+    // 기하학적 패턴 그리기
+    for (int i = 0; i < 6; i++) {
+      final double x = (size.width / 5) * i;
+      for (int j = 0; j < 4; j++) {
+        final double y = (size.height / 3) * j;
+        
+        // 다이아몬드 모양
+        final path = Path();
+        path.moveTo(x + 20, y);
+        path.lineTo(x + 40, y + 20);
+        path.lineTo(x + 20, y + 40);
+        path.lineTo(x, y + 20);
+        path.close();
+        
+        canvas.drawPath(path, paint);
+      }
+    }
+  }
+
+  @override
+  bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
 class _ScoreData {
   final Color backgroundColor;
   final Color textColor;
@@ -1079,6 +1113,7 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
                   ? _buildParticipationButtons()  // 참가 버튼 표시 위젯을 호출
                   : null
           : null,
+      floatingActionButton: _buildFloatingActionButton(),
     );
   }
   
@@ -1092,6 +1127,11 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   }
   
   Widget _buildContent() {
+    // 클랜전인지 확인
+    if (_tournament != null && _tournament!.gameCategory == GameCategory.clan) {
+      return _buildClanTournamentContent();
+    }
+    
     return CustomScrollView(
         controller: _scrollController,
         physics: const BouncingScrollPhysics(),
@@ -2764,6 +2804,11 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
   Widget _buildParticipationButtons() {
     final appState = Provider.of<AppStateProvider>(context);
     
+    // 클랜전인지 확인
+    if (_tournament != null && _tournament!.gameCategory == GameCategory.clan) {
+      return _buildClanTournamentButtons();
+    }
+    
     // 더 견고한 참가 여부 체크 - applications와 participants 모두 확인
     final hasAppliedInApplications = appState.currentUser != null && _applications.any((app) => 
         app.userUid == appState.currentUser!.uid && 
@@ -4157,5 +4202,1143 @@ class _TournamentDetailScreenState extends State<TournamentDetailScreen> {
         app.userUid == appState.currentUser!.uid && 
         app.status != ApplicationStatus.cancelled && 
         app.status != ApplicationStatus.rejected);
+  }
+
+  // 클랜전 전용 컨텐츠
+  Widget _buildClanTournamentContent() {
+    return CustomScrollView(
+      controller: _scrollController,
+      physics: const BouncingScrollPhysics(),
+      slivers: [
+        // 웅장한 클랜전 헤더
+        SliverToBoxAdapter(
+          child: _buildClanTournamentHeader(),
+        ),
+        
+        // 클랜전 상세 정보
+        SliverToBoxAdapter(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 참가 클랜 현황
+                _buildParticipatingClans(),
+                const SizedBox(height: 24),
+                
+                // 클랜전 세부 정보
+                _buildClanTournamentInfo(),
+                const SizedBox(height: 24),
+                
+                // 토너먼트 규칙
+                if (_tournament!.description != null && _tournament!.description!.isNotEmpty)
+                  _buildClanTournamentRules(),
+                
+                const SizedBox(height: 50), // Extra space for bottom button
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // 웅장한 클랜전 헤더
+  Widget _buildClanTournamentHeader() {
+    return Container(
+      height: 280,
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            AppColors.primary,
+            AppColors.primary.withOpacity(0.8),
+            const Color(0xFFE74C3C),
+          ],
+        ),
+      ),
+      child: Stack(
+        children: [
+          // 배경 패턴
+          Positioned.fill(
+            child: Container(
+              decoration: BoxDecoration(
+                backgroundBlendMode: BlendMode.overlay,
+                color: Colors.black.withOpacity(0.1),
+              ),
+              child: CustomPaint(
+                painter: _ClanWarPatternPainter(),
+              ),
+            ),
+          ),
+          
+          // 메인 컨텐츠
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 40, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 클랜전 배지
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.2),
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: Colors.white.withOpacity(0.3),
+                      width: 1,
+                    ),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      const Icon(
+                        Icons.shield,
+                        color: Colors.white,
+                        size: 16,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '클랜 대전',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // 토너먼트 제목
+                Text(
+                  _tournament!.title,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 28,
+                    fontWeight: FontWeight.w900,
+                    height: 1.2,
+                    shadows: [
+                      Shadow(
+                        offset: Offset(0, 2),
+                        blurRadius: 4,
+                        color: Colors.black26,
+                      ),
+                    ],
+                  ),
+                ),
+                
+                const SizedBox(height: 12),
+                
+                // 클랜 vs 클랜 아이콘
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.groups,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                      child: const Text(
+                        'VS',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w900,
+                          letterSpacing: 2,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 16),
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.15),
+                        shape: BoxShape.circle,
+                      ),
+                      child: const Icon(
+                        Icons.groups,
+                        color: Colors.white,
+                        size: 24,
+                      ),
+                    ),
+                  ],
+                ),
+                
+                const Spacer(),
+                
+                // 토너먼트 상태 및 날짜
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _getStatusColor().withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Text(
+                        _getStatusText(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                    const Spacer(),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.2),
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          const Icon(
+                            Icons.schedule,
+                            color: Colors.white,
+                            size: 14,
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            DateFormat('MM월 dd일 HH:mm').format(_tournament!.startsAt.toDate()),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 참가 클랜 현황 (클랜 vs 클랜 1대1 대결)
+  Widget _buildParticipatingClans() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Container(
+              width: 4,
+              height: 24,
+              decoration: BoxDecoration(
+                color: AppColors.primary,
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+            const SizedBox(width: 12),
+            const Text(
+              '클랜 대결',
+              style: TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const Spacer(),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: const Color(0xFF4CAF50).withOpacity(0.1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                '1 vs 1',
+                style: TextStyle(
+                  color: const Color(0xFF4CAF50),
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        
+        const SizedBox(height: 20),
+        
+        // 클랜 vs 클랜 대결 구도
+        _buildClanVersusSection(),
+      ],
+    );
+  }
+
+  // 클랜 vs 클랜 대결 섹션
+  Widget _buildClanVersusSection() {
+    return Container(
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [
+            Colors.grey.shade50,
+            Colors.white,
+          ],
+        ),
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: Colors.grey.shade200),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.05),
+            blurRadius: 10,
+            offset: const Offset(0, 4),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              // 주최 클랜 (왼쪽)
+              Expanded(
+                child: _buildHostClanCard(),
+              ),
+              
+              // VS 중앙
+              Container(
+                width: 80,
+                height: 80,
+                margin: const EdgeInsets.symmetric(horizontal: 16),
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      AppColors.primary,
+                      AppColors.primary.withOpacity(0.7),
+                    ],
+                  ),
+                  boxShadow: [
+                    BoxShadow(
+                      color: AppColors.primary.withOpacity(0.3),
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                    ),
+                  ],
+                ),
+                child: const Center(
+                  child: Text(
+                    'VS',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.w900,
+                      letterSpacing: 2,
+                    ),
+                  ),
+                ),
+              ),
+              
+              // 도전 클랜 (오른쪽)
+              Expanded(
+                child: _buildChallengeClanCard(),
+              ),
+            ],
+          ),
+          
+          const SizedBox(height: 24),
+          
+          // 대결 상태 표시
+          _buildBattleStatus(),
+        ],
+      ),
+    );
+  }
+
+  // 주최 클랜 카드
+  Widget _buildHostClanCard() {
+    return FutureBuilder(
+      future: _getHostClanInfo(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return _buildClanCardSkeleton();
+        }
+        
+        final clanInfo = snapshot.data as Map<String, dynamic>?;
+        
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: AppColors.primary.withOpacity(0.3)),
+            boxShadow: [
+              BoxShadow(
+                color: AppColors.primary.withOpacity(0.1),
+                blurRadius: 8,
+                offset: const Offset(0, 2),
+              ),
+            ],
+          ),
+          child: Column(
+            children: [
+              // 클랜 엠블럼
+              Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: AppColors.primary.withOpacity(0.1),
+                  border: Border.all(
+                    color: AppColors.primary,
+                    width: 2,
+                  ),
+                ),
+                child: ClanEmblemWidget(
+                   emblemData: clanInfo?['emblem'] ?? clanInfo?['emblemUrl'],
+                   size: 52,
+                ),
+              ),
+              
+              const SizedBox(height: 12),
+              
+              // 클랜명
+              Text(
+                clanInfo?['name'] ?? '주최 클랜',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+                textAlign: TextAlign.center,
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+              ),
+              
+              const SizedBox(height: 8),
+              
+              // 주최자 배지
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                decoration: BoxDecoration(
+                  color: AppColors.primary.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(
+                  '주최',
+                  style: TextStyle(
+                    fontSize: 10,
+                    fontWeight: FontWeight.bold,
+                    color: AppColors.primary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // 도전 클랜 카드
+  Widget _buildChallengeClanCard() {
+    // TODO: 실제 참가한 클랜 정보 가져오기
+    final hasChallenger = false; // 임시
+    
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: hasChallenger ? Colors.white : Colors.grey.shade50,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: hasChallenger 
+              ? const Color(0xFFE74C3C).withOpacity(0.3)
+              : Colors.grey.shade300,
+        ),
+        boxShadow: hasChallenger ? [
+          BoxShadow(
+            color: const Color(0xFFE74C3C).withOpacity(0.1),
+            blurRadius: 8,
+            offset: const Offset(0, 2),
+          ),
+        ] : null,
+      ),
+      child: Column(
+        children: [
+          // 클랜 엠블럼 또는 빈 상태
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: hasChallenger 
+                  ? const Color(0xFFE74C3C).withOpacity(0.1)
+                  : Colors.grey.shade200,
+              border: Border.all(
+                color: hasChallenger 
+                    ? const Color(0xFFE74C3C)
+                    : Colors.grey.shade400,
+                width: hasChallenger ? 2 : 1,
+              ),
+            ),
+            child: Icon(
+              hasChallenger ? Icons.shield : Icons.help_outline,
+              color: hasChallenger 
+                  ? const Color(0xFFE74C3C)
+                  : Colors.grey.shade500,
+              size: 28,
+            ),
+          ),
+          
+          const SizedBox(height: 12),
+          
+          // 클랜명 또는 대기 메시지
+          Text(
+            hasChallenger ? '도전 클랜명' : '도전자 대기 중',
+            style: TextStyle(
+              fontSize: 14,
+              fontWeight: FontWeight.bold,
+              color: hasChallenger ? Colors.black : Colors.grey.shade600,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
+          ),
+          
+          const SizedBox(height: 8),
+          
+          // 도전자 배지 또는 대기 배지
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: hasChallenger 
+                  ? const Color(0xFFE74C3C).withOpacity(0.1)
+                  : Colors.grey.shade200,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              hasChallenger ? '도전자' : '대기',
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.bold,
+                color: hasChallenger 
+                    ? const Color(0xFFE74C3C)
+                    : Colors.grey.shade600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 대결 상태
+  Widget _buildBattleStatus() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: Colors.grey.shade200),
+      ),
+      child: Row(
+        children: [
+          Icon(
+            Icons.access_time,
+            color: Colors.orange.shade600,
+            size: 20,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text(
+                  '대결 대기 중',
+                  style: TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  '도전할 클랜을 기다리고 있습니다',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+            decoration: BoxDecoration(
+              color: Colors.orange.shade50,
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Text(
+              '모집중',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.orange.shade700,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 주최 클랜 정보 가져오기
+  Future<Map<String, dynamic>?> _getHostClanInfo() async {
+    try {
+      if (_tournament?.hostId == null) return null;
+      
+      // 주최자의 사용자 정보 직접 가져오기
+      final userDoc = await FirebaseFirestore.instance
+          .collection('users')
+          .doc(_tournament!.hostId)
+          .get();
+      
+      if (!userDoc.exists) return null;
+      
+      final userData = userDoc.data() as Map<String, dynamic>;
+      final clanId = userData['clanId'] as String?;
+      
+      if (clanId == null) return null;
+      
+      // 클랜 정보 가져오기
+      final clanDoc = await FirebaseFirestore.instance
+          .collection('clans')
+          .doc(clanId)
+          .get();
+      
+      if (clanDoc.exists) {
+        final data = clanDoc.data() as Map<String, dynamic>;
+        return {
+          'name': data['name'] ?? '클랜',
+          'emblem': data['emblem'],
+          'emblemUrl': data['emblemUrl'],
+          'memberCount': (data['members'] as List?)?.length ?? 0,
+        };
+      }
+    } catch (e) {
+      debugPrint('Error getting host clan info: $e');
+    }
+    return null;
+  }
+
+  // 클랜 카드 스켈레톤
+  Widget _buildClanCardSkeleton() {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: Colors.grey.shade100,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 56,
+            height: 56,
+            decoration: BoxDecoration(
+              shape: BoxShape.circle,
+              color: Colors.grey.shade300,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            width: 60,
+            height: 14,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+          const SizedBox(height: 8),
+          Container(
+            width: 30,
+            height: 12,
+            decoration: BoxDecoration(
+              color: Colors.grey.shade300,
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 클랜전 상세 정보
+  Widget _buildClanTournamentInfo() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  '대전 정보',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 20),
+            
+            // 정보 항목들
+            _buildInfoItem(
+              icon: Icons.emoji_events,
+              title: '경기 형식',
+              value: '5 vs 5 클랜 대전',
+              color: const Color(0xFFFF9800),
+            ),
+            
+            _buildInfoItem(
+              icon: Icons.schedule,
+              title: '경기 일시',
+              value: DateFormat('yyyy년 MM월 dd일 HH:mm').format(_tournament!.startsAt.toDate()),
+              color: const Color(0xFF2196F3),
+            ),
+            
+            _buildInfoItem(
+              icon: Icons.location_on,
+              title: '서버',
+              value: _tournament!.location,
+              color: const Color(0xFF4CAF50),
+            ),
+            
+            if (_tournament!.tournamentType == TournamentType.competitive)
+              _buildInfoItem(
+                icon: Icons.diamond,
+                title: '참가비',
+                value: '${_tournament!.creditCost ?? 20} 크레딧',
+                color: const Color(0xFF9C27B0),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // 정보 항목 위젯
+  Widget _buildInfoItem({
+    required IconData icon,
+    required String title,
+    required String value,
+    required Color color,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: Row(
+        children: [
+          Container(
+            width: 40,
+            height: 40,
+            decoration: BoxDecoration(
+              color: color.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(
+              icon,
+              color: color,
+              size: 20,
+            ),
+          ),
+          const SizedBox(width: 16),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: Colors.grey.shade600,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  value,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // 클랜전 규칙
+  Widget _buildClanTournamentRules() {
+    return Card(
+      elevation: 0,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(16),
+        side: BorderSide(color: Colors.grey.shade200),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 4,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                const Text(
+                  '대전 규칙',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+            
+            const SizedBox(height: 16),
+            
+            Text(
+              _tournament!.description!,
+              style: const TextStyle(
+                fontSize: 16,
+                height: 1.6,
+              ),
+            ),
+          ],
+        ),
+          ),
+  );
+  }
+
+  // 플로팅 액션 버튼
+  Widget? _buildFloatingActionButton() {
+    if (_tournament == null) return null;
+    
+    // 클랜전인 경우만 플로팅 액션 버튼 표시
+    if (_tournament!.gameCategory == GameCategory.clan && 
+        _tournament!.status == TournamentStatus.open &&
+        !_isUserHost()) {
+      return FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => ClanTeamApplicationScreen(
+                tournament: _tournament!,
+              ),
+            ),
+          );
+        },
+        backgroundColor: AppColors.primary,
+        foregroundColor: Colors.white,
+        elevation: 8,
+        extendedPadding: const EdgeInsets.symmetric(horizontal: 24),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(28),
+        ),
+        label: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.shield, size: 20),
+            const SizedBox(width: 8),
+            const Text(
+              '클랜 팀 신청',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                fontSize: 16,
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+    
+    return null;
+  }
+
+  // 클랜전용 버튼 위젯
+  Widget _buildClanTournamentButtons() {
+    final appState = Provider.of<AppStateProvider>(context);
+    
+    // TODO: 클랜전 팀 신청 여부 확인 로직 추가 (향후 구현)
+    // 현재는 간단하게 클랜 가입 여부만 확인
+    final hasClan = appState.myClan != null;
+    
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: const BorderRadius.only(
+          topLeft: Radius.circular(24),
+          topRight: Radius.circular(24),
+        ),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, -5),
+          ),
+        ],
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 클랜전 안내 카드
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: AppColors.primary.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(
+                color: AppColors.primary.withOpacity(0.3),
+                width: 1,
+              ),
+            ),
+            child: Row(
+              children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: AppColors.primary,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: const Icon(
+                    Icons.groups,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                const Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '클랜전 참가',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: AppColors.primary,
+                        ),
+                      ),
+                      Text(
+                        '팀 vs 팀 단위로 신청합니다',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.black87,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+          
+          if (!hasClan) ...[
+            // 클랜이 없는 경우
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.orange.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.orange.shade200,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.warning_rounded,
+                    color: Colors.orange.shade600,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  const Expanded(
+                    child: Text(
+                      '클랜전에 참가하려면 먼저 클랜에 가입해주세요',
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: () {
+                // 클랜 목록 화면으로 이동
+                context.go('/clans');
+              },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.grey.shade600,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 56),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              child: const Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.search),
+                  SizedBox(width: 8),
+                  Text(
+                    '클랜 찾아보기',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ] else ...[
+            // 클랜이 있는 경우
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Colors.green.shade50,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: Colors.green.shade200,
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                children: [
+                  Icon(
+                    Icons.check_circle,
+                    color: Colors.green.shade600,
+                    size: 20,
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Text(
+                      '${appState.myClan!.name} 클랜으로 참가',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                        color: Colors.black87,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _isLoading ? null : _showClanTeamApplicationScreen,
+              style: ElevatedButton.styleFrom(
+                backgroundColor: AppColors.primary,
+                foregroundColor: Colors.white,
+                minimumSize: const Size(double.infinity, 56),
+                disabledBackgroundColor: Colors.grey.shade300,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(16),
+                ),
+                elevation: 0,
+              ),
+              child: _isLoading 
+                  ? const SizedBox(
+                      height: 24,
+                      width: 24,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+                      ),
+                    )
+                  : const Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        Icon(Icons.group_add),
+                        SizedBox(width: 8),
+                        Text(
+                          '클랜전 팀 신청하기',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+            ),
+          ],
+        ],
+      ),
+    );
+  }
+
+  // 클랜전 팀 신청 화면 표시
+  Future<void> _showClanTeamApplicationScreen() async {
+    if (_tournament == null) return;
+    
+    final result = await Navigator.of(context).push<bool>(
+      MaterialPageRoute(
+        builder: (context) => ClanTeamApplicationScreen(
+          tournament: _tournament!,
+        ),
+      ),
+    );
+    
+    if (result == true) {
+      // 신청 완료 후 토너먼트 정보 새로고침
+      _loadTournamentDetails();
+    }
   }
 } 

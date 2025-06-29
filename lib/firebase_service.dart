@@ -159,25 +159,7 @@ class FirebaseService {
     }
   }
   
-  // Mercenary methods
-  Future<String> createMercenary(MercenaryModel mercenary) async {
-    try {
-      DocumentReference docRef = await _firestore.collection('mercenaries').add(mercenary.toFirestore());
-      return docRef.id;
-    } catch (e) {
-      debugPrint('Error creating mercenary: $e');
-      throw e;
-    }
-  }
-  
-  Future<void> updateMercenary(MercenaryModel mercenary) async {
-    try {
-      await _firestore.collection('mercenaries').doc(mercenary.id).update(mercenary.toFirestore());
-    } catch (e) {
-      debugPrint('Error updating mercenary: $e');
-      throw e;
-    }
-  }
+  // 용병 관련 메서드들을 제거했습니다 (듀오 찾기 기능만 유지)
   
   // Rating methods
   Future<void> addRating(RatingModel rating) async {

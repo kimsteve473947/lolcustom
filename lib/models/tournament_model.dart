@@ -33,6 +33,13 @@ enum TournamentType {
   competitive,  // 경쟁전 (크레딧 사용)
 }
 
+// 게임 카테고리 정의 - 개인전/클랜전/대학리그전 구분
+enum GameCategory {
+  individual,   // 개인전
+  clan,        // 클랜전
+  university,  // 대학리그전
+}
+
 class TournamentModel extends Equatable {
   final String id;
   final String title;
@@ -44,6 +51,7 @@ class TournamentModel extends Equatable {
   final Timestamp startsAt;
   final String location; // 게임 서버 지역 정보로 사용
   final TournamentType tournamentType; // 토너먼트 타입 (일반전/경쟁전)
+  final GameCategory gameCategory; // 게임 카테고리 (개인전/클랜전/대학리그전)
   final int? creditCost; // 경쟁전 참가 시 필요한 크레딧 (경쟁전인 경우에만 사용)
   final int? ovrLimit; // 기존 제한 필드 (하위 호환성 유지)
   final PlayerTier? tierLimit; // 추가: 티어 제한
@@ -120,6 +128,7 @@ class TournamentModel extends Equatable {
     required this.startsAt,
     required this.location,
     required this.tournamentType,
+    required this.gameCategory,
     this.creditCost,
     this.ovrLimit,
     this.tierLimit,
@@ -179,6 +188,7 @@ class TournamentModel extends Equatable {
     List<String> referees = const [],
     bool isRefereed = false,
     String? hostPosition,
+    required GameCategory gameCategory,
   }) {
     // 리그 오브 레전드 내전을 위한 기본 슬롯 - 각 라인 2명씩
     final defaultSlotsByRole = <String, int>{
@@ -216,6 +226,7 @@ class TournamentModel extends Equatable {
       startsAt: startsAt,
       location: location,
       tournamentType: tournamentType,
+      gameCategory: gameCategory,
       creditCost: creditCost,
       ovrLimit: ovrLimit,
       tierLimit: tierLimit,
@@ -419,6 +430,20 @@ class TournamentModel extends Equatable {
       tournamentType = TournamentType.casual;
     }
 
+    // GameCategory 파싱
+    GameCategory gameCategory;
+    if (data.containsKey('gameCategory')) {
+      final categoryIndex = _dynamicToInt(data['gameCategory'], defaultValue: GameCategory.individual.index);
+      if (categoryIndex >= 0 && categoryIndex < GameCategory.values.length) {
+        gameCategory = GameCategory.values[categoryIndex];
+      } else {
+        gameCategory = GameCategory.individual;
+      }
+    } else {
+      // 기본값: 개인전으로 설정 (하위 호환성)
+      gameCategory = GameCategory.individual;
+    }
+
     // 참가비를 크레딧으로 변환
     int? creditCost;
     if (tournamentType == TournamentType.competitive) {
@@ -536,6 +561,7 @@ class TournamentModel extends Equatable {
       referees: referees,
       isRefereed: isRefereed,
       hostPosition: data['hostPosition'],
+      gameCategory: GameCategory.values[data['gameCategory'] ?? 0],
     );
   }
   
@@ -576,6 +602,7 @@ class TournamentModel extends Equatable {
       'gameFormat': gameFormat.index,
       'gameServer': gameServer.index,
       'premiumBadge': premiumBadge,
+      'gameCategory': gameCategory.index,
     };
     
     // 선택적 필드 추가 (null이 아닌 경우만)
@@ -629,6 +656,7 @@ class TournamentModel extends Equatable {
     List<String>? referees,
     bool? isRefereed,
     String? hostPosition,
+    GameCategory? gameCategory,
   }) {
     return TournamentModel(
       id: id,
@@ -665,6 +693,7 @@ class TournamentModel extends Equatable {
       referees: referees ?? this.referees,
       isRefereed: isRefereed ?? this.isRefereed,
       hostPosition: hostPosition ?? this._hostPosition,
+      gameCategory: gameCategory ?? this.gameCategory,
     );
   }
   
@@ -738,6 +767,6 @@ class TournamentModel extends Equatable {
     status, createdAt, updatedAt, slots, filledSlots, slotsByRole, filledSlotsByRole,
     participants, participantsByRole, rules, results, distance, 
     discordChannels, gameFormat, gameServer, customRoomName, customRoomPassword,
-    referees, isRefereed, _hostPosition
+    referees, isRefereed, _hostPosition, gameCategory
   ];
 } 

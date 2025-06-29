@@ -24,9 +24,13 @@ class _RankingsScreenState extends State<RankingsScreen> {
   
   // 클랜 랭킹 데이터
   List<Map<String, dynamic>> _clanRankings = [];
+
+  // 대학 랭킹 데이터
+  List<Map<String, dynamic>> _universityRankings = [];
   
   bool _isLoadingCompetitive = false;
   bool _isLoadingClan = false;
+  bool _isLoadingUniversity = false;
   
   // 시즌 정보
   String _currentSeason = '2024 시즌 1';
@@ -36,6 +40,7 @@ class _RankingsScreenState extends State<RankingsScreen> {
     super.initState();
     _loadCompetitiveRankings();
     _loadClanRankings();
+    _loadUniversityRankings();
   }
   
   Future<void> _loadCompetitiveRankings() async {
@@ -127,6 +132,40 @@ class _RankingsScreenState extends State<RankingsScreen> {
       setState(() => _isLoadingClan = false);
     }
   }
+
+  Future<void> _loadUniversityRankings() async {
+    setState(() => _isLoadingUniversity = true);
+    try {
+      // 'universities' 컬렉션에서 랭킹 데이터를 가져옵니다.
+      // 'totalPoints' 필드를 기준으로 정렬합니다.
+      final snapshot = await FirebaseFirestore.instance
+          .collection('universities')
+          .orderBy('points', descending: true)
+          .limit(50)
+          .get();
+      
+      final rankings = <Map<String, dynamic>>[];
+      
+      for (var doc in snapshot.docs) {
+        final data = doc.data();
+        rankings.add({
+          'id': doc.id,
+          'name': data['name'] ?? '알 수 없음',
+          'emblemUrl': data['emblemUrl'],
+          'totalPoints': data['points'] ?? 0,
+          'memberCount': data['memberCount'] ?? 0,
+        });
+      }
+      
+      setState(() {
+        _universityRankings = rankings;
+        _isLoadingUniversity = false;
+      });
+    } catch (e) {
+      print('Error loading university rankings: $e');
+      setState(() => _isLoadingUniversity = false);
+    }
+  }
   
   @override
   Widget build(BuildContext context) {
@@ -153,7 +192,9 @@ class _RankingsScreenState extends State<RankingsScreen> {
             Expanded(
               child: _selectedTab == 0
                   ? _buildCompetitiveRankingList()
-                  : _buildClanRankingList(),
+                  : _selectedTab == 1
+                      ? _buildClanRankingList()
+                      : _buildUniversityRankingList(),
             ),
           ],
         ),
@@ -297,97 +338,59 @@ class _RankingsScreenState extends State<RankingsScreen> {
       ),
       child: Row(
         children: [
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedTab = 0),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: _selectedTab == 0 ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: _selectedTab == 0
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(
-                      Icons.military_tech,
-                      size: 18,
-                      color: _selectedTab == 0
-                          ? AppColors.primary
-                          : const Color(0xFF999999),
-                    ),
-                    const SizedBox(width: 6),
-                    Text(
-                      '경쟁전 랭킹',
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: _selectedTab == 0
-                            ? const Color(0xFF1A1A1A)
-                            : const Color(0xFF999999),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-          Expanded(
-            child: GestureDetector(
-              onTap: () => setState(() => _selectedTab = 1),
-              child: Container(
-                padding: const EdgeInsets.symmetric(vertical: 12),
-                decoration: BoxDecoration(
-                  color: _selectedTab == 1 ? Colors.white : Colors.transparent,
-                  borderRadius: BorderRadius.circular(10),
-                  boxShadow: _selectedTab == 1
-                      ? [
-                          BoxShadow(
-                            color: Colors.black.withOpacity(0.04),
-                            blurRadius: 4,
-                            offset: const Offset(0, 2),
-                          ),
-                        ]
-                      : null,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    Icon(
-                      Icons.groups,
-                      size: 18,
-                      color: _selectedTab == 1
-                          ? AppColors.primary
-                          : const Color(0xFF999999),
-            ),
-                    const SizedBox(width: 6),
-            Text(
-                      '클랜 랭킹',
-              style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.w600,
-                        color: _selectedTab == 1
-                            ? const Color(0xFF1A1A1A)
-                            : const Color(0xFF999999),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              ),
-            ),
-          ],
-        ),
+          _buildTabItem(0, '개인', Icons.person),
+          _buildTabItem(1, '클랜', Icons.groups),
+          _buildTabItem(2, '대학', Icons.school),
+        ],
+      ),
       );
+  }
+
+  Widget _buildTabItem(int index, String title, IconData icon) {
+    return Expanded(
+      child: GestureDetector(
+        onTap: () => setState(() => _selectedTab = index),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 12),
+          decoration: BoxDecoration(
+            color: _selectedTab == index ? Colors.white : Colors.transparent,
+            borderRadius: BorderRadius.circular(10),
+            boxShadow: _selectedTab == index
+                ? [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.04),
+                      blurRadius: 4,
+                      offset: const Offset(0, 2),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              Icon(
+                icon,
+                size: 18,
+                color: _selectedTab == index
+                    ? AppColors.primary
+                    : const Color(0xFF999999),
+              ),
+              const SizedBox(width: 6),
+              Text(
+                title,
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                  color: _selectedTab == index
+                      ? const Color(0xFF1A1A1A)
+                      : const Color(0xFF999999),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
   
   Widget _buildMyRankCard(UserModel currentUser) {
@@ -402,6 +405,18 @@ class _RankingsScreenState extends State<RankingsScreen> {
           myRank = i + 1;
           myData = _competitiveRankings[i];
           break;
+        }
+      }
+    } else if (_selectedTab == 1) {
+      // 클랜 랭킹에서 내 순위 찾기
+      final myClanId = currentUser.clanId;
+      if (myClanId != null) {
+        for (int i = 0; i < _clanRankings.length; i++) {
+          if (_clanRankings[i]['id'] == myClanId) {
+            myRank = i + 1;
+            myData = _clanRankings[i];
+            break;
+          }
         }
       }
     }
@@ -665,6 +680,30 @@ class _RankingsScreenState extends State<RankingsScreen> {
       ),
     );
   }
+
+  Widget _buildUniversityRankingList() {
+    if (_isLoadingUniversity) {
+      return const Center(child: LoadingIndicator());
+    }
+    
+    if (_universityRankings.isEmpty) {
+      return _buildEmptyState('대학 랭킹 데이터가 없습니다');
+    }
+    
+    return RefreshIndicator(
+      onRefresh: _loadUniversityRankings,
+      child: ListView.builder(
+        padding: const EdgeInsets.fromLTRB(20, 8, 20, 20),
+        itemCount: _universityRankings.length,
+        itemBuilder: (context, index) {
+          final data = _universityRankings[index];
+          final rank = index + 1;
+          
+          return _buildUniversityRankItem(rank, data);
+        },
+      ),
+    );
+  }
   
   Widget _buildClanRankItem(int rank, Map<String, dynamic> data) {
     return Container(
@@ -781,6 +820,115 @@ class _RankingsScreenState extends State<RankingsScreen> {
                           const SizedBox(width: 4),
                           Text(
                             '주간 ${data['weeklyPoints']}점',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: Color(0xFF666666),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                // 포인트 정보
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.end,
+                  children: [
+                    Text(
+                      '${data['totalPoints']}',
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        color: Color(0xFF1A1A1A),
+                      ),
+                    ),
+                    const Text(
+                      '포인트',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Color(0xFF999999),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildUniversityRankItem(int rank, Map<String, dynamic> data) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.04),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          onTap: () { /* 대학 상세 페이지로 이동 (추후 구현) */ },
+          borderRadius: BorderRadius.circular(16),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Row(
+              children: [
+                _buildRankBadge(rank),
+                const SizedBox(width: 16),
+                // 대학 엠블럼
+                Container(
+                  width: 48,
+                  height: 48,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: data['emblemUrl'] != null
+                      ? ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.network(
+                            data['emblemUrl'],
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) =>
+                                const Icon(Icons.school, color: Color(0xFF999999)),
+                          ),
+                        )
+                      : const Icon(Icons.school, color: Color(0xFF999999)),
+                ),
+                const SizedBox(width: 12),
+                // 대학 정보
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        data['name'],
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF1A1A1A),
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Row(
+                        children: [
+                          const Icon(
+                            Icons.people_outline,
+                            size: 14,
+                            color: Color(0xFF666666),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            '${data['memberCount']}명',
                             style: const TextStyle(
                               fontSize: 12,
                               color: Color(0xFF666666),

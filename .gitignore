@@ -54,3 +54,10 @@ functions/.env
 # Environment variables
 functions/.env
 .env
+.DS_Store
+.flutter-plugins-dependencies
+firebase-debug.log
+firestore-debug.log
+firepit-log.txt
+*.log
+cleanup_report.md

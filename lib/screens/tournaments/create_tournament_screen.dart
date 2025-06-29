@@ -13,7 +13,12 @@ import 'package:lol_custom_game_manager/constants/lol_constants.dart';
 import 'package:lol_custom_game_manager/providers/chat_provider.dart';
 
 class CreateTournamentScreen extends StatefulWidget {
-  const CreateTournamentScreen({Key? key}) : super(key: key);
+  final String? type; // URL 쿼리 파라미터로 받은 토너먼트 유형
+  
+  const CreateTournamentScreen({
+    Key? key,
+    this.type,
+  }) : super(key: key);
 
   @override
   State<CreateTournamentScreen> createState() => _CreateTournamentScreenState();
@@ -28,6 +33,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   TimeOfDay _selectedTime = TimeOfDay.now();
   
   TournamentType _tournamentType = TournamentType.casual;
+  GameCategory _gameCategory = GameCategory.individual; // 기본값은 개인전
   
   // 리그 오브 레전드 특화 필드
   GameFormat _gameFormat = GameFormat.single;
@@ -62,6 +68,21 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
   @override
   void initState() {
     super.initState();
+    
+    // URL 파라미터에 따라 gameCategory 설정
+    switch (widget.type) {
+      case 'clan':
+        _gameCategory = GameCategory.clan;
+        break;
+      case 'university':
+        _gameCategory = GameCategory.university;
+        break;
+      case 'individual':
+      default:
+        _gameCategory = GameCategory.individual;
+        break;
+    }
+    
     // 기본 타이틀 설정 - 티어가 선택되지 않았을 때 기본값
     _updateGeneratedTitle('랜덤 멸망전');
     
@@ -537,6 +558,7 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
             : '리그 오브 레전드 내전입니다',
         gameFormat: _gameFormat,
         hostPosition: _hostPosition,
+        gameCategory: _gameCategory,
       );
 
       if (!mounted) return;
@@ -612,13 +634,11 @@ class _CreateTournamentScreenState extends State<CreateTournamentScreen> {
                   const SizedBox(height: 24),
                   _buildDateTimeSection(),
                   const SizedBox(height: 24),
-                  _buildGameFormatSection(),
-                  const SizedBox(height: 24),
                   _buildTierLimitSection(),
                   const SizedBox(height: 24),
-                  _buildHostPositionSection(),
+                  _buildGameFormatSection(),
                   const SizedBox(height: 24),
-                  _buildPriceSection(),
+                  _buildHostPositionSection(),
                   const SizedBox(height: 24),
                   _buildDescriptionSection(),
                   const SizedBox(height: 32),

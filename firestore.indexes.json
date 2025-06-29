@@ -251,6 +251,20 @@
       ]
     },
     {
+      "collectionGroup": "tournaments",
+      "queryScope": "COLLECTION",
+      "fields": [
+        {
+          "fieldPath": "hostId",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "startsAt",
+          "order": "DESCENDING"
+        }
+      ]
+    },
+    {
       "collectionGroup": "users",
       "queryScope": "COLLECTION",
       "fields": [
@@ -369,34 +383,10 @@
         {
           "fieldPath": "completedAt",
           "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "tournaments",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "hostId",
-          "order": "ASCENDING"
         },
         {
-          "fieldPath": "startsAt",
+          "fieldPath": "__name__",
           "order": "ASCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "tournaments",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "hostId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "startsAt",
-          "order": "DESCENDING"
         }
       ]
     },
@@ -461,62 +451,38 @@
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "hostId",
+          "fieldPath": "gameCategory",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "status",
+          "fieldPath": "tournamentType",
           "order": "ASCENDING"
         },
         {
-          "fieldPath": "completedAt",
+          "fieldPath": "startsAt",
+          "order": "ASCENDING"
+        },
+        {
+          "fieldPath": "__name__",
           "order": "ASCENDING"
         }
       ]
     },
     {
-      "collectionGroup": "clan_recruitment_posts",
+      "collectionGroup": "universityVerifications",
       "queryScope": "COLLECTION",
       "fields": [
         {
-          "fieldPath": "isRecruiting",
+          "fieldPath": "userId",
           "order": "ASCENDING"
         },
         {
           "fieldPath": "createdAt",
           "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "clan_recruitment_posts",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "isRecruiting",
-          "order": "ASCENDING"
         },
         {
-          "fieldPath": "teamFeatures",
-          "arrayConfig": "CONTAINS"
-        },
-        {
-          "fieldPath": "createdAt",
+          "fieldPath": "__name__",
           "order": "DESCENDING"
-        }
-      ]
-    },
-    {
-      "collectionGroup": "clan_recruitment_posts",
-      "queryScope": "COLLECTION",
-      "fields": [
-        {
-          "fieldPath": "clanId",
-          "order": "ASCENDING"
-        },
-        {
-          "fieldPath": "isRecruiting",
-          "order": "ASCENDING"
         }
       ]
     }

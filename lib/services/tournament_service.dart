@@ -110,6 +110,13 @@ class TournamentService {
 
       // 필터 적용
       if (filters != null) {
+        // 게임 카테고리 필터 (개인전/클랜전/대학리그전)
+        if (filters.containsKey('gameCategory') &&
+            filters['gameCategory'] != null) {
+          query = query.where('gameCategory',
+              isEqualTo: filters['gameCategory']);
+        }
+
         // 토너먼트 타입 필터 (일반전/경쟁전)
         if (filters.containsKey('tournamentType') &&
             filters['tournamentType'] != null) {
@@ -215,6 +222,15 @@ class TournamentService {
 
       // 추가 필터링 적용 (Firebase 쿼리로 처리할 수 없는 필터)
       if (filters != null) {
+        // 게임 카테고리 필터 (폴백 쿼리에서 처리 못한 경우)
+        if (filters.containsKey('gameCategory') &&
+            filters['gameCategory'] != null) {
+          final gameCategory = filters['gameCategory'];
+          tournaments = tournaments
+              .where((t) => t.gameCategory.index == gameCategory)
+              .toList();
+        }
+
         // 토너먼트 타입 필터 (폴백 쿼리에서 처리 못한 경우)
         if (filters.containsKey('tournamentType') &&
             filters['tournamentType'] != null) {

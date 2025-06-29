@@ -281,11 +281,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                             fontWeight: FontWeight.bold,
                           ),
                         ),
-                        // 참가자 수 - 토너먼트의 경우 총 슬롯 수를 함께 표시
+                        // 참가자 수 - 실제 참가자 수 표시
                         Text(
-                          chatRoom.type == ChatRoomType.tournamentRecruitment
-                              ? '${members.length}/${chatRoom.participantIds.length}' // TODO: Fix total slots
-                              : '${members.length}',
+                          '${members.length}명',
                           style: TextStyle(
                             fontSize: 16,
                             color: AppColors.textSecondary,
@@ -388,16 +386,46 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                                           ),
                                       ],
                                     ),
-                                    subtitle: Text(
-                                      '${_getRoleNameKorean(member['role'] ?? '')}',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Colors.grey.shade600,
-                                      ),
-                                    ),
+                                    subtitle: member['clanName'] != null
+                                        ? Text(
+                                            '${member['clanName']} 클랜',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.grey.shade600,
+                                            ),
+                                          )
+                                        : member['role'] != null
+                                            ? Text(
+                                                '${_getRoleNameKorean(member['role'])}',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey.shade600,
+                                                ),
+                                              )
+                                            : null,
                                     trailing: member['role'] != null
                                         ? _buildRoleChip(member['role'])
-                                        : null,
+                                        : member['clanName'] != null
+                                            ? Container(
+                                                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                                                decoration: BoxDecoration(
+                                                  color: AppColors.primary.withOpacity(0.1),
+                                                  borderRadius: BorderRadius.circular(12),
+                                                  border: Border.all(
+                                                    color: AppColors.primary.withOpacity(0.3),
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                child: Text(
+                                                  '클랜원',
+                                                  style: TextStyle(
+                                                    fontSize: 10,
+                                                    color: AppColors.primary,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                              )
+                                            : null,
                                   );
                                 },
                               ),
@@ -418,30 +446,52 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       
       if (chatRoom.tournamentId != null) {
         final tournamentDoc = await FirebaseFirestore.instance.collection('tournaments').doc(chatRoom.tournamentId).get();
-        if(tournamentDoc.exists) {
-          final tournament = TournamentModel.fromFirestore(tournamentDoc);
-          for (String userId in tournament.participants) {
-            final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
-            if (userDoc.exists) {
-              String? role;
+        TournamentModel? tournament;
+        
+        if (tournamentDoc.exists) {
+          tournament = TournamentModel.fromFirestore(tournamentDoc);
+        }
+        
+        // 채팅방 참가자를 기준으로 멤버 정보 구성 (클랜전 포함)
+        for (String userId in chatRoom.participantIds) {
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+          if (userDoc.exists) {
+            final userData = userDoc.data() as Map<String, dynamic>;
+            
+            // 역할 정보 찾기
+            String? role;
+            if (tournament != null) {
               for (var entry in tournament.participantsByRole.entries) {
                 if (entry.value.contains(userId)) {
                   role = entry.key;
                   break;
                 }
               }
-              final userData = userDoc.data() as Map<String, dynamic>;
-              result.add({
-                'userId': userId,
-                'nickname': userData['nickname'] ?? 'Unknown',
-                'profileImageUrl': userData['profileImageUrl'],
-                'role': role,
-                'isHost': userId == tournament.hostId,
-              });
             }
+            
+            // 클랜 정보 가져오기
+            String? clanName;
+            final userClanId = userData['clanId'] as String?;
+            if (userClanId != null) {
+              final clanDoc = await FirebaseFirestore.instance.collection('clans').doc(userClanId).get();
+              if (clanDoc.exists) {
+                final clanData = clanDoc.data() as Map<String, dynamic>;
+                clanName = clanData['name'] as String?;
+              }
+            }
+            
+            result.add({
+              'userId': userId,
+              'nickname': userData['nickname'] ?? 'Unknown',
+              'profileImageUrl': userData['profileImageUrl'],
+              'role': role,
+              'clanName': clanName,
+              'isHost': tournament != null ? userId == tournament.hostId : false,
+            });
           }
         }
       } else {
+        // 일반 채팅방인 경우
         for (String userId in chatRoom.participantIds) {
           final userDoc = await FirebaseFirestore.instance
               .collection('users')
@@ -450,10 +500,23 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           
           if (userDoc.exists) {
             final userData = userDoc.data() as Map<String, dynamic>;
+            
+            // 클랜 정보 가져오기
+            String? clanName;
+            final userClanId = userData['clanId'] as String?;
+            if (userClanId != null) {
+              final clanDoc = await FirebaseFirestore.instance.collection('clans').doc(userClanId).get();
+              if (clanDoc.exists) {
+                final clanData = clanDoc.data() as Map<String, dynamic>;
+                clanName = clanData['name'] as String?;
+              }
+            }
+            
             result.add({
               'userId': userId,
               'nickname': userData['nickname'] ?? 'Unknown',
               'profileImageUrl': userData['profileImageUrl'],
+              'clanName': clanName,
               'createdAt': Timestamp.now(),
             });
           }

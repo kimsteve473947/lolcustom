@@ -57,7 +57,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
       if (clan != null && currentUser != null) {
         final isMember = clan.members.contains(currentUser.uid);
         
-        // 멤버가 아닌 경우 공개 프로필 화면으로 리다이렉트
         if (!isMember) {
           if (mounted) {
             context.go('/clans/public/${widget.clanId}');
@@ -67,7 +66,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
         
         final isOwner = clan.ownerId == currentUser.uid;
         
-        // 가입 신청 여부 확인
         final applications = await _clanService.getUserApplications().first;
         final currentApplication = applications
             .where((app) => app.clanId == widget.clanId && app.status == ClanApplicationStatus.pending)
@@ -84,7 +82,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
           });
         }
       } else {
-        // 로그인하지 않았거나 클랜이 없는 경우 공개 프로필로 리다이렉트
         if (mounted) {
           if (clan != null) {
             context.go('/clans/public/${widget.clanId}');
@@ -133,7 +130,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
         backgroundColor: AppColors.background,
         body: Column(
           children: [
-            // 헤더 부분
             Container(
               decoration: BoxDecoration(
                 gradient: LinearGradient(
@@ -148,7 +144,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
               child: SafeArea(
                 child: Column(
                   children: [
-                    // AppBar 부분
                     Padding(
                       padding: const EdgeInsets.symmetric(horizontal: 8),
                       child: Row(
@@ -165,27 +160,16 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
                           ),
                           const Spacer(),
                           if (_isOwner)
-                            IconButton(
-                              icon: const Icon(Icons.settings, color: Colors.white),
-                              onPressed: () async {
-                                await context.push('/clans/${widget.clanId}/manage');
-                                _loadClanDetails();
-                              },
-                            ),
-                          IconButton(
-                            icon: const Icon(Icons.more_vert, color: Colors.white),
-                            onPressed: () { /* 더보기 메뉴 */ },
-                          ),
+                            _buildOwnerMenu(context),
+                          _buildMemberMenu(context),
                         ],
                       ),
                     ),
                     
-                    // 클랜 정보 부분
                     Padding(
                       padding: const EdgeInsets.fromLTRB(20, 10, 20, 30),
                       child: Column(
                         children: [
-                          // 클랜 엠블럼
                           Container(
                             width: 80,
                             height: 80,
@@ -208,7 +192,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
                           
                           const SizedBox(height: 16),
                           
-                          // 클랜 이름
                           Text(
                             _clan!.name,
                             style: const TextStyle(
@@ -224,7 +207,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
                           
                           const SizedBox(height: 12),
                           
-                          // 레벨 & 멤버 정보
                           Row(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: [
@@ -247,7 +229,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
               ),
             ),
             
-            // 탭바
             Container(
               color: Colors.white,
               child: TabBar(
@@ -271,7 +252,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
               ),
             ),
             
-            // 탭 내용
             Expanded(
               child: TabBarView(
                 controller: _tabController,
@@ -329,7 +309,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // 클랜 정보 카드
           _buildInfoCard(
             title: '클랜 정보',
             icon: Icons.info_outline_rounded,
@@ -346,7 +325,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
 
           const SizedBox(height: 16),
 
-          // 활동 정보 카드
           _buildInfoCard(
             title: '활동 정보',
             icon: Icons.schedule_rounded,
@@ -371,7 +349,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
 
           const SizedBox(height: 16),
 
-          // 클랜 성향 카드
           _buildInfoCard(
             title: '클랜 성향',
             icon: Icons.psychology_rounded,
@@ -402,7 +379,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
 
           const SizedBox(height: 16),
 
-          // 레벨 정보 카드
           _buildInfoCard(
             title: '레벨 & 경험치',
             icon: Icons.trending_up_rounded,
@@ -417,7 +393,7 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
             ],
           ),
 
-          const SizedBox(height: 100), // 하단 여백
+          const SizedBox(height: 100),
         ],
       ),
     );
@@ -428,7 +404,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
       padding: const EdgeInsets.all(16),
       child: Column(
         children: [
-          // 활동 요일 카드
           _buildInfoCard(
             title: '활동 요일',
             icon: Icons.calendar_today_rounded,
@@ -469,7 +444,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
 
           const SizedBox(height: 16),
 
-          // 활동 시간 카드
           _buildInfoCard(
             title: '활동 시간대',
             icon: Icons.access_time_rounded,
@@ -510,7 +484,6 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
 
           const SizedBox(height: 16),
 
-          // 예정된 이벤트 카드
           _buildInfoCard(
             title: '예정된 이벤트',
             icon: Icons.event_rounded,
@@ -523,7 +496,7 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
             ],
           ),
 
-          const SizedBox(height: 100), // 하단 여백
+          const SizedBox(height: 100),
         ],
       ),
     );
@@ -925,5 +898,229 @@ class _ClanDetailScreenState extends State<ClanDetailScreen> with SingleTickerPr
       case ClanFocus.balanced: return '균형';
       default: return '';
     }
+  }
+
+  Widget _buildOwnerMenu(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.settings, color: Colors.white),
+      onSelected: (value) async {
+        if (value == 'manage') {
+          await context.push('/clans/${widget.clanId}/manage');
+          _loadClanDetails();
+        } else if (value == 'transfer') {
+          _transferOwnership(context);
+        } else if (value == 'delete') {
+          _deleteClan(context);
+        }
+      },
+      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+        const PopupMenuItem<String>(
+          value: 'manage',
+          child: Text('클랜 관리'),
+        ),
+        const PopupMenuItem<String>(
+          value: 'transfer',
+          child: Text('소유자 위임'),
+        ),
+        const PopupMenuItem<String>(
+          value: 'delete',
+          child: Text('클랜 삭제'),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildMemberMenu(BuildContext context) {
+    return PopupMenuButton<String>(
+      icon: const Icon(Icons.more_vert, color: Colors.white),
+      onSelected: (value) {
+        if (value == 'leave') {
+          _leaveClan(context);
+        }
+      },
+      itemBuilder: (BuildContext context) => <PopupMenuEntry<String>>[
+        const PopupMenuItem<String>(
+          value: 'leave',
+          child: Text('클랜 탈퇴'),
+        ),
+      ],
+    );
+  }
+
+  void _leaveClan(BuildContext context) {
+    if (_isOwner) {
+      showDialog(
+        context: context,
+        builder: (BuildContext dialogContext) {
+          return AlertDialog(
+            title: const Text('클랜 탈퇴 불가'),
+            content: const Text('클랜 소유자는 [설정] 에서 [클랜 소유자 위임] 후 탈퇴할 수 있습니다.'),
+            actions: <Widget>[
+              TextButton(
+                child: const Text('확인'),
+                onPressed: () => Navigator.of(dialogContext).pop(),
+              ),
+            ],
+          );
+        },
+      );
+      return;
+    }
+
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('클랜 탈퇴'),
+          content: const Text('정말로 클랜을 탈퇴하시겠습니까?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('취소'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+            TextButton(
+              child: const Text('탈퇴'),
+              onPressed: () async {
+                try {
+                  final authProvider = Provider.of<AuthProvider>(context, listen: false);
+                  await _clanService.removeMember(widget.clanId, authProvider.user!.uid);
+                  Navigator.of(dialogContext).pop();
+                  context.go('/clans');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('클랜에서 탈퇴했습니다.')),
+                  );
+                } catch (e) {
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('클랜 탈퇴 중 오류 발생: $e')),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _deleteClan(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('클랜 삭제'),
+          content: const Text('정말로 클랜을 삭제하시겠습니까? 이 작업은 되돌릴 수 없습니다.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('취소'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+            TextButton(
+              child: const Text('삭제', style: TextStyle(color: Colors.red)),
+              onPressed: () async {
+                try {
+                  await _clanService.deleteClan(widget.clanId);
+                  Navigator.of(dialogContext).pop();
+                  context.go('/clans');
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('클랜을 삭제했습니다.')),
+                  );
+                } catch (e) {
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('클랜 삭제 중 오류 발생: $e')),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  void _transferOwnership(BuildContext context) async {
+    try {
+      final members = await _clanService.getClanMembers(widget.clanId);
+      final currentUser = Provider.of<AuthProvider>(context, listen: false).user;
+      final otherMembers = members.where((m) => m['uid'] != currentUser!.uid).toList();
+
+      if (otherMembers.isEmpty) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('위임할 다른 멤버가 없습니다.')),
+        );
+        return;
+      }
+
+      _showTransferOwnershipDialog(context, otherMembers);
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('멤버 정보를 불러오는 중 오류 발생: $e')),
+      );
+    }
+  }
+
+  void _showTransferOwnershipDialog(BuildContext context, List<Map<String, dynamic>> members) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('소유자 위임'),
+          content: SizedBox(
+            width: double.minPositive,
+            child: ListView.builder(
+              shrinkWrap: true,
+              itemCount: members.length,
+              itemBuilder: (context, index) {
+                final member = members[index];
+                return ListTile(
+                  title: Text(member['displayName']),
+                  onTap: () {
+                    Navigator.of(dialogContext).pop();
+                    _confirmTransfer(context, member['uid'], member['displayName']);
+                  },
+                );
+              },
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  void _confirmTransfer(BuildContext context, String newOwnerId, String newOwnerName) {
+    showDialog(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return AlertDialog(
+          title: const Text('소유자 위임 확인'),
+          content: Text('$newOwnerName 님에게 클랜 소유권을 위임하시겠습니까?'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('취소'),
+              onPressed: () => Navigator.of(dialogContext).pop(),
+            ),
+            TextButton(
+              child: const Text('위임'),
+              onPressed: () async {
+                try {
+                  await _clanService.transferClanOwnership(widget.clanId, newOwnerId);
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('클랜 소유권을 위임했습니다.')),
+                  );
+                  _loadClanDetails();
+                } catch (e) {
+                  Navigator.of(dialogContext).pop();
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    SnackBar(content: Text('소유권 위임 중 오류 발생: $e')),
+                  );
+                }
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 }
